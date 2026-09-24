@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveAuth
+import com.yswy.assetdashboard.csv.CsvIngest
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.drive.DriveFolderSetup
 import com.yswy.assetdashboard.drive.InboxScanner
@@ -134,17 +135,37 @@ private suspend fun setUpDrive(context: Context, accessToken: String): String {
 
         val dao = AppDatabase.get(context).ingestedFileDao()
         val scan = InboxScanner.scan(api, outcome.folders, dao)
+
         val inboxNote = buildString {
             append("inbox: 未取り込み ${scan.pending.size}件")
             if (scan.alreadyIngested.isNotEmpty()) {
                 append(" / 取り込み済みが残留 ${scan.alreadyIngested.size}件")
             }
-            scan.pending.take(3).forEach { append("\n・${it.name}") }
-            if (scan.pending.size > 3) append("\n・ほか${scan.pending.size - 3}件")
+            for (file in scan.pending) {
+                append("\n")
+                append(describe(CsvIngest.read(api, file)))
+            }
         }
 
         "接続OK: ${about.email}\n$folderNote\n$inboxNote"
     }.getOrElse { e -> "失敗: ${e.message}" }
+}
+
+/** 取り込み結果を1行にまとめる。E03でちゃんとした画面にする。 */
+private fun describe(outcome: CsvIngest.Outcome): String = when (outcome) {
+    is CsvIngest.Outcome.Parsed -> buildString {
+        val r = outcome.result
+        append("・${outcome.file.name}: ${r.adapterId} ${r.transactions.size}行")
+        if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
+        r.dateRange?.let { (from, to) -> append("\n　 $from 〜 $to") }
+        r.latestBalance?.let { append(" 残高 ${"%,d".format(it)}円") }
+    }
+
+    is CsvIngest.Outcome.UnknownFormat ->
+        "・${outcome.file.name}: 未知のフォーマット (${outcome.header.size}列)"
+
+    is CsvIngest.Outcome.Failed ->
+        "・${outcome.file.name}: ${outcome.reason}"
 }
 
 @Preview(showBackground = true)

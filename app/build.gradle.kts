@@ -36,6 +36,13 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // android.util.Log などをテストから呼んでも落とさない
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 // スキーマのjsonを出力させておく。マイグレーションを書くとき(E02)に必要になる。

@@ -118,6 +118,37 @@ class DriveApi(private val accessToken: String) {
         return files
     }
 
+    /**
+     * ファイルの中身をそのまま落とす。
+     *
+     * 文字コードがUTF-8とは限らない(銀行のCSVはShift_JISが多い)ので、
+     * ここでは文字列にせずバイト列のまま返す。判定は[com.yswy.assetdashboard.csv.CsvText]の仕事。
+     */
+    suspend fun download(fileId: String): ByteArray = withContext(Dispatchers.IO) {
+        val url = "$BASE_URL/files/$fileId".toHttpUrl().newBuilder()
+            .addQueryParameter("alt", "media")
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw DriveException(
+                        "HTTP ${response.code}: ${response.body.string().take(300)}",
+                        httpCode = response.code,
+                    )
+                }
+                response.body.bytes()
+            }
+        } catch (e: IOException) {
+            throw DriveException("ダウンロードに失敗: ${e.message}", cause = e)
+        }
+    }
+
     /** [parentId] 直下にフォルダを作り、そのIDを返す。 */
     suspend fun createFolder(name: String, parentId: String): String {
         val body = JSONObject()
