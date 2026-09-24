@@ -30,11 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveAuth
-import com.yswy.assetdashboard.csv.CsvIngest
-import com.yswy.assetdashboard.csv.ParsedData
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.drive.DriveFolderSetup
-import com.yswy.assetdashboard.drive.InboxScanner
+import com.yswy.assetdashboard.drive.InboxSync
 import kotlinx.coroutines.launch
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 
@@ -135,58 +133,19 @@ private suspend fun setUpDrive(context: Context, accessToken: String): String {
         }
 
         val dao = AppDatabase.get(context).ingestedFileDao()
-        val scan = InboxScanner.scan(api, outcome.folders, dao)
+        val report = InboxSync.run(api, outcome.folders, dao)
 
         val inboxNote = buildString {
-            append("inbox: 未取り込み ${scan.pending.size}件")
-            if (scan.alreadyIngested.isNotEmpty()) {
-                append(" / 取り込み済みが残留 ${scan.alreadyIngested.size}件")
-            }
-            for (file in scan.pending) {
-                append("\n")
-                append(describe(CsvIngest.read(api, file)))
+            append(report.summary())
+            report.entries.forEach { entry ->
+                append("\n・${entry.fileName}")
+                append("\n　 ${entry.status.label}: ${entry.detail}")
             }
         }
 
         "接続OK: ${about.email}\n$folderNote\n$inboxNote"
     }.getOrElse { e -> "失敗: ${e.message}" }
 }
-
-/** 取り込み結果を1行にまとめる。E03でちゃんとした画面にする。 */
-private fun describe(outcome: CsvIngest.Outcome): String = when (outcome) {
-    is CsvIngest.Outcome.Parsed -> buildString {
-        val r = outcome.result
-        append("・${outcome.file.name}: ${r.adapterId}")
-        // 推測で読んだことは隠さない。数字を鵜呑みにされると困る。
-        if (outcome.viaFallback) append("(推測)")
-
-        when (val data = r.data) {
-            is ParsedData.Transactions -> {
-                append(" ${data.rows.size}行")
-                if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
-                data.dateRange?.let { append("\n　 ${it.start} 〜 ${it.endInclusive}") }
-                data.latestBalance?.let { append(" 残高 ${yen(it)}") }
-            }
-
-            is ParsedData.Metrics -> {
-                append(" ${data.points.size}点")
-                if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
-                data.dateRange?.let { append("\n　 ${it.start} 〜 ${it.endInclusive}") }
-                data.keys.forEach { key ->
-                    data.latest(key)?.let { append("\n　 $key ${yen(it)}") }
-                }
-            }
-        }
-    }
-
-    is CsvIngest.Outcome.UnknownFormat ->
-        "・${outcome.file.name}: 未知のフォーマット (${outcome.header.size}列)"
-
-    is CsvIngest.Outcome.Failed ->
-        "・${outcome.file.name}: ${outcome.reason}"
-}
-
-private fun yen(value: Long): String = "%,d円".format(value)
 
 @Preview(showBackground = true)
 @Composable

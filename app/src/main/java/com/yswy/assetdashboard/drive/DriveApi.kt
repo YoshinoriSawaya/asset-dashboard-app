@@ -166,6 +166,29 @@ class DriveApi(private val accessToken: String) {
     }
 
     /**
+     * ファイルの親フォルダを付け替える(= 移動)。
+     *
+     * Driveにはファイルの「移動」APIは無く、親の追加と削除で表現する。
+     * 中身はコピーされないのでファイルIDは変わらない。
+     * つまり移動してもE01-03の取り込み済み判定は効き続ける。
+     */
+    suspend fun moveFile(fileId: String, fromParentId: String, toParentId: String) {
+        val url = "$BASE_URL/files/$fileId".toHttpUrl().newBuilder()
+            .addQueryParameter("addParents", toParentId)
+            .addQueryParameter("removeParents", fromParentId)
+            .addQueryParameter("fields", "id,parents")
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .patch("{}".toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        execute(request)
+    }
+
+    /**
      * フォルダを探し、無ければ作る。
      * 返り値はIDと、新規作成したかどうか。
      */
