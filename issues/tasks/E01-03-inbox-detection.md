@@ -84,7 +84,7 @@ DAOクエリが走って初めて作られる。
 そのままログに出す。
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-toolsdb.exe" logcat -d -s InboxScanner
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" logcat -d -s InboxScanner
 ```
 
 ```
@@ -95,7 +95,7 @@ InboxScanner: 未取り込み: id=1UD06... modified=2026-09-24T15:44:59.422Z nam
 DBを直接覗きたいときは(google_apisイメージなのでrootが取れる):
 
 ```powershell
-$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-toolsdb.exe"
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb root
 & $adb shell sqlite3 /data/data/com.yswy.assetdashboard/databases/asset-dashboard.db '"SELECT * FROM ingested_file;"'
 ```
