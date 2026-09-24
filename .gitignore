@@ -1,0 +1,24 @@
+# Gradle / Android build
+.gradle/
+build/
+local.properties
+captures/
+.cxx/
+*.apk
+*.aab
+
+# 署名鍵は絶対にコミットしない(E00-06)
+*.jks
+*.keystore
+keystore.properties
+
+# Firebase設定(E05)
+app/google-services.json
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# OS
+Thumbs.db
+.DS_Store
