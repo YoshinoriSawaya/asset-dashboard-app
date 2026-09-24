@@ -35,18 +35,11 @@ Google Driveの `inbox` に放り込むだけで取り込み、資産の推移�
 
 ## ビルドと実行
 
-`java` も `adb` もPATHに入っていない。Android Studio同梱のJDKを使う。
+このマシンでは `java` も `adb` もPATHに入っていないため、
+`./gradlew` をそのまま叩いても動かない。
 
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$proj = "E:\Engineering\asset-dashboard-app\asset-dashboard-app"
-
-& "$proj\gradlew.bat" -p $proj testDebugUnitTest   # テスト
-& "$proj\gradlew.bat" -p $proj installDebug        # ビルドして端末に入れる
-```
-
-エミュレータの起動や画面確認の手順は
-[docs/development.md](docs/development.md) にまとめてある。
+**手順は [docs/development.md](docs/development.md) にまとめてある。**
+ビルド、エミュレータの起動、画面の確認、ログの見方、DBの覗き方まで。
 
 ## 構成
 

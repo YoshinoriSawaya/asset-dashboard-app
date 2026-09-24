@@ -144,7 +144,9 @@ OAuthクライアントIDは「パッケージ名 + 署名SHA-1」に紐づく�
 SHA-1でもクライアントIDを登録する必要がある。忘れるとデバッグでは
 動くのにリリースだけ認証が通らない。
 
-詳細は [issues/tasks/E01-01-oauth-setup.md](../issues/tasks/E01-01-oauth-setup.md)。
+Console側の設定手順(どのスコープを選んだか、テストユーザーの登録など)は
+[issues/tasks/E01-01-oauth-setup.md](../issues/tasks/E01-01-oauth-setup.md)。
+ここに載せているのは「すぐ必要になる値」だけ。
 
 ## 踏んだ落とし穴
 
