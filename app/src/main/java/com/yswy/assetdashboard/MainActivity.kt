@@ -28,13 +28,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.yswy.assetdashboard.drive.DriveApi
-import com.yswy.assetdashboard.drive.DriveAuth
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.drive.DriveFolderSetup
+import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.InboxSync
-import kotlinx.coroutines.launch
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,19 +57,24 @@ class MainActivity : ComponentActivity() {
 private fun Placeholder(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf("未接続") }
+    var status by remember { mutableStateOf("未同期") }
 
-    // 同意画面から戻ってきたら、もう一度authorizeし直してトークンを取る。
+    suspend fun sync() {
+        status = when (val outcome = DriveSession.withDrive(context) { syncInbox(context, it) }) {
+            is DriveSession.Outcome.Success -> outcome.value
+            is DriveSession.Outcome.Offline ->
+                "オフライン: 同期をスキップしました\n(${outcome.message})"
+            is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
+            // 同意画面の起動は呼び出し元で扱う
+            is DriveSession.Outcome.ConsentRequired -> "同意が必要"
+        }
+    }
+
+    // 同意画面から戻ってきたら、そのまま同期をやり直す。
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) {
-        scope.launch {
-            status = when (val result = DriveAuth.authorize(context)) {
-                is DriveAuth.Result.Authorized -> setUpDrive(context, result.accessToken)
-                is DriveAuth.Result.ConsentRequired -> "同意が完了しなかった"
-                is DriveAuth.Result.Failed -> "失敗: ${result.message}"
-            }
-        }
+        scope.launch { sync() }
     }
 
     Column(
@@ -89,23 +93,27 @@ private fun Placeholder(modifier: Modifier = Modifier) {
 
         Button(
             onClick = {
-                status = "接続中..."
+                status = "同期中..."
                 scope.launch {
-                    when (val result = DriveAuth.authorize(context)) {
-                        is DriveAuth.Result.Authorized -> status = setUpDrive(context, result.accessToken)
-                        is DriveAuth.Result.ConsentRequired -> {
-                            status = "同意画面を表示中"
-                            consentLauncher.launch(
-                                IntentSenderRequest.Builder(result.pendingIntent.intentSender)
-                                    .build(),
-                            )
+                    val outcome = DriveSession.withDrive(context) { syncInbox(context, it) }
+                    if (outcome is DriveSession.Outcome.ConsentRequired) {
+                        status = "同意画面を表示中"
+                        consentLauncher.launch(
+                            IntentSenderRequest.Builder(outcome.pendingIntent.intentSender).build(),
+                        )
+                    } else {
+                        status = when (outcome) {
+                            is DriveSession.Outcome.Success -> outcome.value
+                            is DriveSession.Outcome.Offline ->
+                                "オフライン: 同期をスキップしました\n(${outcome.message})"
+                            is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
+                            else -> status
                         }
-                        is DriveAuth.Result.Failed -> status = "失敗: ${result.message}"
                     }
                 }
             },
         ) {
-            Text("Driveに接続")
+            Text("Driveと同期")
         }
 
         Text(
@@ -116,35 +124,31 @@ private fun Placeholder(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * 認可できたらアカウントを確認し、フォルダ構成を用意して、
- * inboxに未取り込みのファイルがあるかまで見る。
- * 落ちるより理由を画面に出すほうを優先する。
- */
-private suspend fun setUpDrive(context: Context, accessToken: String): String {
-    val api = DriveApi(accessToken)
-    return runCatching {
-        val about = api.about()
-        val outcome = DriveFolderSetup.ensure(api)
-        val folderNote = if (outcome.created.isEmpty()) {
-            "フォルダは作成済み"
-        } else {
-            "作成: ${outcome.created.joinToString(", ")}"
+/** フォルダを用意してinboxを一周する。 */
+private suspend fun syncInbox(
+    context: Context,
+    api: com.yswy.assetdashboard.drive.DriveApi,
+): String {
+    val about = api.about()
+    val setup = DriveFolderSetup.ensure(api)
+    val folderNote = if (setup.created.isEmpty()) {
+        "フォルダは作成済み"
+    } else {
+        "作成: ${setup.created.joinToString(", ")}"
+    }
+
+    val dao = AppDatabase.get(context).ingestedFileDao()
+    val report = InboxSync.run(api, setup.folders, dao)
+
+    val inboxNote = buildString {
+        append(report.summary())
+        report.entries.forEach { entry ->
+            append("\n・${entry.fileName}")
+            append("\n　 ${entry.status.label}: ${entry.detail}")
         }
+    }
 
-        val dao = AppDatabase.get(context).ingestedFileDao()
-        val report = InboxSync.run(api, outcome.folders, dao)
-
-        val inboxNote = buildString {
-            append(report.summary())
-            report.entries.forEach { entry ->
-                append("\n・${entry.fileName}")
-                append("\n　 ${entry.status.label}: ${entry.detail}")
-            }
-        }
-
-        "接続OK: ${about.email}\n$folderNote\n$inboxNote"
-    }.getOrElse { e -> "失敗: ${e.message}" }
+    return "接続OK: ${about.email}\n$folderNote\n$inboxNote"
 }
 
 @Preview(showBackground = true)

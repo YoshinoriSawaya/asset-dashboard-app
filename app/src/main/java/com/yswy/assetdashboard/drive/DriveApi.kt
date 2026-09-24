@@ -12,6 +12,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.concurrent.TimeUnit
 
 /**
  * Drive APIがエラーを返した、または応答を解釈できなかった。
@@ -24,7 +29,21 @@ class DriveException(
     val httpCode: Int? = null,
     cause: Throwable? = null,
 ) : Exception(message, cause) {
+
+    /** トークンが切れている。再認可すれば回復する見込みがある。 */
     val isUnauthorized: Boolean get() = httpCode == 401
+
+    /**
+     * 通信そのものができていない。
+     *
+     * 圏外・機内モード・Wi-Fi切断など。再認可しても直らないので、
+     * 同期をスキップしてキャッシュを見せるべき状況。
+     */
+    val isOffline: Boolean
+        get() = cause is UnknownHostException ||
+            cause is ConnectException ||
+            cause is SocketTimeoutException ||
+            cause is NoRouteToHostException
 }
 
 /**
@@ -355,7 +374,13 @@ class DriveApi(private val accessToken: String) {
         private val MULTIPART_RELATED = "multipart/related".toMediaType()
 
         // OkHttpClientは使い回す前提のオブジェクトなので1つだけ持つ。
-        private val client = OkHttpClient()
+        // 圏外のときに何十秒も固まらないよう、タイムアウトは短めにする
+        // (E01-13の「長時間のフリーズが発生しない」)。
+        private val client = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
 
         /**
          * Driveのクエリ文字列はシングルクォート括り。

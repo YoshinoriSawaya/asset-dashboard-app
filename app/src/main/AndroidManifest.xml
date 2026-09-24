@@ -3,6 +3,8 @@
 
     <!-- Drive APIを叩くため(E01)。 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 圏外なら同期を諦めるため(E01-13)。 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="false"

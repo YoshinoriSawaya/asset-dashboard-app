@@ -10,6 +10,14 @@ import com.yswy.assetdashboard.data.IngestedFileDao
 /**
  * inboxを一周する。読んで、記録して、processedへ移す。
  *
+ * ## inboxにあるものは必ず読む
+ * 取り込み済みの記録があっても読み直す。人がprocessedからinboxへ
+ * ファイルを戻す動機はたいてい「もう一度取り込ませたい」だから。
+ * 「inboxに放り込むだけで、あとはアプリ側が処理する」という原則に素直な形。
+ *
+ * 二重取り込みは[com.yswy.assetdashboard.csv.Deduplication]が行単位で
+ * 防ぐので、読み直しても資産額は狂わない。
+ *
  * ## 記録してから移動する(この順序は重要)
  * 逆にすると、移動に成功した直後に記録が失敗したとき
  * 「processedにあるが記録は無い」状態になる。次回のスキャンでは
@@ -28,18 +36,13 @@ object InboxSync {
         val entries = mutableListOf<Entry>()
         val skippedByFile = mutableMapOf<String, List<SkippedRow>>()
 
-        // 前回移動に失敗して残っているものを先に片付ける。
-        // 取り込み自体はもう済んでいるので、読み直さず移動だけ試す。
-        for (file in scan.alreadyIngested) {
-            entries += if (tryMove(api, folders, file)) {
-                Entry(file.name, Status.MOVE_RECOVERED, "前回の移動失敗から回復")
-            } else {
-                Entry(file.name, Status.MOVE_FAILED, "取り込み済みだが移動できない")
-            }
-        }
-
-        for (file in scan.pending) {
-            val (entry, skipped) = ingestOne(api, folders, dao, file)
+        // 記録済みのものも含めて、inboxにあるものは全部読む。
+        val alreadyIngestedIds = scan.alreadyIngested.map { it.id }.toSet()
+        for (file in scan.pending + scan.alreadyIngested) {
+            val (entry, skipped) = ingestOne(
+                api, folders, dao, file,
+                isReingest = file.id in alreadyIngestedIds,
+            )
             entries += entry
             if (skipped.isNotEmpty()) skippedByFile[file.name] = skipped
         }
@@ -59,6 +62,7 @@ object InboxSync {
         folders: AppFolders,
         dao: IngestedFileDao,
         file: DriveApi.DriveFile,
+        isReingest: Boolean,
     ): Pair<Entry, List<SkippedRow>> {
         val outcome = CsvIngest.read(api, file)
 
@@ -106,8 +110,9 @@ object InboxSync {
             if (!backedUp) append(" / backupに書けず")
         }
 
+        val okStatus = if (isReingest) Status.REINGESTED else Status.INGESTED
         val entry = if (tryMove(api, folders, file)) {
-            Entry(file.name, Status.INGESTED, detail)
+            Entry(file.name, okStatus, detail)
         } else {
             // 取り込みは済んでいる。次回この関数が移動だけリトライする。
             Entry(file.name, Status.MOVE_FAILED, "$detail / processedへ移動できない")
@@ -130,7 +135,13 @@ object InboxSync {
 
     enum class Status(val label: String) {
         INGESTED("取り込み"),
-        MOVE_RECOVERED("移動を回復"),
+
+        /**
+         * 一度取り込んだファイルをinboxで見つけたので読み直した。
+         * 人が戻したか、前回processedへ移動できなかったか。
+         */
+        REINGESTED("再取り込み"),
+
         MOVE_FAILED("移動できず"),
         FAILED("失敗"),
     }
