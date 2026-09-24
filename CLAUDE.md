@@ -49,6 +49,19 @@ Androidのホームウィジェットで「何か対応が必要か」を一目�
 - Firebase Cloud Messaging(通知)
 - ストア非公開、署名付きAPKを直接配布(個人利用のみ)
 
+## ドキュメントの置き場所
+
+| 場所 | 中身 |
+|------|------|
+| `README.md` | 何のアプリか、いまどこまで動くか、ビルド手順 |
+| `docs/architecture.md` | 仕組みと「なぜそうしたか」 |
+| `docs/development.md` | このマシンでの開発手順、踏んだ落とし穴 |
+| `issues/` | タスクごとの設計判断と検証結果 |
+
+設計判断の**理由**はissuesの各タスクファイルに書く。
+横断的に効く判断だけ `docs/architecture.md` に集約する。
+同じことを2か所に書かない。
+
 ## 進捗管理
 
 GitHub Issueは使わない。`issues/epics/`(親)と`issues/tasks/`(子)に
