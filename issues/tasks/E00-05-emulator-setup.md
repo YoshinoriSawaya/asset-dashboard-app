@@ -49,8 +49,19 @@ $bin = "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\latest\bin"
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\latest\bin\android.exe" emulator start AssetDash_API37
 ```
-`emulator start` は起動完了まで戻ってこないので、CI的に使うときは
-`adb -e shell getprop sys.boot_completed` が `1` になるのを待つ。
+ただし `android.exe emulator start` はエミュレータを**子プロセスとして起動し、
+ブート完了を報告した時点で終了する**。つまりコマンドが終わるとエミュレータも
+一緒に落ちる。スクリプトから「起動 → ビルド → 確認」を一周回す用途向け。
+
+起動しっぱなしにしたい場合は Android Studio のデバイスマネージャーか、
+CLIなら切り離して起動する。
+
+```powershell
+Start-Process "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" `
+  -ArgumentList "-avd","AssetDash_API37"
+```
+
+起動待ちは `adb -e shell getprop sys.boot_completed` が `1` になるのを見る。
 
 ハードウェアアクセラレーションは WHPX が利用可能(`emulator -accel-check` で確認)。
 

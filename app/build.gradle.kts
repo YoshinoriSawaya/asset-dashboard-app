@@ -54,6 +54,13 @@ dependencies {
     implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
 
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    // Drive連携(E01)。認証はAuthorizationClient、HTTPはOkHttpで直接叩く。
+    implementation(libs.play.services.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.okhttp)
+
     // ウィジェット(E04)で使う。E00時点では依存を通すだけ。
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
