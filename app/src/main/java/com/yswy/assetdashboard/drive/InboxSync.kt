@@ -3,6 +3,7 @@ package com.yswy.assetdashboard.drive
 import android.util.Log
 import com.yswy.assetdashboard.csv.CsvIngest
 import com.yswy.assetdashboard.csv.ParseResult
+import com.yswy.assetdashboard.csv.SkippedRow
 import com.yswy.assetdashboard.data.IngestedFile
 import com.yswy.assetdashboard.data.IngestedFileDao
 
@@ -25,6 +26,7 @@ object InboxSync {
     suspend fun run(api: DriveApi, folders: AppFolders, dao: IngestedFileDao): Report {
         val scan = InboxScanner.scan(api, folders, dao)
         val entries = mutableListOf<Entry>()
+        val skippedByFile = mutableMapOf<String, List<SkippedRow>>()
 
         // 前回移動に失敗して残っているものを先に片付ける。
         // 取り込み自体はもう済んでいるので、読み直さず移動だけ試す。
@@ -37,20 +39,27 @@ object InboxSync {
         }
 
         for (file in scan.pending) {
-            entries += ingestOne(api, folders, dao, file)
+            val (entry, skipped) = ingestOne(api, folders, dao, file)
+            entries += entry
+            if (skipped.isNotEmpty()) skippedByFile[file.name] = skipped
         }
 
         val report = Report(entries)
         Log.i(TAG, "同期完了: ${report.summary()}")
+
+        // 問題があればDriveのlogsに残す。書けなくても同期は成立している。
+        SyncLog.writeIfNeeded(api, folders, report, skippedByFile)
+
         return report
     }
 
+    /** @return 結果と、読めなかった行(ログ用) */
     private suspend fun ingestOne(
         api: DriveApi,
         folders: AppFolders,
         dao: IngestedFileDao,
         file: DriveApi.DriveFile,
-    ): Entry {
+    ): Pair<Entry, List<SkippedRow>> {
         val outcome = CsvIngest.read(api, file)
 
         val result: ParseResult = when (outcome) {
@@ -58,10 +67,10 @@ object InboxSync {
 
             // 読めなかったものはinboxに残す。直して置き直せば次回拾われる。
             is CsvIngest.Outcome.UnknownFormat ->
-                return Entry(file.name, Status.FAILED, "フォーマットを判別できない")
+                return Entry(file.name, Status.FAILED, "フォーマットを判別できない") to emptyList()
 
             is CsvIngest.Outcome.Failed ->
-                return Entry(file.name, Status.FAILED, outcome.reason)
+                return Entry(file.name, Status.FAILED, outcome.reason) to emptyList()
         }
 
         // 記録が先。ここで落ちてもファイルはinboxに残るので、次回やり直せる。
@@ -77,20 +86,33 @@ object InboxSync {
             )
         } catch (e: Exception) {
             Log.w(TAG, "記録に失敗: ${file.name}", e)
-            return Entry(file.name, Status.FAILED, "取り込み記録を保存できない: ${e.message}")
+            return Entry(file.name, Status.FAILED, "取り込み記録を保存できない: ${e.message}") to
+                result.skipped
         }
+
+        // 正規化した結果をbackupに残す。これがあればDBを失っても作り直せる。
+        val backedUp = BackupWriter.write(
+            api = api,
+            folders = folders,
+            sourceFileName = file.name,
+            sourceFileId = file.id,
+            adapterId = result.adapterId,
+            data = result.data,
+        )
 
         val detail = buildString {
             append(result.adapterId)
             if (result.skipped.isNotEmpty()) append(" / 読めない行 ${result.skipped.size}")
+            if (!backedUp) append(" / backupに書けず")
         }
 
-        return if (tryMove(api, folders, file)) {
+        val entry = if (tryMove(api, folders, file)) {
             Entry(file.name, Status.INGESTED, detail)
         } else {
             // 取り込みは済んでいる。次回この関数が移動だけリトライする。
             Entry(file.name, Status.MOVE_FAILED, "$detail / processedへ移動できない")
         }
+        return entry to result.skipped
     }
 
     private suspend fun tryMove(

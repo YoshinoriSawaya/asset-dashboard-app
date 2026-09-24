@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -166,6 +167,103 @@ class DriveApi(private val accessToken: String) {
     }
 
     /**
+     * テキストファイルを新規作成する。返り値はファイルID。
+     *
+     * メタデータと中身を1リクエストで送るmultipartを使う。
+     * Driveのアップロードは別ホスト(`/upload/drive/v3`)なので注意。
+     */
+    suspend fun uploadTextFile(
+        name: String,
+        parentId: String,
+        content: String,
+        mimeType: String = "text/plain",
+    ): String {
+        val metadata = JSONObject()
+            .put("name", name)
+            .put("mimeType", mimeType)
+            .put("parents", JSONArray().put(parentId))
+
+        val body = MultipartBody.Builder()
+            .setType(MULTIPART_RELATED)
+            .addPart(metadata.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .addPart(content.toRequestBody("$mimeType; charset=utf-8".toMediaType()))
+            .build()
+
+        val url = "$UPLOAD_URL/files".toHttpUrl().newBuilder()
+            .addQueryParameter("uploadType", "multipart")
+            .addQueryParameter("fields", "id")
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .post(body)
+            .build()
+
+        val id = execute(request).optString("id")
+        if (id.isBlank()) throw DriveException("アップロードの応答にidが無かった: $name")
+        return id
+    }
+
+    /** 既存ファイルの中身を丸ごと差し替える。 */
+    suspend fun updateTextFile(
+        fileId: String,
+        content: String,
+        mimeType: String = "text/plain",
+    ) {
+        val url = "$UPLOAD_URL/files/$fileId".toHttpUrl().newBuilder()
+            .addQueryParameter("uploadType", "media")
+            .addQueryParameter("fields", "id")
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .patch(content.toRequestBody("$mimeType; charset=utf-8".toMediaType()))
+            .build()
+
+        execute(request)
+    }
+
+    /**
+     * 同名ファイルがあれば中身を差し替え、無ければ作る。
+     *
+     * 毎回新しいファイルを作るとフォルダが同名ファイルだらけになるので、
+     * 「最新版が1つだけある」ようにしたい用途(backupなど)で使う。
+     */
+    suspend fun putTextFile(
+        name: String,
+        parentId: String,
+        content: String,
+        mimeType: String = "text/plain",
+    ): String {
+        val existing = findFile(name, parentId)
+        return if (existing != null) {
+            updateTextFile(existing, content, mimeType)
+            existing
+        } else {
+            uploadTextFile(name, parentId, content, mimeType)
+        }
+    }
+
+    /** [parentId] 直下から名前が [name] のファイルを探す。 */
+    suspend fun findFile(name: String, parentId: String): String? {
+        val query = buildString {
+            append("name = '").append(escapeForQuery(name)).append("'")
+            append(" and '").append(escapeForQuery(parentId)).append("' in parents")
+            append(" and trashed = false")
+        }
+        val url = "$BASE_URL/files".toHttpUrl().newBuilder()
+            .addQueryParameter("q", query)
+            .addQueryParameter("fields", "files(id)")
+            .addQueryParameter("pageSize", "1")
+            .build()
+
+        val files = get(url).optJSONArray("files") ?: JSONArray()
+        return files.optJSONObject(0)?.optString("id")?.takeIf { it.isNotBlank() }
+    }
+
+    /**
      * ファイルの親フォルダを付け替える(= 移動)。
      *
      * Driveにはファイルの「移動」APIは無く、親の追加と削除で表現する。
@@ -248,9 +346,13 @@ class DriveApi(private val accessToken: String) {
 
     companion object {
         private const val BASE_URL = "https://www.googleapis.com/drive/v3"
+
+        // アップロードだけエンドポイントが別
+        private const val UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3"
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private val MULTIPART_RELATED = "multipart/related".toMediaType()
 
         // OkHttpClientは使い回す前提のオブジェクトなので1つだけ持つ。
         private val client = OkHttpClient()

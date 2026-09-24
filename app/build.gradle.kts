@@ -85,4 +85,7 @@ dependencies {
     implementation(libs.androidx.glance.material3)
 
     testImplementation(libs.junit)
+    // android.jarのorg.jsonはスタブで、putがnullを返す。
+    // テストでは本物の実装を使う。
+    testImplementation(libs.org.json)
 }
