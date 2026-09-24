@@ -1,0 +1,16 @@
+# 既定はGitに任せる(Windows側ではCRLFでチェックアウトされる)
+* text=auto
+
+# シェルスクリプトは必ずLF。CRLFになるとWSL/macOSで
+# `bad interpreter: /bin/sh^M` になって ./gradlew が動かなくなる。
+gradlew        text eol=lf
+*.sh           text eol=lf
+
+# Windows専用のバッチはCRLF
+*.bat          text eol=crlf
+
+# バイナリ(改行変換をかけない)
+*.jar          binary
+*.png          binary
+*.jks          binary
+*.keystore     binary
