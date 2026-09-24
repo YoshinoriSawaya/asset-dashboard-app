@@ -29,8 +29,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveAuth
-import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
+import com.yswy.assetdashboard.drive.DriveFolderSetup
 import kotlinx.coroutines.launch
+import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +49,7 @@ class MainActivity : ComponentActivity() {
 
 /**
  * E03でダッシュボード本体に置き換わる暫定画面。
- * 今はDrive認証(E01-01)の疎通確認だけができる。
+ * 今はDrive連携(E01)の疎通確認だけができる。
  */
 @Composable
 private fun Placeholder(modifier: Modifier = Modifier) {
@@ -62,7 +63,7 @@ private fun Placeholder(modifier: Modifier = Modifier) {
     ) {
         scope.launch {
             status = when (val result = DriveAuth.authorize(context)) {
-                is DriveAuth.Result.Authorized -> verify(result.accessToken)
+                is DriveAuth.Result.Authorized -> setUpDrive(result.accessToken)
                 is DriveAuth.Result.ConsentRequired -> "同意が完了しなかった"
                 is DriveAuth.Result.Failed -> "失敗: ${result.message}"
             }
@@ -88,7 +89,7 @@ private fun Placeholder(modifier: Modifier = Modifier) {
                 status = "接続中..."
                 scope.launch {
                     when (val result = DriveAuth.authorize(context)) {
-                        is DriveAuth.Result.Authorized -> status = verify(result.accessToken)
+                        is DriveAuth.Result.Authorized -> status = setUpDrive(result.accessToken)
                         is DriveAuth.Result.ConsentRequired -> {
                             status = "同意画面を表示中"
                             consentLauncher.launch(
@@ -112,12 +113,23 @@ private fun Placeholder(modifier: Modifier = Modifier) {
     }
 }
 
-/** トークンが実際にDrive APIで通るかまで確かめる。 */
-private suspend fun verify(accessToken: String): String =
-    when (val about = DriveApi(accessToken).about()) {
-        is DriveApi.AboutResult.Success -> "接続OK: ${about.email}"
-        is DriveApi.AboutResult.Failed -> "トークンは取れたがAPIで失敗: ${about.message}"
-    }
+/**
+ * 認可できたらアカウントを確認し、続けてフォルダ構成を用意する。
+ * 落ちるより理由を画面に出すほうを優先する。
+ */
+private suspend fun setUpDrive(accessToken: String): String {
+    val api = DriveApi(accessToken)
+    return runCatching {
+        val about = api.about()
+        val outcome = DriveFolderSetup.ensure(api)
+        val folderNote = if (outcome.created.isEmpty()) {
+            "フォルダは作成済み"
+        } else {
+            "作成: ${outcome.created.joinToString(", ")}"
+        }
+        "接続OK: ${about.email}\n$folderNote"
+    }.getOrElse { e -> "失敗: ${e.message}" }
+}
 
 @Preview(showBackground = true)
 @Composable
