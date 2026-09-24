@@ -40,15 +40,23 @@ object CsvIngest {
         }
 
         val result = adapter.parse(header, dataRows)
+
+        val summary = when (val data = result.data) {
+            is ParsedData.Transactions -> "取引${data.rows.size}行"
+            is ParsedData.Metrics -> "Metric${data.points.size}点 (${data.keys.joinToString("/")})"
+        }
         Log.i(
             TAG,
             "${file.name}: ${adapter.id} charset=${decoded.charsetName} " +
-                "行=${result.transactions.size} 読めず=${result.skipped.size}",
+                "$summary 読めず=${result.skipped.size}",
         )
+
         // 入出金の判定に使っている取引名が想定どおりかを確かめる手がかり。
         // 列の区分値なので個人情報は入らない。
-        val labels = result.transactions.mapNotNull { it.label }.distinct()
-        if (labels.isNotEmpty()) Log.i(TAG, "  取引名の種類: ${labels.joinToString(" / ")}")
+        (result.data as? ParsedData.Transactions)?.let { data ->
+            val labels = data.rows.mapNotNull { it.label }.distinct()
+            if (labels.isNotEmpty()) Log.i(TAG, "  取引名の種類: ${labels.joinToString(" / ")}")
+        }
 
         result.skipped.take(5).forEach {
             // 行の中身には口座番号や氏名が入る。デバッグビルドでだけ出す。

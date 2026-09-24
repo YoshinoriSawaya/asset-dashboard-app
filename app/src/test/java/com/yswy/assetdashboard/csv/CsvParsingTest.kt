@@ -56,12 +56,12 @@ class CsvParsingTest {
         val adapter = CsvAdapters.findFor(rows.first())
         assertEquals(WithdrawalDepositAdapter, adapter)
 
-        val result = adapter!!.parse(rows.first(), rows.drop(1))
-        assertEquals(2, result.transactions.size)
-        assertEquals(300000L, result.transactions[0].deposit)
-        assertNull(result.transactions[0].withdrawal)
-        assertEquals(80000L, result.transactions[1].withdrawal)
-        assertEquals(420000L, result.latestBalance)
+        val data = adapter!!.parse(rows.first(), rows.drop(1)).data as ParsedData.Transactions
+        assertEquals(2, data.rows.size)
+        assertEquals(300000L, data.rows[0].deposit)
+        assertNull(data.rows[0].withdrawal)
+        assertEquals(80000L, data.rows[1].withdrawal)
+        assertEquals(420000L, data.latestBalance)
     }
 
     @Test
@@ -74,7 +74,7 @@ class CsvParsingTest {
         val rows = CsvText.splitRows(csv)
         val result = WithdrawalDepositAdapter.parse(rows.first(), rows.drop(1))
 
-        assertEquals(1, result.transactions.size)
+        assertEquals(1, (result.data as ParsedData.Transactions).rows.size)
         assertEquals(1, result.skipped.size)
         assertTrue(result.skipped.first().reason.contains("日付"))
     }
@@ -90,15 +90,15 @@ class CsvParsingTest {
         val adapter = CsvAdapters.findFor(rows.first())
         assertEquals(AnserAdapter, adapter)
 
-        val result = adapter!!.parse(rows.first(), rows.drop(1))
-        assertEquals(2, result.transactions.size)
+        val data = adapter!!.parse(rows.first(), rows.drop(1)).data as ParsedData.Transactions
+        assertEquals(2, data.rows.size)
 
-        val deposit = result.transactions[0]
+        val deposit = data.rows[0]
         assertEquals(java.time.LocalDate.of(2026, 9, 24), deposit.date)
         assertEquals(50000L, deposit.deposit)
         assertNull(deposit.withdrawal)
 
-        val withdrawal = result.transactions[1]
+        val withdrawal = data.rows[1]
         assertEquals(1200L, withdrawal.withdrawal)
         assertNull(withdrawal.deposit)
     }
@@ -113,7 +113,7 @@ class CsvParsingTest {
         val rows = CsvText.splitRows(csv)
         val result = AnserAdapter.parse(rows.first(), rows.drop(1))
 
-        assertEquals(1, result.transactions.size)
+        assertEquals(1, (result.data as ParsedData.Transactions).rows.size)
         assertEquals(1, result.skipped.size)
     }
 
@@ -131,9 +131,61 @@ class CsvParsingTest {
     }
 
     @Test
-    fun `未知のヘッダーはアダプターに当たらない`() {
-        val header = listOf("日付", "合計（円）", "預金・現金（円）", "投資信託（円）", "年金（円）")
-        assertNull(CsvAdapters.findFor(header))
+    fun `資産推移はMetricとして読める`() {
+        val csv = """
+            日付,合計（円）,預金・現金（円）,投資信託（円）,年金（円）
+            2026/8/1,1000000,600000,300000,100000
+            2026/9/1,1100000,650000,350000,100000
+        """.trimIndent()
+        val rows = CsvText.splitRows(csv)
+        val adapter = CsvAdapters.findFor(rows.first())
+        assertEquals(AssetTrendAdapter, adapter)
+
+        val data = adapter!!.parse(rows.first(), rows.drop(1)).data as ParsedData.Metrics
+        assertEquals(8, data.points.size)
+        assertEquals(listOf("合計", "預金・現金", "投資信託", "年金"), data.keys)
+        assertEquals(350000L, data.latest("投資信託"))
+        assertEquals(1100000L, data.latest("合計"))
+    }
+
+    @Test
+    fun `資産推移は列が増えたらMetricが増える`() {
+        val csv = """
+            日付,合計（円）,暗号資産（円）
+            2026/9/1,1100000,50000
+        """.trimIndent()
+        val rows = CsvText.splitRows(csv)
+        val data = AssetTrendAdapter.parse(rows.first(), rows.drop(1)).data as ParsedData.Metrics
+
+        // コードを変えずに新しいMetricが1種類増える
+        assertEquals(listOf("合計", "暗号資産"), data.keys)
+        assertEquals(50000L, data.latest("暗号資産"))
+    }
+
+    @Test
+    fun `資産推移は一部の列が空でも行ごと捨てない`() {
+        val csv = """
+            日付,合計（円）,年金（円）
+            2026/9/1,1100000,
+        """.trimIndent()
+        val rows = CsvText.splitRows(csv)
+        val result = AssetTrendAdapter.parse(rows.first(), rows.drop(1))
+        val data = result.data as ParsedData.Metrics
+
+        assertEquals(1, data.points.size)
+        assertEquals(listOf("合計"), data.keys)
+        assertTrue(result.skipped.isEmpty())
+    }
+
+    @Test
+    fun `銀行の明細は資産推移アダプターに当たらない`() {
+        val header = listOf("年月日", "お引出し", "お預入れ", "お取り扱い内容", "残高", "メモ", "ラベル")
+        assertEquals(WithdrawalDepositAdapter, CsvAdapters.findFor(header))
+    }
+
+    @Test
+    fun `本当に未知のヘッダーはアダプターに当たらない`() {
+        assertNull(CsvAdapters.findFor(listOf("なにか", "ほかのなにか")))
     }
 
     @Test

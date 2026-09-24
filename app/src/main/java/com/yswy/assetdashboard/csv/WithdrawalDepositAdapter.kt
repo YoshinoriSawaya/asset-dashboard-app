@@ -69,7 +69,7 @@ object WithdrawalDepositAdapter : CsvAdapter {
             )
         }
 
-        return ParseResult(id, transactions, skipped)
+        return ParseResult(id, ParsedData.Transactions(transactions), skipped)
     }
 }
 

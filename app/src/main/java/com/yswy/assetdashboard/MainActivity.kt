@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveAuth
 import com.yswy.assetdashboard.csv.CsvIngest
+import com.yswy.assetdashboard.csv.ParsedData
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.drive.DriveFolderSetup
 import com.yswy.assetdashboard.drive.InboxScanner
@@ -155,10 +156,25 @@ private suspend fun setUpDrive(context: Context, accessToken: String): String {
 private fun describe(outcome: CsvIngest.Outcome): String = when (outcome) {
     is CsvIngest.Outcome.Parsed -> buildString {
         val r = outcome.result
-        append("・${outcome.file.name}: ${r.adapterId} ${r.transactions.size}行")
-        if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
-        r.dateRange?.let { (from, to) -> append("\n　 $from 〜 $to") }
-        r.latestBalance?.let { append(" 残高 ${"%,d".format(it)}円") }
+        append("・${outcome.file.name}: ${r.adapterId}")
+
+        when (val data = r.data) {
+            is ParsedData.Transactions -> {
+                append(" ${data.rows.size}行")
+                if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
+                data.dateRange?.let { append("\n　 ${it.start} 〜 ${it.endInclusive}") }
+                data.latestBalance?.let { append(" 残高 ${yen(it)}") }
+            }
+
+            is ParsedData.Metrics -> {
+                append(" ${data.points.size}点")
+                if (r.skipped.isNotEmpty()) append(" (読めず${r.skipped.size}行)")
+                data.dateRange?.let { append("\n　 ${it.start} 〜 ${it.endInclusive}") }
+                data.keys.forEach { key ->
+                    data.latest(key)?.let { append("\n　 $key ${yen(it)}") }
+                }
+            }
+        }
     }
 
     is CsvIngest.Outcome.UnknownFormat ->
@@ -167,6 +183,8 @@ private fun describe(outcome: CsvIngest.Outcome): String = when (outcome) {
     is CsvIngest.Outcome.Failed ->
         "・${outcome.file.name}: ${outcome.reason}"
 }
+
+private fun yen(value: Long): String = "%,d円".format(value)
 
 @Preview(showBackground = true)
 @Composable

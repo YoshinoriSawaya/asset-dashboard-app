@@ -92,7 +92,7 @@ object AnserAdapter : CsvAdapter {
 
         // 取引名は BankTransaction.label に入れてあるので、
         // 判定の当たり外れの確認(どんな取引名が来たか)は呼び出し側でできる。
-        return ParseResult(id, transactions, skipped)
+        return ParseResult(id, ParsedData.Transactions(transactions), skipped)
     }
 
     /**
