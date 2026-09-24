@@ -157,6 +157,8 @@ private fun describe(outcome: CsvIngest.Outcome): String = when (outcome) {
     is CsvIngest.Outcome.Parsed -> buildString {
         val r = outcome.result
         append("・${outcome.file.name}: ${r.adapterId}")
+        // 推測で読んだことは隠さない。数字を鵜呑みにされると困る。
+        if (outcome.viaFallback) append("(推測)")
 
         when (val data = r.data) {
             is ParsedData.Transactions -> {

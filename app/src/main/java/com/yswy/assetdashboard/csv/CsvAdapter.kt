@@ -57,9 +57,18 @@ sealed interface ParsedData {
         val keys: List<String> get() = points.map { it.metricKey }.distinct()
         val dateRange: ClosedRange<LocalDate>? get() = points.map { it.date }.toRange()
 
-        /** [key] の最新値。 */
-        fun latest(key: String): Long? =
-            points.filter { it.metricKey == key }.maxByOrNull { it.date }?.valueYen
+        /**
+         * [key] の最新値。
+         *
+         * 同じ日付の点が複数あるときは**後の行を採る**。CSVは古い順に
+         * 並んでいるのが普通なので、同日なら後ろのほうが新しい。
+         * (maxByOrNullは同着だと最初の要素を返すので、それだと古い値が残る)
+         */
+        fun latest(key: String): Long? {
+            val ofKey = points.filter { it.metricKey == key }
+            val latestDate = ofKey.maxOfOrNull { it.date } ?: return null
+            return ofKey.last { it.date == latestDate }.valueYen
+        }
     }
 }
 
