@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.drive
 
+import android.util.Log
 import com.yswy.assetdashboard.data.IngestedFileDao
 
 /**
@@ -27,8 +28,16 @@ object InboxScanner {
             }
         }
 
+        // 「置いたのに拾われない」を後から追えるようにしておく。
+        // 判定に使った値をそのまま出すのが目的なのでmodifiedTimeまで出す。
+        Log.i(TAG, "inbox=${files.size}件 未取り込み=${pending.size}件 残留=${alreadyIngested.size}件")
+        pending.forEach { Log.i(TAG, "未取り込み: id=${it.id} modified=${it.modifiedTime} name=${it.name}") }
+        alreadyIngested.forEach { Log.i(TAG, "取り込み済み残留: id=${it.id} name=${it.name}") }
+
         return Result(pending = pending, alreadyIngested = alreadyIngested)
     }
+
+    private const val TAG = "InboxScanner"
 
     /**
      * @param pending これから取り込むファイル

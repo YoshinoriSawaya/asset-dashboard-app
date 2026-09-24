@@ -58,9 +58,47 @@ Driveの一覧APIはページングする。inboxに何百件も溜まる想定�
   E01-07のprocessedへの移動が失敗した形跡を表す。
 
 ## 検証結果 (2026-09-25)
-- inboxが空の状態: `inbox: 未取り込み 0件` を表示。クラッシュなし。
-  このときRoomのDBファイルはまだ作られない(DAOクエリが一度も走らないため)。
-- 実ファイルを置いた場合の検知: 下記「実ファイルでの確認」参照。
+inboxに実ファイル `資産推移月次 (10).csv` を置いて、判定の3分岐すべてを確認した。
+スペース・括弧・日本語を含む名前なので、クエリのエスケープの確認にもなった。
+
+| # | 状況 | 期待 | 結果 |
+|---|------|------|------|
+| 0 | inboxが空 | 0件 | `未取り込み 0件` |
+| 1 | 記録に無いid | 未取り込み | `未取り込み 1件` + ファイル名表示 |
+| 2 | 記録あり・modifiedTime一致 | 取り込み済み | `未取り込み 0件 / 取り込み済みが残留 1件` |
+| 3 | 記録あり・modifiedTime不一致 | 未取り込み | `未取り込み 1件` |
+
+2と3は、`adb root` + `sqlite3` でDBに直接レコードを入れて確認した。
+3は記録側のmodifiedTimeを古い値に書き換えることで「Drive上で上書き
+更新された」状況を作っている。つまり**比較ロジックが正しいことは
+確認できたが、Driveが実際に上書き時にmodifiedTimeを更新するかは
+この方法では確認していない**(Drive APIの仕様上は更新される)。
+
+確認に使ったレコードは削除済み。
+
+inboxが空のときRoomのDBファイルは作られない。ファイルが1件でもあると
+DAOクエリが走って初めて作られる。
+
+### デバッグの足がかり
+「置いたのに拾われない」を追えるよう、`InboxScanner` が判定に使った値を
+そのままログに出す。
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\platform-toolsdb.exe" logcat -d -s InboxScanner
+```
+
+```
+InboxScanner: inbox=1件 未取り込み=1件 残留=0件
+InboxScanner: 未取り込み: id=1UD06... modified=2026-09-24T15:44:59.422Z name=資産推移月次 (10).csv
+```
+
+DBを直接覗きたいときは(google_apisイメージなのでrootが取れる):
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-toolsdb.exe"
+& $adb root
+& $adb shell sqlite3 /data/data/com.yswy.assetdashboard/databases/asset-dashboard.db '"SELECT * FROM ingested_file;"'
+```
 
 ## ステータス
-進行中(実ファイルでの検知確認が残っている)
+完了 (2026-09-25)
