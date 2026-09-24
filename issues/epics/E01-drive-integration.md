@@ -6,7 +6,7 @@ inboxフォルダに置かれたCSVを検知・取得し、パースしてロー
 の土台になるエピック。
 
 ## 子イシュー
-- [ ] E01-01: Google Cloud Console設定・OAuth認証
+- [x] E01-01: Google Cloud Console設定・OAuth認証
 - [ ] E01-02: Driveフォルダ構成の作成(inbox/processed/backup/corrections/logs)
 - [ ] E01-03: inboxファイル一覧取得・新規判定ロジック
 - [ ] E01-04: 既知ヘッダー判定パーサー(銀行ごとのアダプター)
