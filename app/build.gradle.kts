@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -36,6 +38,11 @@ android {
     }
 }
 
+// スキーマのjsonを出力させておく。マイグレーションを書くとき(E02)に必要になる。
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -60,6 +67,11 @@ dependencies {
     implementation(libs.play.services.auth)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.okhttp)
+
+    // ローカルキャッシュ(E01-03で取り込み済みファイルの記録から使い始める)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // ウィジェット(E04)で使う。E00時点では依存を通すだけ。
     implementation(libs.androidx.glance.appwidget)

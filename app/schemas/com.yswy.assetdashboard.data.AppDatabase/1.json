@@ -1,0 +1,54 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "be5af8acc94afd448f7db75d48650063",
+    "entities": [
+      {
+        "tableName": "ingested_file",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`driveFileId` TEXT NOT NULL, `name` TEXT NOT NULL, `modifiedTime` TEXT NOT NULL, `md5Checksum` TEXT, `ingestedAt` INTEGER NOT NULL, PRIMARY KEY(`driveFileId`))",
+        "fields": [
+          {
+            "fieldPath": "driveFileId",
+            "columnName": "driveFileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modifiedTime",
+            "columnName": "modifiedTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "md5Checksum",
+            "columnName": "md5Checksum",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ingestedAt",
+            "columnName": "ingestedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "driveFileId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'be5af8acc94afd448f7db75d48650063')"
+    ]
+  }
+}

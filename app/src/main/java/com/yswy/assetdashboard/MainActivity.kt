@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveAuth
+import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.drive.DriveFolderSetup
+import com.yswy.assetdashboard.drive.InboxScanner
 import kotlinx.coroutines.launch
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 
@@ -63,7 +66,7 @@ private fun Placeholder(modifier: Modifier = Modifier) {
     ) {
         scope.launch {
             status = when (val result = DriveAuth.authorize(context)) {
-                is DriveAuth.Result.Authorized -> setUpDrive(result.accessToken)
+                is DriveAuth.Result.Authorized -> setUpDrive(context, result.accessToken)
                 is DriveAuth.Result.ConsentRequired -> "同意が完了しなかった"
                 is DriveAuth.Result.Failed -> "失敗: ${result.message}"
             }
@@ -89,7 +92,7 @@ private fun Placeholder(modifier: Modifier = Modifier) {
                 status = "接続中..."
                 scope.launch {
                     when (val result = DriveAuth.authorize(context)) {
-                        is DriveAuth.Result.Authorized -> status = setUpDrive(result.accessToken)
+                        is DriveAuth.Result.Authorized -> status = setUpDrive(context, result.accessToken)
                         is DriveAuth.Result.ConsentRequired -> {
                             status = "同意画面を表示中"
                             consentLauncher.launch(
@@ -114,10 +117,11 @@ private fun Placeholder(modifier: Modifier = Modifier) {
 }
 
 /**
- * 認可できたらアカウントを確認し、続けてフォルダ構成を用意する。
+ * 認可できたらアカウントを確認し、フォルダ構成を用意して、
+ * inboxに未取り込みのファイルがあるかまで見る。
  * 落ちるより理由を画面に出すほうを優先する。
  */
-private suspend fun setUpDrive(accessToken: String): String {
+private suspend fun setUpDrive(context: Context, accessToken: String): String {
     val api = DriveApi(accessToken)
     return runCatching {
         val about = api.about()
@@ -127,7 +131,19 @@ private suspend fun setUpDrive(accessToken: String): String {
         } else {
             "作成: ${outcome.created.joinToString(", ")}"
         }
-        "接続OK: ${about.email}\n$folderNote"
+
+        val dao = AppDatabase.get(context).ingestedFileDao()
+        val scan = InboxScanner.scan(api, outcome.folders, dao)
+        val inboxNote = buildString {
+            append("inbox: 未取り込み ${scan.pending.size}件")
+            if (scan.alreadyIngested.isNotEmpty()) {
+                append(" / 取り込み済みが残留 ${scan.alreadyIngested.size}件")
+            }
+            scan.pending.take(3).forEach { append("\n・${it.name}") }
+            if (scan.pending.size > 3) append("\n・ほか${scan.pending.size - 3}件")
+        }
+
+        "接続OK: ${about.email}\n$folderNote\n$inboxNote"
     }.getOrElse { e -> "失敗: ${e.message}" }
 }
 

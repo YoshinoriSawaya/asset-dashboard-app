@@ -70,6 +70,54 @@ class DriveApi(private val accessToken: String) {
         return files.optJSONObject(0)?.optString("id")?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * [parentId] 直下のファイル(フォルダ以外)を全件返す。
+     *
+     * Driveの一覧APIはページングするので、nextPageTokenが尽きるまで回す。
+     * inboxに何百件も溜まる想定はないが、打ち切ると「取り込まれない
+     * ファイルがある」という分かりにくい不具合になるので全部取る。
+     */
+    suspend fun listFiles(parentId: String): List<DriveFile> {
+        val query = buildString {
+            append("'").append(escapeForQuery(parentId)).append("' in parents")
+            append(" and mimeType != '").append(FOLDER_MIME).append("'")
+            append(" and trashed = false")
+        }
+
+        val files = mutableListOf<DriveFile>()
+        var pageToken: String? = null
+        do {
+            val builder = "$BASE_URL/files".toHttpUrl().newBuilder()
+                .addQueryParameter("q", query)
+                .addQueryParameter(
+                    "fields",
+                    "nextPageToken,files(id,name,mimeType,modifiedTime,size,md5Checksum)",
+                )
+                .addQueryParameter("pageSize", "100")
+                .addQueryParameter("orderBy", "modifiedTime")
+            pageToken?.let { builder.addQueryParameter("pageToken", it) }
+
+            val json = get(builder.build())
+            val array = json.optJSONArray("files") ?: JSONArray()
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                val id = item.optString("id")
+                if (id.isBlank()) continue
+                files += DriveFile(
+                    id = id,
+                    name = item.optString("name"),
+                    mimeType = item.optString("mimeType"),
+                    modifiedTime = item.optString("modifiedTime"),
+                    size = item.optString("size").toLongOrNull(),
+                    md5Checksum = item.optString("md5Checksum").takeIf { it.isNotBlank() },
+                )
+            }
+            pageToken = json.optString("nextPageToken").takeIf { it.isNotBlank() }
+        } while (pageToken != null)
+
+        return files
+    }
+
     /** [parentId] 直下にフォルダを作り、そのIDを返す。 */
     suspend fun createFolder(name: String, parentId: String): String {
         val body = JSONObject()
@@ -131,6 +179,16 @@ class DriveApi(private val accessToken: String) {
     }
 
     data class AboutInfo(val displayName: String, val email: String)
+
+    data class DriveFile(
+        val id: String,
+        val name: String,
+        val mimeType: String,
+        /** RFC3339。同じidでも中身が差し替わると変わる。 */
+        val modifiedTime: String,
+        val size: Long?,
+        val md5Checksum: String?,
+    )
 
     data class EnsuredFolder(val id: String, val created: Boolean)
 
