@@ -116,6 +116,27 @@ object CsvAdapters {
 /** 金額・日付のパースはフォーマットを問わず共通なのでここにまとめる。 */
 internal object FieldParsers {
 
+    /**
+     * ありえない金額のしきい値(10兆円)。
+     *
+     * 桁が飛んだ値は、たいてい行がずれて別の列を読んでいるか、
+     * 区切り文字を誤判定して数字が繋がっている。個人の資産で
+     * これを超えることは無いので、通すより弾いたほうが安全。
+     */
+    private const val MAX_ABS_AMOUNT = 10_000_000_000_000L
+
+    /** ありえない年。これを外れる日付は誤読とみなす。 */
+    private val PLAUSIBLE_YEARS = 1900..2100
+
+    /**
+     * 年月日から日付を作る。ありえない年なら誤読とみなしてnull。
+     * 日付を組み立てる場所が複数あるので、判定をここに1つだけ置く。
+     */
+    fun dateOf(year: Int, month: Int, day: Int): LocalDate? =
+        runCatching { LocalDate.of(year, month, day) }
+            .getOrNull()
+            ?.takeIf { it.year in PLAUSIBLE_YEARS }
+
     private val DATE_PATTERNS = listOf(
         Regex("""^(\d{4})[/\-年](\d{1,2})[/\-月](\d{1,2})日?$"""),
     )
@@ -130,23 +151,19 @@ internal object FieldParsers {
 
         for (pattern in DATE_PATTERNS) {
             val m = pattern.find(text) ?: continue
-            return runCatching {
-                LocalDate.of(
-                    m.groupValues[1].toInt(),
-                    m.groupValues[2].toInt(),
-                    m.groupValues[3].toInt(),
-                )
-            }.getOrNull()
+            return dateOf(
+                m.groupValues[1].toInt(),
+                m.groupValues[2].toInt(),
+                m.groupValues[3].toInt(),
+            )
         }
 
         if (text.length == 8 && text.all { it.isDigit() }) {
-            return runCatching {
-                LocalDate.of(
-                    text.substring(0, 4).toInt(),
-                    text.substring(4, 6).toInt(),
-                    text.substring(6, 8).toInt(),
-                )
-            }.getOrNull()
+            return dateOf(
+                text.substring(0, 4).toInt(),
+                text.substring(4, 6).toInt(),
+                text.substring(6, 8).toInt(),
+            )
         }
         return null
     }
@@ -165,7 +182,10 @@ internal object FieldParsers {
         val digits = text.filter { it.isDigit() }
         if (digits.isEmpty()) return null
 
+        // 桁が多すぎるとLongも溢れる。toLongOrNullがnullを返すのでそこでも止まる。
         val magnitude = digits.toLongOrNull() ?: return null
+        if (magnitude > MAX_ABS_AMOUNT) return null
+
         return if (negative) -magnitude else magnitude
     }
 }

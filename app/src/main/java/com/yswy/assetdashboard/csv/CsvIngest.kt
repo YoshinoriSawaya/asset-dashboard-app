@@ -21,15 +21,17 @@ object CsvIngest {
             return Outcome.Failed(file, "ダウンロードできない: ${e.message}")
         }
 
-        if (bytes.isEmpty()) return Outcome.Failed(file, "中身が空")
+        // 中身だけで足切りする。拡張子やファイル名は当てにしない。
+        CsvValidation.rejectReason(bytes)?.let { return Outcome.Failed(file, it) }
 
         val decoded = CsvText.decode(bytes)
-        val rows = CsvText.splitRows(decoded.text)
-        if (rows.isEmpty()) return Outcome.Failed(file, "行が1つも無い")
+        val delimiter = CsvValidation.detectDelimiter(decoded.text)
+        val rows = CsvText.splitRows(decoded.text, delimiter)
+
+        CsvValidation.rejectRowsReason(rows)?.let { return Outcome.Failed(file, it) }
 
         val header = rows.first()
         val dataRows = rows.drop(1)
-        if (dataRows.isEmpty()) return Outcome.Failed(file, "ヘッダーしか無い")
 
         val adapter = CsvAdapters.findFor(header)
 
@@ -64,7 +66,7 @@ object CsvIngest {
         Log.i(
             TAG,
             "${file.name}: ${adapter.id} charset=${decoded.charsetName} " +
-                "$summary 読めず=${result.skipped.size}",
+                "区切り=${delimiterName(delimiter)} $summary 読めず=${result.skipped.size}",
         )
 
         // 入出金の判定に使っている取引名が想定どおりかを確かめる手がかり。
@@ -81,6 +83,13 @@ object CsvIngest {
         }
 
         return Outcome.Parsed(file, decoded.charsetName, result, viaFallback = false)
+    }
+
+    private fun delimiterName(delimiter: Char): String = when (delimiter) {
+        ',' -> "カンマ"
+        '	' -> "タブ"
+        ';' -> "セミコロン"
+        else -> delimiter.toString()
     }
 
     /**

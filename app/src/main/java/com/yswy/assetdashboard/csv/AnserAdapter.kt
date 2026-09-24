@@ -120,6 +120,6 @@ object AnserAdapter : CsvAdapter {
         val day = FieldParsers.parseAmount(cell(index[dayKey]))?.toInt() ?: return null
         // 2桁年(26 → 2026)にも一応備えておく
         val fullYear = if (year in 0..99) 2000 + year else year
-        return runCatching { LocalDate.of(fullYear, month, day) }.getOrNull()
+        return FieldParsers.dateOf(fullYear, month, day)
     }
 }
