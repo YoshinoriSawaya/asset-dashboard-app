@@ -27,6 +27,22 @@ $sdk  = "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\latest\bin"
 テストが落ちたときの詳細は `app/build/reports/tests/testDebugUnitTest/`
 にHTMLで出る。
 
+### DBのテスト(エミュレータが要る)
+Roomは本物のSQLiteが要るので、`app/src/androidTest/` に置いてエミュレータで回す。
+
+```powershell
+& "$proj\gradlew.bat" -p $proj connectedDebugAndroidTest `
+  "-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true"
+```
+
+**最後の `-P` を必ず付ける。** 付けないと、終わったときにアプリを
+アンインストールし、エミュレータのDB(`ingested_file`の記録)も
+Googleの認可も消える。
+
+結果は `app/build/reports/androidTests/connected/debug/`。
+1クラスだけ回すなら
+`"-Pandroid.testInstrumentationRunnerArguments.class=<クラスのFQCN>"` を足す。
+
 ## エミュレータ
 
 AVD名は `AssetDash_API37`(Pixel 9 / API 37.2 / google_apis x86_64)。
@@ -158,3 +174,5 @@ Console側の設定手順(どのスコープを選んだか、テストユーザ
 | 圏外で「同意が必要」と出る | 認可より先にネットワークを見る |
 | `adb shell` のパスが化ける | Git Bashが `/sdcard/...` を変換する。PowerShellを使う |
 | ドキュメント中のパスが壊れる | Pythonで書くとき `\a` がBEL文字になる |
+| エミュレータのアプリとDBが消えた | `connectedDebugAndroidTest` は終了時にアンインストールする。上の `-P` を付ける |
+| `MigrationTestHelper` が `AbstractMethodError`(kotlinx.serialization) | AGPがテストをアプリと同じ版に固定する。アプリ側を `constraints` で上げる |

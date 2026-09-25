@@ -15,6 +15,8 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -88,4 +90,16 @@ dependencies {
     // android.jarのorg.jsonはスタブで、putがnullを返す。
     // テストでは本物の実装を使う。
     testImplementation(libs.org.json)
+
+    // Roomは本物のSQLiteが要るので、DBのテストはエミュレータで回す(E02-02)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.room.testing)
+
+    constraints {
+        // room-testing(MigrationTestHelper)は1.8系を要求するが、アプリ側は間接依存で
+        // 1.7.3に解決され、AGPがテストもアプリと同じ版に固定するため
+        // AbstractMethodErrorで落ちる。アプリ側を揃えて上げる。
+        implementation(libs.kotlinx.serialization.core)
+    }
 }
