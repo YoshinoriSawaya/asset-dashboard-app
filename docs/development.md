@@ -221,6 +221,7 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 | ホームに置いたウィジェットが見つからない | HOMEキーは1ページ目に戻る。置いたページ(2ページ目など)へスワイプする |
 | adbでタップしたのにボタンが反応しない | キーボードがボタンを覆っていて、キーボードに当たっている。`dumpsys input_method` の `mInputShown` を見て、出ていればBACKで閉じてから押す(出ていないときのBACKは画面を閉じる) |
 | インストルメントテストが `Expecting '('` でコンパイルできない | テスト名(関数名)に「、」を入れた。Kotlinの識別子に使えない |
+| adbでスイッチを押したのに変わらない | Composeのスイッチやチップはテキストを持たない `android.view.View`(`checkable="true"`)。見出しの文字の位置ではなく、そのノードの位置を押す |
 | PowerShellで自作の関数 `Where` が動かない | `where` は `Where-Object` の別名。別の名前にする |
 | リリース版を入れると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | デバッグ版と署名が違う。デバッグ版を消してから入れる |
 | リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |

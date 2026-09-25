@@ -46,6 +46,12 @@ object Routes {
     private const val CORRECT = "correct/"
     private const val GOAL = "goal/"
     private const val METRIC = "metric/"
+    private const val USAGE = "usage/"
+
+    /** 毎年リセットする枠に使った分を足す(E07-09)。 */
+    fun usage(goalId: String) = USAGE + goalId
+
+    fun usageGoalId(route: String): String? = route.removePrefix(USAGE).takeIf { route.startsWith(USAGE) }
 
     /** Metric項目の表示名・非表示(E07-14)。 */
     fun metric(metricKey: String) = METRIC + metricKey
@@ -90,11 +96,25 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     val correctKey = Routes.correctKey(route)
     val goalId = Routes.goalId(route)
     val metricKey = Routes.metricKey(route)
+    val usageGoalId = Routes.usageGoalId(route)
     /** [target]がまだ一番上なら閉じる。保存の完了が画面を離れた後に届いても、別の画面を閉じない。 */
     fun close(target: String) {
         if (stack.size > 1 && stack.last() == target) stack.removeAt(stack.lastIndex)
     }
     when {
+        usageGoalId != null -> {
+            val goal = state.overviews.filterIsInstance<ItemOverview.Goal>().firstOrNull { it.item.id == usageGoalId }
+            UsageScreen(
+                goal = goal,
+                saving = state.syncing,
+                onSave = { amount, onResult ->
+                    val key = goal?.item?.metricKey
+                    if (key == null) onResult("記録する系列が無い") else viewModel.addUsage(key, amount, onResult)
+                },
+                onBack = { close(route) },
+                modifier = modifier,
+            )
+        }
         metricKey != null -> MetricEditScreen(
             // 一覧にある項目と、隠している項目の両方から探す
             metric = (state.overviews.map { it.item }.filterIsInstance<Item.Metric>() + state.hiddenMetrics)
@@ -150,6 +170,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 onCorrect = { stack.add(Routes.correct(it)) },
                 onEditGoal = { stack.add(Routes.goal(it)) },
                 onEditMetric = { stack.add(Routes.metric(it)) },
+                onAddUsage = { stack.add(Routes.usage(it)) },
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,

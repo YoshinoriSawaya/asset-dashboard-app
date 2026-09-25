@@ -133,6 +133,23 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 毎年リセットする枠に使った分を足す(E07-09)。今年の累計に足した値を、
+     * 今日の手入力の点として補正と同じ道で保存する。
+     */
+    fun addUsage(metricKey: String, amount: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val points = db.metricPointDao().series(metricKey)
+            when (val input = UsageForm.parse(points, amount, LocalDate.now())) {
+                is UsageForm.Result.Invalid -> onResult(input.message)
+                is UsageForm.Result.Ok -> saveCorrection(
+                    CorrectionForm.Result.Ok(metricKey, input.date, input.newTotalYen, note = "使った分を足す"),
+                    onResult,
+                )
+            }
+        }
+    }
+
     /** 補正を取り消す。CSVの点があればその値に戻り、手入力だけの点なら消える。 */
     fun deleteCorrection(metricKey: String, date: LocalDate, onResult: (String?) -> Unit) {
         viewModelScope.launch {

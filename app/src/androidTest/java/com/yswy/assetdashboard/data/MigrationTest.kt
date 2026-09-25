@@ -75,6 +75,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v3からv4で目標が残り毎年の枠の印が既定値になる() {
+        helper.createDatabase(DB4, 3).use { v3 ->
+            v3.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden, autoAverageMonths, autoCoverMonths) " +
+                    "VALUES ('g1', 'GOAL', '車', NULL, 1000, NULL, NULL, 0, 0, NULL, NULL)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB4, 4, true).use { v4 ->
+            v4.query("SELECT name, resetsYearly FROM item").use { c ->
+                c.moveToFirst(); assertEquals("車", c.getString(0)); assertEquals(0, c.getInt(1))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -110,5 +125,6 @@ class MigrationTest {
 
         const val DB = "migration-test.db"
         const val DB3 = "migration-test-3.db"
+        const val DB4 = "migration-test-4.db"
     }
 }

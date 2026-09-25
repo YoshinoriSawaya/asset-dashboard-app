@@ -81,6 +81,7 @@ object Settings {
                     .put("name", item.name)
                     .put("sortOrder", item.sortOrder)
                     .put("hidden", item.hidden)
+                    .also { json -> if (item.resetsYearly) json.put("resetsYearly", true) }
                     .also { json ->
                         item.metricKey?.let { json.put("metricKey", it) }
                         item.targetYen?.let { json.put("targetYen", it) }
@@ -128,6 +129,7 @@ object Settings {
                 hidden = obj.optBoolean("hidden"),
                 autoAverageMonths = obj.optJSONObject("autoTarget")?.optInt("averageMonths")?.takeIf { it > 0 },
                 autoCoverMonths = obj.optJSONObject("autoTarget")?.optInt("coverMonths")?.takeIf { it > 0 },
+                resetsYearly = obj.optBoolean("resetsYearly"),
             )
             if (item.toItem() == null) {
                 Log.w(TAG, "項目を読めないので飛ばす: id=$id type=$type")

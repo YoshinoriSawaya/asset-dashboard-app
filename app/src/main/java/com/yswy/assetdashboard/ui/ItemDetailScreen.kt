@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +58,7 @@ fun ItemDetailScreen(
     busy: Boolean = false,
     onEditGoal: (String) -> Unit = {},
     onEditMetric: (String) -> Unit = {},
+    onAddUsage: (String) -> Unit = {},
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -92,6 +94,9 @@ fun ItemDetailScreen(
             }
             is ItemDetail.Goal -> item {
                 GoalContent(detail)
+                if (detail.overview.item.resetsYearly) {
+                    Button(onClick = { onAddUsage(detail.overview.item.id) }, enabled = !busy) { Text("使った分を足す") }
+                }
                 OutlinedButton(onClick = { onEditGoal(detail.overview.item.id) }, enabled = !busy) {
                     Text("編集・削除")
                 }
@@ -197,8 +202,9 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             progress = { (progress ?: 0.0).coerceIn(0.0, 1.0).toFloat() },
             modifier = Modifier.fillMaxWidth(),
         )
-        detail.overview.currentYen?.let { Label("現在 ${Formatters.yen(it)}") }
-        Label(detail.overview.targetYen?.let { "目標 ${Formatters.yen(it)}" } ?: "目標 不明")
+        val yearly = goal.resetsYearly
+        detail.overview.currentYen?.let { Label((if (yearly) "今年使った額 " else "現在 ") + Formatters.yen(it)) }
+        Label(detail.overview.targetYen?.let { (if (yearly) "枠 " else "目標 ") + Formatters.yen(it) } ?: "目標 不明")
         // 支出から出した目標なら、どう計算したかを出す(E07-06)
         goal.autoTarget?.let { rule ->
             val auto = detail.overview.auto
@@ -211,9 +217,19 @@ private fun GoalContent(detail: ItemDetail.Goal) {
                 },
             )
         }
-        detail.remainingYen?.let { Label(if (it == 0L) "達成済み" else "あと ${Formatters.yen(it)}") }
+        detail.remainingYen?.let {
+            Label(
+                when {
+                    // 毎年の枠(E07-09)は「使い切った」、目標は「達成」
+                    yearly -> if (it == 0L) "枠を使い切った" else "残りの枠 ${Formatters.yen(it)}(${LocalDate.now().year}年末まで)"
+                    it == 0L -> "達成済み"
+                    else -> "あと ${Formatters.yen(it)}"
+                },
+            )
+        }
         // 届いていなければ、月々いくらで何か月で届くか(E07-07)
-        detail.recovery?.takeIf { it.isShort }?.let { plan ->
+        // 毎年の枠では「残り」は埋めるものではないので出さない
+        detail.recovery?.takeIf { it.isShort && !yearly }?.let { plan ->
             Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
             plan.options.forEach { option ->
                 Label("${option.months}か月で: 月々 ${Formatters.yen(option.monthlyYen)}")

@@ -31,6 +31,7 @@ object GoalForm {
         dueDate: String,
         newId: () -> String = { UUID.randomUUID().toString() },
         auto: Pair<String, String>? = null,
+        resetsYearly: Boolean = false,
     ): Result {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -65,12 +66,15 @@ object GoalForm {
                 id = existing?.id ?: newId(),
                 name = trimmedName,
                 targetYen = yen,
-                metricKey = metricKey,
+                // 毎年リセットする枠で系列を選ばなければ、目標の名前の系列を使う
+                // (最初に「使った分を足す」ときに手入力の系列としてできる。E07-09)
+                metricKey = metricKey ?: trimmedName.takeIf { resetsYearly },
                 dueDate = due,
                 // 目標は一覧の上に出す。Metric項目(並び順0)より前
                 sortOrder = existing?.sortOrder ?: -1,
                 hidden = existing?.hidden ?: false,
                 autoTarget = autoTarget,
+                resetsYearly = resetsYearly,
             ),
         )
     }

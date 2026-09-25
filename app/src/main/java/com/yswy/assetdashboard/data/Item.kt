@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -38,6 +39,9 @@ data class ItemEntity(
     /** 目標額を支出から自動で出すとき(E07-06)。平均を取る月数と、何か月分か。 */
     val autoAverageMonths: Int? = null,
     val autoCoverMonths: Int? = null,
+    /** 毎年1月にリセットする枠(ふるさと納税・NISAの年間枠など)。E07-09。 */
+    @ColumnInfo(defaultValue = "0")
+    val resetsYearly: Boolean = false,
 )
 
 /**
@@ -80,6 +84,11 @@ sealed interface Item {
         override val sortOrder: Int = 0,
         override val hidden: Boolean = false,
         val autoTarget: AutoTarget? = null,
+        /**
+         * 毎年1月にリセットする枠(E07-09)。進捗は「今年使った額 ÷ 枠」で、
+         * 系列の値は今年の累計。去年の点は数えない。
+         */
+        val resetsYearly: Boolean = false,
     ) : Item
 
     data class Reminder(
@@ -120,7 +129,7 @@ fun ItemEntity.toItem(): Item? = when (type) {
         }
         // 目標額の決め方がどちらも無いGoalは読めない
         if (targetYen == null && auto == null) null
-        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto)
+        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly)
     }
     ItemType.REMINDER -> dueDate?.let {
         Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden)
@@ -138,6 +147,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         metricKey = metricKey, targetYen = targetYen, dueDate = dueDate,
         sortOrder = sortOrder, hidden = hidden,
         autoAverageMonths = autoTarget?.averageMonths, autoCoverMonths = autoTarget?.coverMonths,
+        resetsYearly = resetsYearly,
     )
     is Item.Reminder -> ItemEntity(
         id = id, type = ItemType.REMINDER, name = name,

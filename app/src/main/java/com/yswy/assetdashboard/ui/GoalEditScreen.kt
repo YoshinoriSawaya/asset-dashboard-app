@@ -16,6 +16,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,7 @@ fun GoalEditScreen(
     // 目標額の決め方(E07-06)。生活防衛資金のように、生活費の何か月分かで決めたいとき
     var useAuto by rememberSaveable { mutableStateOf(existing?.autoTarget != null) }
     var averageMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.averageMonths ?: 6).toString()) }
+    var resetsYearly by rememberSaveable { mutableStateOf(existing?.resetsYearly ?: false) }
     var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
 
     Column(
@@ -113,6 +116,19 @@ fun GoalEditScreen(
             label = { Text("期日(任意。2030-04-01)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
 
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Switch(checked = resetsYearly, onCheckedChange = { resetsYearly = it })
+            Column {
+                Text("毎年1月にリセットする枠")
+                Text(
+                    "ふるさと納税の上限やNISAの年間枠など。進捗は今年使った額で数え、" +
+                        "詳細画面の「使った分を足す」で記録します。系列を選ばなければ、目標の名前で記録します。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         Text("進捗を測る系列", style = MaterialTheme.typography.titleSmall)
         Text(
             "選んだ系列の最新値を、目標額に対する進捗として出します。",
@@ -131,7 +147,7 @@ fun GoalEditScreen(
                 enabled = !saving,
                 onClick = {
                     val auto = if (useAuto) averageMonths to coverMonths else null
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto)) {
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."

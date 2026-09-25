@@ -70,15 +70,15 @@ object AiExport {
             for (goal in goals) {
                 val item = goal.item
                 val target = goal.targetYen
-                append("- ${item.name}: 目標 ${target?.let(::yen) ?: "不明"}")
+                append("- ${item.name}: ${if (item.resetsYearly) "今年の枠" else "目標"} ${target?.let(::yen) ?: "不明"}")
                 item.autoTarget?.let { append("(生活費の${it.averageMonths}か月平均 × ${it.coverMonths}か月から自動計算)") }
                 goal.currentYen?.let { current ->
-                    append(" / 現在 ${yen(current)}")
+                    append(if (item.resetsYearly) " / 今年使った額 ${yen(current)}" else " / 現在 ${yen(current)}")
                     goal.progress?.let { append("(${(it * 100).toInt()}%)") }
                     target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
                 item.dueDate?.let { append(" / 期日 $it") }
-                RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort }?.let { plan ->
+                RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort && !item.resetsYearly }?.let { plan ->
                     append(" / 不足分を埋めるには ")
                     append(plan.options.joinToString("、") { "${it.months}か月なら月々${yen(it.monthlyYen)}" })
                 }

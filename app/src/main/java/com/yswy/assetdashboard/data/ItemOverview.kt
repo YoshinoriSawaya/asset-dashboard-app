@@ -70,10 +70,15 @@ sealed interface ItemOverview {
                 }
                 is Item.Goal -> Goal(
                     item = item,
-                    currentYen = item.metricKey
-                        ?.let { pointsByKey[it] }
-                        ?.maxByOrNull { it.date }
-                        ?.valueYen,
+                    currentYen = item.metricKey?.let { key ->
+                        val points = pointsByKey[key].orEmpty()
+                        if (item.resetsYearly) {
+                            // 毎年リセットする枠(E07-09): 今年の最新の累計。今年まだ無ければ0
+                            points.filter { it.date.year == today.year }.maxByOrNull { it.date }?.valueYen ?: 0L
+                        } else {
+                            points.maxByOrNull { it.date }?.valueYen
+                        }
+                    },
                     auto = item.autoTarget?.let { AutoTargets.compute(it, monthlyCashflow, today) },
                 )
                 is Item.Reminder -> Reminder(item, ChronoUnit.DAYS.between(today, item.dueDate))
