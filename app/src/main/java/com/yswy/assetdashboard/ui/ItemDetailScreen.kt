@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.GoalForecast
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
@@ -250,8 +251,26 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             }
         }
         goal.dueDate?.let { Label("期日 $it") }
+        OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 生活防衛資金の見通し(E09-02)。生活費から目標額を出す目標にだけ出す。 */
+@Composable
+private fun OutlookLabels(detail: ItemDetail.Goal) {
+    val outlook = FundOutlook.of(detail.overview) ?: return
+    Text("見通し", style = MaterialTheme.typography.titleSmall)
+    outlook.monthsCovered?.let {
+        Label("収入が止まっても、生活費の約${"%.1f".format(it)}か月分")
+    }
+    outlook.monthsUntilBelowTarget?.let { months ->
+        Text(
+            if (months == 0) "このペースだと今月中に目標を割ります" else "このペースだと約${months}か月後に目標を割ります",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (months <= FundOutlook.WARN_MONTHS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

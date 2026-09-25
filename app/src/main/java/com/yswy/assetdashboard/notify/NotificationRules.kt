@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.notify
 
+import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncStatus
 import java.time.LocalDate
@@ -95,6 +96,13 @@ object NotificationRules {
                         val key = "shortfall:${goal.id}"
                         if (intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
                             notices += Notice(key, "${goal.name}が目標を下回っています", "アプリで回復の目安を確認してください。")
+                        }
+                    } else if (goal.autoTarget != null) {
+                        // E09-02: まだ目標以上だが、このペースだと数か月で割るなら、下回る前に知らせる
+                        val months = FundOutlook.of(overview)?.monthsUntilBelowTarget
+                        val key = "outlook:${goal.id}"
+                        if (months != null && months <= FundOutlook.WARN_MONTHS && intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
+                            notices += Notice(key, "${goal.name}が減っています", "このペースだと数か月で目標を割ります。アプリで見通しを確認してください。")
                         }
                     }
                 }

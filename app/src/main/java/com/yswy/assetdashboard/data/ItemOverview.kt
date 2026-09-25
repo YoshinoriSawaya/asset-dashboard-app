@@ -26,6 +26,8 @@ sealed interface ItemOverview {
         val currentYen: Long?,
         /** 支出から自動で出したときの計算結果(E07-06)。決まった額の目標ならnull。 */
         val auto: AutoTargets.Result? = null,
+        /** 系列の月あたりの増え方(E09)。点が足りなければnull。 */
+        val monthlyPaceYen: Long? = null,
     ) : ItemOverview {
         /** 実際に使う目標額。自動の目標で、計算に使える月が無ければnull。 */
         val targetYen: Long?
@@ -80,6 +82,8 @@ sealed interface ItemOverview {
                         }
                     },
                     auto = item.autoTarget?.let { AutoTargets.compute(it, monthlyCashflow, today) },
+                    monthlyPaceYen = item.metricKey?.takeIf { !item.resetsYearly }
+                        ?.let { pointsByKey[it] }?.let { Pace.of(it) }?.monthlyYen,
                 )
                 is Item.Reminder -> Reminder(item, ChronoUnit.DAYS.between(today, item.dueDate))
             }

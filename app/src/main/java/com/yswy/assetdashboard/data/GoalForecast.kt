@@ -35,14 +35,6 @@ sealed interface GoalForecast {
     ) : GoalForecast
 
     companion object {
-        /** ペースを見る期間。 */
-        const val LOOKBACK_DAYS = 182L
-
-        /** これより短い期間しか無ければ、ペースを出さない。 */
-        const val MIN_SPAN_DAYS = 60L
-
-        private const val DAYS_PER_MONTH = 365.2425 / 12
-
         /**
          * @param points 目標の系列の点
          * @return 目標額・系列が無い、毎年の枠(E07-09)ならnull(予測しない)
@@ -53,13 +45,9 @@ sealed interface GoalForecast {
             val latest = sorted.last()
             if (latest.valueYen >= targetYen) return Achieved
 
-            // 約半年前の点。それより古い点が無ければ、いちばん古い点
-            val from = sorted.lastOrNull { !it.date.isAfter(latest.date.minusDays(LOOKBACK_DAYS)) } ?: sorted.first()
-            val days = ChronoUnit.DAYS.between(from.date, latest.date)
-            if (days < MIN_SPAN_DAYS) return NotEnoughData
-
-            val perDay = (latest.valueYen - from.valueYen).toDouble() / days
-            val monthly = Math.round(perDay * DAYS_PER_MONTH)
+            val pace = Pace.of(sorted) ?: return NotEnoughData
+            val perDay = pace.perDayYen
+            val monthly = pace.monthlyYen
             if (perDay <= 0) return NotReaching(monthly)
 
             val daysToGo = Math.ceil((targetYen - latest.valueYen) / perDay).toLong()

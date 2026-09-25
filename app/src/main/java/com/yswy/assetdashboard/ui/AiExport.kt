@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.ui
 
+import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.RecoveryPlan
@@ -78,6 +79,10 @@ object AiExport {
                     target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
                 item.dueDate?.let { append(" / 期日 $it") }
+                FundOutlook.of(goal)?.let { outlook ->
+                    outlook.monthsCovered?.let { append(" / 生活費の約${"%.1f".format(it)}か月分") }
+                    outlook.monthsUntilBelowTarget?.let { append(" / このペースだと約${it}か月後に目標を割る") }
+                }
                 RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort && !item.resetsYearly }?.let { plan ->
                     append(" / 不足分を埋めるには ")
                     append(plan.options.joinToString("、") { "${it.months}か月なら月々${yen(it.monthlyYen)}" })
