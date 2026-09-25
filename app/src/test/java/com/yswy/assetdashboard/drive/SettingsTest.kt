@@ -1,0 +1,43 @@
+package com.yswy.assetdashboard.drive
+
+import com.yswy.assetdashboard.data.Item
+import com.yswy.assetdashboard.data.Repeat
+import com.yswy.assetdashboard.data.toEntity
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import java.time.LocalDate
+
+class SettingsTest {
+
+    @Test
+    fun `3種類とも書いたとおりに読み戻せる`() {
+        val items = listOf(
+            Item.Metric(Item.metricId("投資信託"), "NISA", "投資信託", sortOrder = 2, hidden = true),
+            Item.Goal("g1", "車購入", 1_000_000, "預金・現金", LocalDate.of(2030, 4, 1), sortOrder = 1),
+            Item.Reminder("r1", "車の点検", LocalDate.of(2027, 3, 1), Repeat.YEARLY),
+        ).map { it.toEntity() }
+
+        assertEquals(items, Settings.parse(Settings.render(items)))
+    }
+
+    @Test
+    fun `読めない項目だけ落として残りは使う`() {
+        val json = """
+            {"formatVersion":1,"items":[
+              {"id":"g1","type":"GOAL","name":"車購入","targetYen":1000000},
+              {"id":"g2","type":"GOAL","name":"目標額なし"},
+              {"id":"x","type":"UNKNOWN","name":"知らない種類"},
+              {"type":"REMINDER","name":"idなし","dueDate":"2027-01-01"},
+              {"id":"r1","type":"REMINDER","name":"期日が壊れている","dueDate":"来年"}
+            ]}
+        """.trimIndent()
+
+        assertEquals(listOf("g1"), Settings.parse(json).map { it.id })
+    }
+
+    @Test
+    fun `名前が空ならidで代用する`() {
+        val json = """{"formatVersion":1,"items":[{"id":"metric:合計","type":"METRIC","metricKey":"合計"}]}"""
+        assertEquals("metric:合計", Settings.parse(json).single().name)
+    }
+}

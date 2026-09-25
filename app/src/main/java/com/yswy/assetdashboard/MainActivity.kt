@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.AppDatabase
+import com.yswy.assetdashboard.drive.CacheSync
+import com.yswy.assetdashboard.drive.CacheSync.summary
 import com.yswy.assetdashboard.drive.DriveFolderSetup
 import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.InboxSync
@@ -124,7 +126,7 @@ private fun Placeholder(modifier: Modifier = Modifier) {
     }
 }
 
-/** フォルダを用意してinboxを一周する。 */
+/** フォルダを用意してinboxを一周し、Driveの中身でキャッシュを作り直す。 */
 private suspend fun syncInbox(
     context: Context,
     api: com.yswy.assetdashboard.drive.DriveApi,
@@ -137,8 +139,12 @@ private suspend fun syncInbox(
         "作成: ${setup.created.joinToString(", ")}"
     }
 
-    val dao = AppDatabase.get(context).ingestedFileDao()
-    val report = InboxSync.run(api, setup.folders, dao)
+    val db = AppDatabase.get(context)
+    val report = InboxSync.run(api, setup.folders, db.ingestedFileDao())
+
+    // 取り込みで増えたbackupも含めて作り直す。取り込みが全部失敗していても、
+    // 既存のbackupからキャッシュは作れるので必ず走らせる。
+    val cache = CacheSync.rebuild(api, setup.folders, db)
 
     val inboxNote = buildString {
         append(report.summary())
@@ -148,7 +154,7 @@ private suspend fun syncInbox(
         }
     }
 
-    return "接続OK: ${about.email}\n$folderNote\n$inboxNote"
+    return "接続OK: ${about.email}\n$folderNote\n$inboxNote\n${cache.summary()}"
 }
 
 @Preview(showBackground = true)

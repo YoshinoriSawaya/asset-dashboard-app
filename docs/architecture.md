@@ -41,11 +41,17 @@ Drive/inbox のCSV
       ▼           ▼           ▼
    backup/     記録(Room)   processed/へ移動
    (JSON)                      │
-                               ▼
-                    問題があれば logs/
+      │                        ▼
+      │             問題があれば logs/
+      ▼
+ ┌─────────────┐   + corrections/ + settings/
+ │  CacheSync   │  Driveの中身からRoomを丸ごと作り直す
+ └─────────────┘
 ```
 
-`InboxSync` がこの一周を取り仕切る。
+`InboxSync` がinboxの一周を、`CacheSync` がキャッシュの作り直しを受け持つ。
+キャッシュを差分でなく毎回作り直す理由は
+[E02-03](../issues/tasks/E02-03-drive-to-cache-sync.md)。
 `DriveSession` が認可・トークン切れ・オフラインを引き受けるので、
 UIはこの流れを気にしなくていい。
 
@@ -187,7 +193,7 @@ Play Servicesが署名を照合する。**リポジトリに秘密情報が入�
 
 | エピック | やること |
 |---------|---------|
-| E02 | パース結果をRoomに保存。重複検出をここで繋ぐ |
+| E02 | 開いたときの同期判定と、月次・年次の集計(保存までは済み) |
 | E03 | ダッシュボードと手動補正画面 |
 | E04 | Glanceウィジェット(色だけ) |
 | E05 | FCM通知 |

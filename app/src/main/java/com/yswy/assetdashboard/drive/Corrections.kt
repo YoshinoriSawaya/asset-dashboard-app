@@ -57,21 +57,25 @@ object Corrections {
         val correctedAt: Long,
     )
 
-    /** Driveからcorrectionsを読む。無ければ空。 */
-    suspend fun load(api: DriveApi, folders: AppFolders): List<Entry> {
+    /**
+     * Driveからcorrectionsを読む。ファイルが無ければ空。
+     *
+     * 探せない・読めないときは`null`で、空と区別する。空として扱うと
+     * キャッシュを作り直したときに補正が黙って消える(E02-03)。
+     */
+    suspend fun load(api: DriveApi, folders: AppFolders): List<Entry>? {
         val fileId = try {
             api.findFile(FILE_NAME, folders.corrections) ?: return emptyList()
         } catch (e: Exception) {
             Log.w(TAG, "correctionsを探せなかった", e)
-            return emptyList()
+            return null
         }
 
         return try {
             parse(String(api.download(fileId), Charsets.UTF_8))
         } catch (e: Exception) {
-            // 読めなくても致命傷ではない。補正が効かないだけ。
             Log.w(TAG, "correctionsを読めなかった", e)
-            emptyList()
+            null
         }
     }
 
@@ -103,10 +107,7 @@ object Corrections {
     fun apply(points: List<MetricPoint>, corrections: List<Entry>): List<MetricPoint> {
         if (corrections.isEmpty()) return points
 
-        // 同じキーの補正が複数あれば、後に補正したほうを採る
-        val byKey = corrections
-            .groupBy { "${it.metricKey}|${it.date}" }
-            .mapValues { (_, list) -> list.maxBy { it.correctedAt } }
+        val byKey = effective(corrections)
 
         val result = LinkedHashMap<String, MetricPoint>()
         for (point in points) {
@@ -117,6 +118,14 @@ object Corrections {
         }
         return result.values.toList()
     }
+
+    /**
+     * 「項目 + 日付」ごとに効いている補正。同じキーが複数あれば、
+     * 後に補正したほうを採る。キーは[com.yswy.assetdashboard.csv.Deduplication.keyOf]と同じ形。
+     */
+    fun effective(corrections: List<Entry>): Map<String, Entry> = corrections
+        .groupBy { "${it.metricKey}|${it.date}" }
+        .mapValues { (_, list) -> list.maxBy { it.correctedAt } }
 
     /** JSONの組み立て。テストから直接確かめられるよう分けてある。 */
     fun render(entries: List<Entry>): String {

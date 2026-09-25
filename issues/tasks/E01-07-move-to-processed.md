@@ -89,5 +89,9 @@ E02でDB保存を実装したら、processedにあるファイルを読み直す
 - `ingested_file` テーブルを空にする(エミュレータなら
   `adb shell sqlite3 .../asset-dashboard.db "DELETE FROM ingested_file;"`)
 
+**→ 不要になった。** E02-03でキャッシュをbackupから作る形にしたので、
+取り込み済みの3ファイルもprocessedを触らずに入った。
+[E02-03](E02-03-drive-to-cache-sync.md)
+
 ## ステータス
 完了 (2026-09-25)

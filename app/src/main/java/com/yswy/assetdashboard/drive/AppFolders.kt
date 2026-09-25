@@ -15,6 +15,8 @@ data class AppFolders(
     val processed: String,
     val backup: String,
     val corrections: String,
+    /** 項目の定義(E02-01)。correctionsと同じく人が入力したもので、作り直せない。 */
+    val settings: String,
     val logs: String,
 )
 
@@ -31,13 +33,14 @@ object DriveFolderSetup {
     const val PROCESSED = "processed"
     const val BACKUP = "backup"
     const val CORRECTIONS = "corrections"
+    const val SETTINGS = "settings"
     const val LOGS = "logs"
 
     /** Driveのマイドライブ直下を指す予約語。 */
     private const val DRIVE_ROOT = "root"
 
     /**
-     * 5つのフォルダが揃った状態にして、そのIDを返す。
+     * 6つのフォルダが揃った状態にして、そのIDを返す。
      * 既にあるものはそのまま使い、足りないものだけ作る。
      *
      * @return フォルダIDと、今回新規作成したフォルダ名の一覧
@@ -60,6 +63,7 @@ object DriveFolderSetup {
             processed = child(PROCESSED),
             backup = child(BACKUP),
             corrections = child(CORRECTIONS),
+            settings = child(SETTINGS),
             logs = child(LOGS),
         )
         return Outcome(folders, created)
