@@ -19,6 +19,7 @@
 - [ ] [E07-11: Goalの目標期日とランプアップ(積み増し開始)通知](../tasks/E07-11-goal-due-date-rampup.md)
 - [ ] [E07-12: ランプアップGoal未達時の生活防衛資金取り崩し許容](../tasks/E07-12-rampup-shortfall-emergency-fund-drawdown.md)
 - [ ] [E07-13: 口座残高の積み上げ色分けグラフ](../tasks/E07-13-stacked-account-graph.md)
+- [x] [E07-14: Metric項目の表示名・非表示](../tasks/E07-14-metric-display-settings.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

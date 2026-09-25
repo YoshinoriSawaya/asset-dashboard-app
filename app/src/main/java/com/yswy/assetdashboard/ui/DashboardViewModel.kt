@@ -16,6 +16,7 @@ import com.yswy.assetdashboard.data.SummaryBoard
 import com.yswy.assetdashboard.data.SyncPolicy
 import com.yswy.assetdashboard.data.SyncStatus
 import com.yswy.assetdashboard.data.toEntity
+import com.yswy.assetdashboard.data.toItem
 import com.yswy.assetdashboard.drive.AppFolders
 import com.yswy.assetdashboard.drive.CacheSync
 import com.yswy.assetdashboard.drive.Corrections
@@ -50,6 +51,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val syncing: Boolean = false,
         /** 今起きていること(同期中、同期しなかった理由など)の短い一言。 */
         val message: String = "",
+        /** 一覧から隠しているMetric項目(E07-14)。トップから戻せるように持っておく。 */
+        val hiddenMetrics: List<Item.Metric> = emptyList(),
         /** 前回の同期の結果(E03-05)。まだ一度も同期していなければnull。 */
         val lastSync: LastSync? = null,
         /** 同意画面を出してほしい。出したら[consentLaunched]を呼ぶ。 */
@@ -151,6 +154,19 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(editSettings { Settings.upsert(it, goal.toEntity()) }) }
     }
 
+    /** Metric項目の表示名・非表示(E07-14)。既定に戻すならsettingsから消す。 */
+    fun saveMetric(result: MetricForm.Result, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                when (result) {
+                    is MetricForm.Result.Save -> editSettings { Settings.upsert(it, result.metric.toEntity()) }
+                    is MetricForm.Result.Reset -> editSettings { Settings.remove(it, result.id) }
+                    is MetricForm.Result.Invalid -> result.message
+                },
+            )
+        }
+    }
+
     fun deleteGoal(id: String, onResult: (String?) -> Unit) {
         viewModelScope.launch { onResult(editSettings { Settings.remove(it, id) }) }
     }
@@ -241,7 +257,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refresh() {
         val overviews = ItemOverview.load(db)
         val status = SyncStatus.load(db)
-        _state.update { it.copy(overviews = overviews, syncStatus = status) }
+        val hidden = db.itemDao().getAll().mapNotNull { it.toItem() as? Item.Metric }.filter { it.hidden }
+        _state.update { it.copy(overviews = overviews, syncStatus = status, hiddenMetrics = hidden) }
         // ウィジェットの色も同じ判定なので、キャッシュが変わるたびに描き直す(E04)
         SyncStatusWidget.refresh(getApplication())
     }

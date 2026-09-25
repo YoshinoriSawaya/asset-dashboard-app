@@ -56,6 +56,7 @@ fun ItemDetailScreen(
     onDeleteCorrection: (String, LocalDate, (String?) -> Unit) -> Unit = { _, _, _ -> },
     busy: Boolean = false,
     onEditGoal: (String) -> Unit = {},
+    onEditMetric: (String) -> Unit = {},
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -78,6 +79,11 @@ fun ItemDetailScreen(
             is ItemDetail.Metric -> {
                 metricHeader(detail)
                 // 補正の入口は上に置く。月次の表の下だと、スクロールしないと見つからない
+                item {
+                    TextButton(onClick = { onEditMetric(detail.overview.item.metricKey) }, enabled = !busy) {
+                        Text("名前・表示を変更")
+                    }
+                }
                 correctionContent(detail, busy, message, onCorrect) { key, date ->
                     message = "取り消し中..."
                     onDeleteCorrection(key, date) { error -> message = error ?: "取り消しました" }

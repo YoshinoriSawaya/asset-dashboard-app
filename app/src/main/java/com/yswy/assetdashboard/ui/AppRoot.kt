@@ -44,6 +44,12 @@ object Routes {
 
     private const val CORRECT = "correct/"
     private const val GOAL = "goal/"
+    private const val METRIC = "metric/"
+
+    /** Metric項目の表示名・非表示(E07-14)。 */
+    fun metric(metricKey: String) = METRIC + metricKey
+
+    fun metricKey(route: String): String? = route.removePrefix(METRIC).takeIf { route.startsWith(METRIC) }
 
     /** 目標の編集(E07-01)。[id]がnullなら新規。 */
     fun goal(id: String?) = GOAL + id.orEmpty()
@@ -82,11 +88,21 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     val itemId = Routes.itemId(route)
     val correctKey = Routes.correctKey(route)
     val goalId = Routes.goalId(route)
+    val metricKey = Routes.metricKey(route)
     /** [target]がまだ一番上なら閉じる。保存の完了が画面を離れた後に届いても、別の画面を閉じない。 */
     fun close(target: String) {
         if (stack.size > 1 && stack.last() == target) stack.removeAt(stack.lastIndex)
     }
     when {
+        metricKey != null -> MetricEditScreen(
+            // 一覧にある項目と、隠している項目の両方から探す
+            metric = (state.overviews.map { it.item }.filterIsInstance<Item.Metric>() + state.hiddenMetrics)
+                .firstOrNull { it.metricKey == metricKey },
+            saving = state.syncing,
+            onSave = viewModel::saveMetric,
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         goalId != null -> GoalEditScreen(
             existing = state.overviews.map { it.item }.filterIsInstance<Item.Goal>().firstOrNull { it.id == goalId },
             metricKeys = state.overviews.map { it.item }.filterIsInstance<Item.Metric>().map { it.metricKey },
@@ -131,6 +147,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 onBack = { stack.removeAt(stack.lastIndex) },
                 onCorrect = { stack.add(Routes.correct(it)) },
                 onEditGoal = { stack.add(Routes.goal(it)) },
+                onEditMetric = { stack.add(Routes.metric(it)) },
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,
@@ -168,6 +185,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onOpenSyncLog = { stack.add(Routes.SYNC_LOG) },
             onOpenExport = { stack.add(Routes.EXPORT) },
             onAddGoal = { stack.add(Routes.goal(null)) },
+            onEditMetric = { stack.add(Routes.metric(it)) },
             modifier = modifier,
         )
     }

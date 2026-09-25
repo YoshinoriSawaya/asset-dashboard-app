@@ -44,6 +44,7 @@ fun TopScreen(
     onOpenSyncLog: () -> Unit,
     onOpenExport: () -> Unit,
     onAddGoal: () -> Unit,
+    onEditMetric: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -65,6 +66,21 @@ fun TopScreen(
         items(state.overviews, key = { it.item.id }) { overview ->
             ItemRow(overview, onClick = { onOpenItem(overview.item.id) })
             HorizontalDivider()
+        }
+
+        // 隠している項目(E07-14)。ここからしか戻せないので、あれば必ず出す
+        if (state.hiddenMetrics.isNotEmpty()) {
+            item {
+                Text(
+                    "隠している項目(${state.hiddenMetrics.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            items(state.hiddenMetrics, key = { "hidden-" + it.id }) { metric ->
+                TextButton(onClick = { onEditMetric(metric.metricKey) }) { Text(metric.name) }
+            }
         }
 
         item {
@@ -198,6 +214,7 @@ private fun TopScreenPreview() {
             onOpenSyncLog = {},
             onOpenExport = {},
             onAddGoal = {},
+            onEditMetric = {},
         )
     }
 }
