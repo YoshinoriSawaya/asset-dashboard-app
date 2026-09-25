@@ -6,7 +6,7 @@ Metric/Reminder/Goalの汎用スキーマを設計し、Drive取り込み結果�
 はすべてこの上に乗る。
 
 ## 子イシュー
-- [ ] [E02-01: 汎用スキーマ設計(Metric/Reminder/Goal)](../tasks/E02-01-schema-design.md)
+- [x] [E02-01: 汎用スキーマ設計(Metric/Reminder/Goal)](../tasks/E02-01-schema-design.md)
 - [ ] [E02-02: Room DBのテーブル定義](../tasks/E02-02-room-db-schema.md)
 - [ ] [E02-03: Drive取り込み結果→ローカルキャッシュ反映の同期処理](../tasks/E02-03-drive-to-cache-sync.md)
 - [ ] [E02-04: アプリ起動時の同期トリガー判定(前回同期から一定期間経過)](../tasks/E02-04-sync-trigger.md)
