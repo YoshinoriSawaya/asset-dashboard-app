@@ -29,6 +29,8 @@ import com.yswy.assetdashboard.data.MetricChange
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Repeat
+import com.yswy.assetdashboard.ui.chart.ChangeBarChart
+import com.yswy.assetdashboard.ui.chart.LineChart
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import java.time.LocalDate
 import java.time.YearMonth
@@ -36,7 +38,7 @@ import java.time.YearMonth
 /**
  * 項目の詳細画面(E03-02)。種類ごとに中身を切り替える共通テンプレート。
  *
- * Metricの推移グラフはE03-06で、この画面の月次表の上に足す。
+ * Metricは推移の折れ線と月ごとの増減の棒(E03-06)を、月次の表の上に出す。
  */
 @Composable
 fun ItemDetailScreen(detail: ItemDetail?, loading: Boolean, onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -84,6 +86,14 @@ private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
                     if (detail.correctedCount > 0) append(" / うち手動補正 ${detail.correctedCount}点")
                 },
             )
+            if (detail.series.size >= 2) {
+                Spacer8()
+                LineChart(detail.series.map { it.date to it.valueYen })
+                Spacer8()
+                Text("月ごとの増減", style = MaterialTheme.typography.titleMedium)
+                // グラフは古い月から右へ。表(新しい月が先頭)とは逆順
+                ChangeBarChart(detail.monthly.reversed().map { "${it.period.start.monthValue}月" to it.changeYen })
+            }
             Spacer8()
             Text("月ごとの推移", style = MaterialTheme.typography.titleMedium)
             MonthlyRow("月", "最後の値", "増減", header = true)

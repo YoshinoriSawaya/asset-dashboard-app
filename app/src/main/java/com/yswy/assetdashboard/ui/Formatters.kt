@@ -18,6 +18,26 @@ object Formatters {
         else -> "±0円"
     }
 
+    /**
+     * グラフの目盛り用の短い表記。`1.2億` `552万` `-30万` `800円`。
+     * 目盛りは切りのいい値なので、万の位で丸めても情報は落ちない。
+     */
+    fun yenCompact(value: Long): String {
+        val sign = if (value < 0) "-" else ""
+        val abs = kotlin.math.abs(value)
+        return when {
+            abs >= 100_000_000 -> sign + trim(abs / 100_000_000.0) + "億"
+            abs >= 10_000 -> sign + trim(abs / 10_000.0) + "万"
+            else -> "$sign${abs}円"
+        }
+    }
+
+    /** 小数1桁まで。`.0` は落とす。 */
+    private fun trim(value: Double): String {
+        val rounded = kotlin.math.round(value * 10) / 10
+        return if (rounded % 1.0 == 0.0) rounded.toLong().toString() else rounded.toString()
+    }
+
     /** `42%`。達成超えもそのまま出す(`120%`)。 */
     fun percent(ratio: Double): String = "${(ratio * 100).toInt()}%"
 

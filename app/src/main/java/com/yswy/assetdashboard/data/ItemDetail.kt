@@ -11,6 +11,8 @@ sealed interface ItemDetail {
         override val overview: ItemOverview.Metric,
         /** 月ごとの推移(E02-05)。新しい月が先頭。 */
         val monthly: List<MetricChange>,
+        /** 系列の全点(日付順)。推移グラフ(E03-06)に使う。 */
+        val series: List<MetricPointEntity> = emptyList(),
         val pointCount: Int,
         /** 手で直した・足した点の数(E01-10)。 */
         val correctedCount: Int,
@@ -30,6 +32,7 @@ sealed interface ItemDetail {
             is ItemOverview.Metric -> Metric(
                 overview = overview,
                 monthly = Summary.monthlyMetric(overview.item.metricKey, series).reversed(),
+                series = series.sortedBy { it.date },
                 pointCount = series.size,
                 correctedCount = series.count { it.origin != MetricOrigin.CSV },
             )
