@@ -55,6 +55,7 @@ fun TopScreen(
     onAddGoal: () -> Unit,
     onEditMetric: (String) -> Unit,
     onAddReminder: () -> Unit,
+    onOpenCalendar: () -> Unit,
     onRunDailyCheck: ((Int) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -121,6 +122,7 @@ fun TopScreen(
                 Text("+ 目標を追加")
             }
             TextButton(onClick = onAddReminder) { Text("+ リマインダーを追加(点検・保険の更新など)") }
+            TextButton(onClick = onOpenCalendar) { Text("大型出費の予定(向こう3年)") }
             TextButton(onClick = onAddManual) {
                 Text("+ 手入力の系列を追加(現金など)")
             }
@@ -261,6 +263,7 @@ private fun TopScreenPreview() {
             onAddGoal = {},
             onEditMetric = {},
             onAddReminder = {},
+            onOpenCalendar = {},
             onRunDailyCheck = {},
         )
     }

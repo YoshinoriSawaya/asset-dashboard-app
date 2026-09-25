@@ -20,6 +20,8 @@ object ReminderForm {
         dueDate: String,
         repeat: Repeat,
         newId: () -> String = { UUID.randomUUID().toString() },
+        /** 見込み額(任意。E09-04)。空なら無し。 */
+        amount: String = "",
     ): Result {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -27,6 +29,10 @@ object ReminderForm {
             LocalDate.parse(dueDate.trim())
         } catch (e: DateTimeParseException) {
             return Result.Invalid("期日は 2027-03-01 の形で入れてください")
+        }
+        val amountYen = amount.trim().takeIf { it.isNotEmpty() }?.let {
+            CorrectionForm.parseYen(it)?.takeIf { yen -> yen > 0 }
+                ?: return Result.Invalid("見込み額は数字で入れてください(無ければ空のまま)")
         }
         return Result.Ok(
             Item.Reminder(
@@ -37,6 +43,7 @@ object ReminderForm {
                 // リマインダーは目標(-1)の次、系列(0)より前
                 sortOrder = existing?.sortOrder ?: -1,
                 hidden = existing?.hidden ?: false,
+                amountYen = amountYen,
             ),
         )
     }

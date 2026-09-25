@@ -99,6 +99,11 @@ sealed interface Item {
         val repeat: Repeat = Repeat.NONE,
         override val sortOrder: Int = 0,
         override val hidden: Boolean = false,
+        /**
+         * かかりそうな額(任意)。大型出費のカレンダー(E09-04)に出す。
+         * 行の `targetYen` 列に入れる(列を増やさない。汎用スキーマ)。
+         */
+        val amountYen: Long? = null,
     ) : Item
 
     companion object {
@@ -132,7 +137,7 @@ fun ItemEntity.toItem(): Item? = when (type) {
         else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly)
     }
     ItemType.REMINDER -> dueDate?.let {
-        Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden)
+        Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden, amountYen = targetYen)
     }
 }
 
@@ -153,6 +158,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         id = id, type = ItemType.REMINDER, name = name,
         dueDate = dueDate, repeat = repeat,
         sortOrder = sortOrder, hidden = hidden,
+        targetYen = amountYen,
     )
 }
 

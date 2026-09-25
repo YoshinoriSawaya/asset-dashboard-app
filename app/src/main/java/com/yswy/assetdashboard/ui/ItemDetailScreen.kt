@@ -312,6 +312,7 @@ private fun ReminderContent(detail: ItemDetail.Reminder) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(Formatters.daysLeft(detail.overview.daysLeft), style = MaterialTheme.typography.titleLarge)
         Label("期日 ${reminder.dueDate}")
+        reminder.amountYen?.let { Label("見込み額 ${Formatters.yen(it)}") }
         Label(
             when (reminder.repeat) {
                 Repeat.NONE -> "繰り返さない"

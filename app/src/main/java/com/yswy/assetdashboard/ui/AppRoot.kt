@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import com.yswy.assetdashboard.data.ItemDetail
+import com.yswy.assetdashboard.data.ExpenseCalendar
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
@@ -39,6 +40,7 @@ object Routes {
     const val SYNC_LOG = "synclog"
     const val EXPORT = "export"
     const val SPENDING_RULES = "spending_rules"
+    const val CALENDAR = "calendar"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -198,6 +200,12 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 modifier = modifier,
             )
         }
+        route == Routes.CALENDAR -> ExpenseCalendarScreen(
+            entries = ExpenseCalendar.build(state.overviews.map { it.item }, LocalDate.now()),
+            onOpenItem = { entry -> stack.add(Routes.item(entry.itemId)) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.SPENDING_RULES -> SpendingRulesScreen(
             load = viewModel::loadSpendingRules,
             withdrawals = viewModel::withdrawalDescriptions,
@@ -240,6 +248,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onOpenExport = { stack.add(Routes.EXPORT) },
             onAddGoal = { stack.add(Routes.goal(null)) },
             onAddReminder = { stack.add(Routes.reminder(null)) },
+            onOpenCalendar = { stack.add(Routes.CALENDAR) },
             onRunDailyCheck = viewModel::runDailyCheckNow,
             onEditMetric = { stack.add(Routes.metric(it)) },
             modifier = modifier,
