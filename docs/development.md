@@ -238,6 +238,7 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 | adbでスイッチを押したのに変わらない | Composeのスイッチやチップはテキストを持たない `android.view.View`(`checkable="true"`)。見出しの文字の位置ではなく、そのノードの位置を押す |
 | アラームの予約が消えた | `am force-stop` はアプリのアラームも消す。更新・再起動・アプリを開くと予約し直される |
 | 再起動したのにアラームが予約されない | `BOOT_COMPLETED` は起動から1分ほど遅れて届く。待ってから見る |
+| adbでロックを試したい | `adb shell locksettings set-pin 1234` で端末にPINを付ける。消すのは `locksettings clear --old 1234` |
 | PowerShellで自作の関数 `Where` が動かない | `where` は `Where-Object` の別名。別の名前にする |
 | リリース版を入れると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | デバッグ版と署名が違う。デバッグ版を消してから入れる |
 | リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |

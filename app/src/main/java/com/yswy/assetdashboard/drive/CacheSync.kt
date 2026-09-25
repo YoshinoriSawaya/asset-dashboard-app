@@ -1,6 +1,7 @@
 package com.yswy.assetdashboard.drive
 
 import android.util.Log
+import java.security.MessageDigest
 import androidx.room.withTransaction
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.BankTransactionEntity
@@ -49,7 +50,25 @@ object CacheSync {
         val transactions: List<BankTransactionEntity>,
         /** 重複として落とした行数(期間の重なるCSVなど)。 */
         val droppedDuplicates: Int,
-    )
+    ) {
+        /**
+         * 中身の指紋(E06-03)。同じDriveの中身から作れば、いつ・どの端末で作っても
+         * 同じ値になる。入れ直す前と後で比べれば、同じ状態に戻ったかが分かる。
+         *
+         * 並び順に左右されないよう、行を文字列にして並べ替えてからハッシュを取る。
+         * 金額が入るので、画面には先頭の8文字だけを出す(元には戻せない)。
+         */
+        val fingerprint: String
+            get() {
+                val lines = buildList {
+                    items.forEach { add("i|${it.id}|${it.type}|${it.name}|${it.metricKey}|${it.targetYen}|${it.dueDate}|${it.repeat}|${it.sortOrder}|${it.hidden}|${it.autoAverageMonths}|${it.autoCoverMonths}|${it.resetsYearly}") }
+                    points.forEach { add("p|${it.metricKey}|${it.date}|${it.valueYen}|${it.origin}") }
+                    transactions.forEach { add("t|${it.dedupKey}|${it.balance}|${it.memo}|${it.label}|${it.sourceFileId}|${it.excludedFromSpending}") }
+                }.sorted()
+                val digest = MessageDigest.getInstance("SHA-256").digest(lines.joinToString("\n").toByteArray(Charsets.UTF_8))
+                return digest.joinToString("") { "%02x".format(it) }.take(8)
+            }
+    }
 
     sealed interface Outcome {
         data class Rebuilt(
@@ -71,6 +90,7 @@ object CacheSync {
             if (snapshot.droppedDuplicates > 0) append(", 重複 ${snapshot.droppedDuplicates}行")
             if (unreadable.isNotEmpty()) append(", 読めず ${unreadable.size}件")
             append(")")
+            append(" 指紋 ${snapshot.fingerprint}")
         }
         is Outcome.Kept -> "キャッシュは更新せず: $reason"
     }

@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +38,8 @@ import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Repeat
 import com.yswy.assetdashboard.data.SyncStatus
+import com.yswy.assetdashboard.lock.AppLock
+import com.yswy.assetdashboard.lock.LockPrefs
 import com.yswy.assetdashboard.notify.DailyCheck
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import com.yswy.assetdashboard.widget.SyncStatusWidget
@@ -133,6 +136,24 @@ fun TopScreen(
                 TextButton(onClick = { SyncStatusWidget.requestPin(context) }) {
                     Text("ホーム画面にウィジェットを置く")
                 }
+            }
+        }
+
+        // アプリのロック(E06-01)
+        item {
+            val lockPrefs = remember { LockPrefs(context) }
+            var lockEnabled by remember { mutableStateOf(lockPrefs.enabled) }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("アプリのロック", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (AppLock.canLock(context)) "開いたとき・1分以上離れたあとに、生体認証か端末の画面ロックを求めます"
+                        else "この端末には画面ロックが無いため、ロックは効きません(端末の設定で画面ロックを設定してください)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = lockEnabled, onCheckedChange = { lockEnabled = it; lockPrefs.enabled = it })
             }
         }
 

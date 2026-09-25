@@ -6,9 +6,9 @@ Driveをバックアップの正として、機種変更やアプリ再インス
 そこから復元できる状態にする。
 
 ## 子イシュー
-- [ ] [E06-01: アプリロック(生体認証/PIN)](../tasks/E06-01-app-lock.md)
-- [ ] [E06-02: Driveからのローカルキャッシュ再構築フロー](../tasks/E06-02-restore-from-drive.md)
-- [ ] [E06-03: 復元時のデータ整合性確認(元データ+corrections+backupの突合)](../tasks/E06-03-restore-integrity-check.md)
+- [x] [E06-01: アプリロック(生体認証/PIN)](../tasks/E06-01-app-lock.md)
+- [x] [E06-02: Driveからのローカルキャッシュ再構築フロー](../tasks/E06-02-restore-from-drive.md)
+- [x] [E06-03: 復元時のデータ整合性確認(元データ+corrections+backupの突合)](../tasks/E06-03-restore-integrity-check.md)
 - [ ] [E06-04: グラフ・金額表示のプライバシーモード](../tasks/E06-04-privacy-display-mode.md)
 
 ## 完了条件

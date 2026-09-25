@@ -14,6 +14,7 @@ ksp = "2.3.12"
 lifecycleViewmodelCompose = "2.11.0"
 junit = "4.13.2"
 orgJson = "20260814"
+biometric = "1.1.0"
 androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 kotlinxSerialization = "1.8.1"
@@ -39,6 +40,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }

@@ -118,6 +118,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // アプリのロック(E06-01)。生体認証か端末の画面ロック(PIN等)。安定版は1.1.0が最新
+    implementation(libs.androidx.biometric)
+
     // ウィジェット(E04)で使う。E00時点では依存を通すだけ。
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
