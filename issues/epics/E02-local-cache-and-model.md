@@ -10,7 +10,7 @@ Metric/Reminder/Goalの汎用スキーマを設計し、Drive取り込み結果�
 - [x] [E02-02: Room DBのテーブル定義](../tasks/E02-02-room-db-schema.md)
 - [x] [E02-03: Drive取り込み結果→ローカルキャッシュ反映の同期処理](../tasks/E02-03-drive-to-cache-sync.md)
 - [x] [E02-04: アプリ起動時の同期トリガー判定(前回同期から一定期間経過)](../tasks/E02-04-sync-trigger.md)
-- [ ] [E02-05: 月次・年次集計ロジック](../tasks/E02-05-summary-aggregation.md)
+- [x] [E02-05: 月次・年次集計ロジック](../tasks/E02-05-summary-aggregation.md)
 
 ## 完了条件
 E01で取り込んだCSVデータが、Metric/Reminder/Goalの汎用スキーマに
