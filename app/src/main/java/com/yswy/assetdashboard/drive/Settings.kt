@@ -65,6 +65,12 @@ object Settings {
         false
     }
 
+    /** 項目を足す。同じidがあれば置き換える。 */
+    fun upsert(items: List<ItemEntity>, item: ItemEntity): List<ItemEntity> =
+        items.filterNot { it.id == item.id } + item
+
+    fun remove(items: List<ItemEntity>, id: String): List<ItemEntity> = items.filterNot { it.id == id }
+
     fun render(items: List<ItemEntity>): String {
         val array = JSONArray()
         items.forEach { item ->

@@ -6,28 +6,34 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
+import com.yswy.assetdashboard.data.ItemEntity
+import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
 import com.yswy.assetdashboard.data.SummaryBoard
-import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncPolicy
 import com.yswy.assetdashboard.data.SyncStatus
+import com.yswy.assetdashboard.data.toEntity
+import com.yswy.assetdashboard.drive.AppFolders
 import com.yswy.assetdashboard.drive.CacheSync
 import com.yswy.assetdashboard.drive.Corrections
+import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveFolderSetup
 import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.FullSync
 import com.yswy.assetdashboard.drive.LastSync
 import com.yswy.assetdashboard.drive.LastSyncStore
+import com.yswy.assetdashboard.drive.Settings
 import com.yswy.assetdashboard.widget.SyncStatusWidget
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * アプリ全体の状態。キャッシュの読み出しと同期を受け持つ。
@@ -130,13 +136,44 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun editCorrections(change: (List<Corrections.Entry>) -> List<Corrections.Entry>): String? {
+    private suspend fun editCorrections(change: (List<Corrections.Entry>) -> List<Corrections.Entry>): String? =
+        editOnDrive { api, folders ->
+            // 読めないまま書くと、既存の補正を全部消してしまう
+            val current = Corrections.load(api, folders) ?: return@editOnDrive "Driveの補正を読めないので保存しない"
+            if (Corrections.save(api, folders, change(current))) null else "Driveに書けないので保存しない"
+        }
+
+    /**
+     * 目標を保存する(E07-01)。Driveの settings/items.json に足すか置き換える。
+     * 補正(E03-04)と同じく、Driveに書けなければローカルも変えない。
+     */
+    fun saveGoal(goal: Item.Goal, onResult: (String?) -> Unit) {
+        viewModelScope.launch { onResult(editSettings { Settings.upsert(it, goal.toEntity()) }) }
+    }
+
+    fun deleteGoal(id: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch { onResult(editSettings { Settings.remove(it, id) }) }
+    }
+
+    private suspend fun editSettings(change: (List<ItemEntity>) -> List<ItemEntity>): String? =
+        editOnDrive { api, folders ->
+            // 読めないまま書くと、既存の項目の設定を全部消してしまう
+            val current = Settings.load(api, folders) ?: return@editOnDrive "Driveの設定を読めないので保存しない"
+            if (Settings.save(api, folders, change(current))) null else "Driveに書けないので保存しない"
+        }
+
+    /**
+     * Driveにある人が入力したもの(corrections・settings)を書き換え、キャッシュを作り直す。
+     *
+     * **Driveに書けなければローカルも変えない。** ローカルだけ直すと、次の同期で
+     * キャッシュをDriveから作り直したときに黙って消える(Driveが正)。
+     * @param write 書き換える。失敗の理由を返す(成功ならnull)
+     */
+    private suspend fun editOnDrive(write: suspend (DriveApi, AppFolders) -> String?): String? {
         _state.update { it.copy(syncing = true) }
         val outcome = DriveSession.withDrive(getApplication()) { api ->
             val folders = DriveFolderSetup.ensure(api).folders
-            // 読めないまま書くと、既存の補正を全部消してしまう
-            val current = Corrections.load(api, folders) ?: return@withDrive "Driveの補正を読めないので保存しない"
-            if (!Corrections.save(api, folders, change(current))) return@withDrive "Driveに書けないので保存しない"
+            write(api, folders)?.let { return@withDrive it }
             when (val cache = CacheSync.rebuild(api, folders, db)) {
                 is CacheSync.Outcome.Rebuilt -> null
                 is CacheSync.Outcome.Kept -> "Driveには保存したが、画面の更新に失敗: ${cache.reason}(次の同期で反映)"
@@ -146,7 +183,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
         return when (outcome) {
             is DriveSession.Outcome.Success -> outcome.value
-            is DriveSession.Outcome.Offline -> "オフラインなので保存しない(補正はDriveに置くため)"
+            is DriveSession.Outcome.Offline -> "オフラインなので保存しない(Driveに置くため)"
             is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
             is DriveSession.Outcome.ConsentRequired -> {
                 _state.update { it.copy(consentRequest = outcome.pendingIntent) }

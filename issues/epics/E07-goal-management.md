@@ -6,9 +6,9 @@
 自動的に見える状態にする。
 
 ## 子イシュー
-- [ ] [E07-01: Goal項目のCRUD画面(追加・編集・削除、目標金額の入力を含む)](../tasks/E07-01-goal-crud-screen.md)
+- [x] [E07-01: Goal項目のCRUD画面(追加・編集・削除、目標金額の入力を含む)](../tasks/E07-01-goal-crud-screen.md)
 - [x] ~~[E07-02: 口座残高との自動連動](../tasks/E07-02-account-balance-linking.md)~~ → E07-10に統合
-- [ ] [E07-03: 初期Goalデータ投入(車購入X万、緊急予備資金、PC/家電)](../tasks/E07-03-initial-goal-data.md)
+- [x] ~~[E07-03: 初期Goalデータ投入](../tasks/E07-03-initial-goal-data.md)~~ → E07-01に統合(実額をリポジトリに入れないため、画面から入れる)
 - [x] ~~[E07-04: 目標金額・期日の設定](../tasks/E07-04-goal-amount-and-due-date.md)~~ → E07-01・E07-11に統合
 - [ ] [E07-05: iDeCo Metricの追加](../tasks/E07-05-idoco-metric.md)
 - [ ] [E07-06: 生活防衛資金Goalの目標額自動計算](../tasks/E07-06-emergency-fund-auto-target.md)

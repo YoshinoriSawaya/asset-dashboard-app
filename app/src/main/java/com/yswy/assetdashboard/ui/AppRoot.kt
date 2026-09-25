@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import com.yswy.assetdashboard.data.ItemDetail
+import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
@@ -42,6 +43,13 @@ object Routes {
     fun item(id: String) = ITEM + id
 
     private const val CORRECT = "correct/"
+    private const val GOAL = "goal/"
+
+    /** 目標の編集(E07-01)。[id]がnullなら新規。 */
+    fun goal(id: String?) = GOAL + id.orEmpty()
+
+    /** `goal/<id>` なら id(新規なら空文字)、違えばnull。 */
+    fun goalId(route: String): String? = route.removePrefix(GOAL).takeIf { route.startsWith(GOAL) }
 
     /** 補正画面。[metricKey]がnullなら新しい系列の手入力。 */
     fun correct(metricKey: String?) = CORRECT + metricKey.orEmpty()
@@ -73,11 +81,29 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     val route = stack.last()
     val itemId = Routes.itemId(route)
     val correctKey = Routes.correctKey(route)
+    val goalId = Routes.goalId(route)
     /** [target]がまだ一番上なら閉じる。保存の完了が画面を離れた後に届いても、別の画面を閉じない。 */
     fun close(target: String) {
         if (stack.size > 1 && stack.last() == target) stack.removeAt(stack.lastIndex)
     }
     when {
+        goalId != null -> GoalEditScreen(
+            existing = state.overviews.map { it.item }.filterIsInstance<Item.Goal>().firstOrNull { it.id == goalId },
+            metricKeys = state.overviews.map { it.item }.filterIsInstance<Item.Metric>().map { it.metricKey },
+            saving = state.syncing,
+            onSave = viewModel::saveGoal,
+            // 削除したら詳細画面も意味が無いので、トップまで戻る
+            onDelete = { id, onResult ->
+                viewModel.deleteGoal(id) { error ->
+                    if (error == null) {
+                        while (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    }
+                    onResult(error)
+                }
+            },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         correctKey != null -> {
             val latest = state.overviews
                 .filterIsInstance<ItemOverview.Metric>()
@@ -104,6 +130,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 loading = overview != null && detail == null,
                 onBack = { stack.removeAt(stack.lastIndex) },
                 onCorrect = { stack.add(Routes.correct(it)) },
+                onEditGoal = { stack.add(Routes.goal(it)) },
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,
@@ -140,6 +167,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onAddManual = { stack.add(Routes.correct(null)) },
             onOpenSyncLog = { stack.add(Routes.SYNC_LOG) },
             onOpenExport = { stack.add(Routes.EXPORT) },
+            onAddGoal = { stack.add(Routes.goal(null)) },
             modifier = modifier,
         )
     }

@@ -43,6 +43,7 @@ fun TopScreen(
     onAddManual: () -> Unit,
     onOpenSyncLog: () -> Unit,
     onOpenExport: () -> Unit,
+    onAddGoal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -67,7 +68,10 @@ fun TopScreen(
         }
 
         item {
-            TextButton(onClick = onAddManual, modifier = Modifier.padding(top = 8.dp)) {
+            TextButton(onClick = onAddGoal, modifier = Modifier.padding(top = 8.dp)) {
+                Text("+ 目標を追加")
+            }
+            TextButton(onClick = onAddManual) {
                 Text("+ 手入力の系列を追加(現金など)")
             }
             TextButton(onClick = onOpenExport) { Text("AI相談用にコピー") }
@@ -193,6 +197,7 @@ private fun TopScreenPreview() {
             onAddManual = {},
             onOpenSyncLog = {},
             onOpenExport = {},
+            onAddGoal = {},
         )
     }
 }

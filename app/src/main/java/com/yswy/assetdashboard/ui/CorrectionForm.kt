@@ -31,15 +31,21 @@ object CorrectionForm {
             return Result.Invalid("日付は 2026-09-25 の形で入れてください")
         }
 
+        val yen = parseYen(value) ?: return Result.Invalid("金額は数字で入れてください(例: 1,234,567)")
+
+        return Result.Ok(key, day, yen, note.trim().takeIf { it.isNotEmpty() })
+    }
+
+    /**
+     * 手入力の金額。カンマ・円・¥・マイナスを落とした残りが数字だけのときに限る。
+     * 目標額の入力(E07-01)でも使う。
+     */
+    fun parseYen(value: String): Long? {
         val text = value.trim().removePrefix("¥").removeSuffix("円").replace(",", "")
         val negative = text.startsWith("-")
         val digits = text.removePrefix("-")
-        if (digits.isEmpty() || !digits.all { it.isDigit() } || digits.length > 14) {
-            return Result.Invalid("金額は数字で入れてください(例: 1,234,567)")
-        }
-        val yen = digits.toLong().let { if (negative) -it else it }
-
-        return Result.Ok(key, day, yen, note.trim().takeIf { it.isNotEmpty() })
+        if (digits.isEmpty() || !digits.all { it.isDigit() } || digits.length > 14) return null
+        return digits.toLong().let { if (negative) -it else it }
     }
 
     /**

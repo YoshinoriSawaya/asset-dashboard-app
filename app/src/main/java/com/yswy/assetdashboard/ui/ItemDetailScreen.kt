@@ -55,6 +55,7 @@ fun ItemDetailScreen(
     onCorrect: (String) -> Unit = {},
     onDeleteCorrection: (String, LocalDate, (String?) -> Unit) -> Unit = { _, _, _ -> },
     busy: Boolean = false,
+    onEditGoal: (String) -> Unit = {},
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -83,7 +84,12 @@ fun ItemDetailScreen(
                 }
                 metricContent(detail)
             }
-            is ItemDetail.Goal -> item { GoalContent(detail) }
+            is ItemDetail.Goal -> item {
+                GoalContent(detail)
+                OutlinedButton(onClick = { onEditGoal(detail.overview.item.id) }, enabled = !busy) {
+                    Text("編集・削除")
+                }
+            }
             is ItemDetail.Reminder -> item { ReminderContent(detail) }
         }
     }
