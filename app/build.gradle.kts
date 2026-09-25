@@ -1,9 +1,32 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
+
+/**
+ * アプリのバージョン(E08-03)。ここだけを書き換える。
+ * versionCode はここから決まる(1.2.3 → 10203)ので、上げ忘れて
+ * 「更新なのにインストールできない」が起きない。
+ */
+val appVersion = "1.0.0"
+
+fun versionCodeOf(version: String): Int {
+    val (major, minor, patch) = version.split(".").map { it.toInt() }
+    require(minor < 100 && patch < 100) { "minor/patchは99まで: $version" }
+    return major * 10_000 + minor * 100 + patch
+}
+
+/**
+ * リリース署名の設定(E08-01)。リポジトリ直下の keystore.properties から読む。
+ * このファイルと鍵はgitに入れない(.gitignore済み)。作り方はE00-06。
+ */
+val releaseSigning: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
 
 android {
     namespace = "com.yswy.assetdashboard"
@@ -13,14 +36,27 @@ android {
         applicationId = "com.yswy.assetdashboard"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeOf(appVersion)
+        versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        releaseSigning?.let { props ->
+            create("release") {
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // 鍵が無ければnull。そのときは下のチェックでビルドを止める
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -101,5 +137,24 @@ dependencies {
         // 1.7.3に解決され、AGPがテストもアプリと同じ版に固定するため
         // AbstractMethodErrorで落ちる。アプリ側を揃えて上げる。
         implementation(libs.kotlinx.serialization.core)
+    }
+}
+
+// 鍵が無いままリリースをビルドすると、署名されていないAPKが黙ってできる。
+// それをスマホに入れようとして失敗するより、ここで止めて理由を出す(E08-01)。
+val signingMissing = releaseSigning == null
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "bundleRelease") {
+        // ローカルに写してから使う。スクリプトの変数を直接つかむと、
+        // configuration cache が保存できずにビルドが落ちる
+        val missing = signingMissing
+        doFirst {
+            if (missing) {
+                throw GradleException(
+                    "keystore.properties が無いので、リリース用に署名できない。" +
+                        "作り方は issues/tasks/E00-06-keystore-creation.md",
+                )
+            }
+        }
     }
 }

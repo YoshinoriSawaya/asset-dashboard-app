@@ -164,6 +164,46 @@ Console側の設定手順(どのスコープを選んだか、テストユーザ
 [issues/tasks/E01-01-oauth-setup.md](../issues/tasks/E01-01-oauth-setup.md)。
 ここに載せているのは「すぐ必要になる値」だけ。
 
+## リリース(スマホに入れる)
+
+判断の経緯は [E08-01](../issues/tasks/E08-01-signed-apk-build.md) /
+[E08-02](../issues/tasks/E08-02-install-update-flow.md) /
+[E08-03](../issues/tasks/E08-03-version-history.md)。
+
+### 最初の1回だけ
+1. **署名鍵を作る**([E00-06](../issues/tasks/E00-06-keystore-creation.md))。
+   鍵とパスワードはパスワードマネージャーへ。リポジトリ直下に
+   `keystore.properties` を置く(gitには入らない)
+2. **リリース鍵のSHA-1をGoogle Cloud Consoleに登録する**。
+   しないと、リリース版で「Driveと同期」が `失敗: 10:`(DEVELOPER_ERROR)になる
+   ```powershell
+   & "$env:JAVA_HOME\bin\keytool.exe" -list -v `
+     -keystore E:\Engineering\_secrets\asset-dashboard-release.jks -alias asset-dashboard
+   ```
+   出てきた `SHA1:` で、Androidのクライアントを**もう1つ**作る
+   (パッケージ名 `com.yswy.assetdashboard`)。手順はデバッグ用と同じ
+   ([E01-01](../issues/tasks/E01-01-oauth-setup.md))
+3. **スマホに入っているデバッグ版を消す**。デバッグ版とリリース版は署名が違い、
+   上書きできない(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)。消すとスマホの
+   キャッシュも消えるが、同期すればDriveから戻る。Googleの同意はやり直し
+
+### 毎回
+```powershell
+# 1. app/build.gradle.kts の appVersion を上げ、CHANGELOG.md に書く
+# 2. ビルド(keystore.properties が無ければ理由を出して止まる)
+& "$proj\gradlew.bat" -p $proj assembleRelease
+#    → app\build\outputs\apk\release\app-release.apk
+# 3. スマホに入れる(USBデバッグ。E00-04)
+& $adb install -r "$proj\app\build\outputs\apk\release\app-release.apk"
+```
+
+USBでつなげないときは、APKをDriveに上げてスマホで開いてもよい
+(Driveアプリに「不明なアプリのインストール」を許可する必要がある)。
+**`資産アプリ/inbox` には置かない**。CSVとして読もうとして失敗扱いになる。
+
+`-r` の上書きでスマホのデータは残る。バージョンを下げると入らない
+(`INSTALL_FAILED_VERSION_DOWNGRADE`)。
+
 ## 踏んだ落とし穴
 
 | 症状 | 原因 |
@@ -179,3 +219,5 @@ Console側の設定手順(どのスコープを選んだか、テストユーザ
 | ウィジェットをタップしても開かない | `am force-stop` がPendingIntentを取り消した。アプリを開けば直る。確認で強制停止を使わない |
 | ウィジェットの色が同期しても変わらない | Glanceのセッション中は `provideGlance` が呼び直されない。判定は `updateAppWidgetState` に書いて `currentState` で読む |
 | ホームに置いたウィジェットが見つからない | HOMEキーは1ページ目に戻る。置いたページ(2ページ目など)へスワイプする |
+| リリース版を入れると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | デバッグ版と署名が違う。デバッグ版を消してから入れる |
+| リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |

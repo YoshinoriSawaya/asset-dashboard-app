@@ -42,8 +42,9 @@ keyAlias=asset-dashboard
 keyPassword=<パスワード>
 ```
 
-これを `app/build.gradle.kts` の `signingConfigs` から読む実装は
-E08-01(署名付きAPKビルド)で行う。E00の時点ではファイルの存在だけでよい。
+これを読んで署名する設定はE08-01で入れた(使い捨ての鍵で確認済み)。
+鍵を作ったら、Cloud ConsoleへのSHA-1の登録とスマホへの入れ方は
+[docs/development.md](../../docs/development.md) の「リリース」。
 
 ## ステータス
 未着手(パスワードを決める必要があるため手作業)
