@@ -21,7 +21,10 @@ sealed interface ItemDetail {
     data class Goal(override val overview: ItemOverview.Goal) : ItemDetail {
         /** 目標まであといくら。達成済みなら0。進捗不明ならnull。 */
         val remainingYen: Long?
-            get() = overview.currentYen?.let { (overview.item.targetYen - it).coerceAtLeast(0) }
+            get() {
+                val target = overview.targetYen ?: return null
+                return overview.currentYen?.let { (target - it).coerceAtLeast(0) }
+            }
     }
 
     data class Reminder(override val overview: ItemOverview.Reminder) : ItemDetail

@@ -108,8 +108,10 @@ object CacheSync {
             ?: return Outcome.Kept("correctionsを読めない")
         val settings = Settings.load(api, folders)
             ?: return Outcome.Kept("settingsを読めない")
+        val exclusions = SpendingRules.load(api, folders)
+            ?: return Outcome.Kept("生活費から除く決まりを読めない")
 
-        val snapshot = build(backups, corrections, settings)
+        val snapshot = build(backups, corrections, settings, exclusions)
 
         db.withTransaction {
             db.itemDao().deleteAll()
@@ -134,6 +136,8 @@ object CacheSync {
         backups: List<BackupReader.Backup>,
         corrections: List<Corrections.Entry>,
         settings: List<ItemEntity>,
+        /** 摘要にこの言葉を含む出金を生活費から除く(E07-06)。 */
+        exclusions: List<String> = emptyList(),
     ): Snapshot {
         var dropped = 0
 
@@ -144,7 +148,9 @@ object CacheSync {
         for (backup in backups) {
             when (val data = backup.data) {
                 is ParsedData.Transactions -> data.rows.forEach { row ->
-                    val entity = BankTransactionEntity.from(row, backup.sourceFileId)
+                    val entity = BankTransactionEntity.from(row, backup.sourceFileId).copy(
+                        excludedFromSpending = SpendingRules.matches(row.description, exclusions),
+                    )
                     if (transactions.putIfAbsent(entity.dedupKey, entity) != null) dropped++
                 }
                 is ParsedData.Metrics -> data.points.forEach { point ->

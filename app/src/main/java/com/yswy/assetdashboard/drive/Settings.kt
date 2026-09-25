@@ -86,6 +86,14 @@ object Settings {
                         item.targetYen?.let { json.put("targetYen", it) }
                         item.dueDate?.let { json.put("dueDate", it.toString()) }
                         item.repeat?.let { json.put("repeat", it.name) }
+                        if (item.autoAverageMonths != null && item.autoCoverMonths != null) {
+                            json.put(
+                                "autoTarget",
+                                JSONObject()
+                                    .put("averageMonths", item.autoAverageMonths)
+                                    .put("coverMonths", item.autoCoverMonths),
+                            )
+                        }
                     },
             )
         }
@@ -118,6 +126,8 @@ object Settings {
                 repeat = runCatching { Repeat.valueOf(obj.optString("repeat")) }.getOrNull(),
                 sortOrder = obj.optInt("sortOrder"),
                 hidden = obj.optBoolean("hidden"),
+                autoAverageMonths = obj.optJSONObject("autoTarget")?.optInt("averageMonths")?.takeIf { it > 0 },
+                autoCoverMonths = obj.optJSONObject("autoTarget")?.optInt("coverMonths")?.takeIf { it > 0 },
             )
             if (item.toItem() == null) {
                 Log.w(TAG, "項目を読めないので飛ばす: id=$id type=$type")

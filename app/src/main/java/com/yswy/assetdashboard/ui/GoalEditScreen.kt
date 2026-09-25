@@ -44,6 +44,7 @@ fun GoalEditScreen(
     onDelete: (String, (String?) -> Unit) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSpendingRules: () -> Unit = {},
 ) {
     var name by rememberSaveable { mutableStateOf(existing?.name.orEmpty()) }
     var target by rememberSaveable { mutableStateOf(existing?.targetYen?.toString().orEmpty()) }
@@ -51,6 +52,10 @@ fun GoalEditScreen(
     var due by rememberSaveable { mutableStateOf(existing?.dueDate?.toString().orEmpty()) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    // 目標額の決め方(E07-06)。生活防衛資金のように、生活費の何か月分かで決めたいとき
+    var useAuto by rememberSaveable { mutableStateOf(existing?.autoTarget != null) }
+    var averageMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.averageMonths ?: 6).toString()) }
+    var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -68,12 +73,41 @@ fun GoalEditScreen(
             value = name, onValueChange = { name = it },
             label = { Text("名前(例: 車の購入)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
-            value = target, onValueChange = { target = it },
-            label = { Text("目標額(円)") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Text("目標額の決め方", style = MaterialTheme.typography.titleSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(!useAuto, onClick = { useAuto = false }, label = { Text("金額を入れる") })
+            FilterChip(useAuto, onClick = { useAuto = true }, label = { Text("生活費から出す") })
+        }
+        if (!useAuto) {
+            OutlinedTextField(
+                value = target, onValueChange = { target = it },
+                label = { Text("目標額(円)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Text(
+                "直近の生活費の月平均 × 何か月分、を目標額にします。今月と、明細の無い月は平均に入れません。" +
+                    "振替やカードの引き落としは、下の設定で生活費から外せます。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = averageMonths, onValueChange = { averageMonths = it },
+                    label = { Text("平均を取る月数") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = coverMonths, onValueChange = { coverMonths = it },
+                    label = { Text("何か月分") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            TextButton(onClick = onOpenSpendingRules) { Text("生活費から除く出金を設定") }
+        }
         OutlinedTextField(
             value = due, onValueChange = { due = it },
             label = { Text("期日(任意。2030-04-01)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -96,7 +130,8 @@ fun GoalEditScreen(
             Button(
                 enabled = !saving,
                 onClick = {
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due)) {
+                    val auto = if (useAuto) averageMonths to coverMonths else null
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."

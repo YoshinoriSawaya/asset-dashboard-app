@@ -24,10 +24,19 @@ sealed interface ItemOverview {
         override val item: Item.Goal,
         /** 紐づけた系列の最新値。系列が未設定かデータが無ければnull。 */
         val currentYen: Long?,
+        /** 支出から自動で出したときの計算結果(E07-06)。決まった額の目標ならnull。 */
+        val auto: AutoTargets.Result? = null,
     ) : ItemOverview {
+        /** 実際に使う目標額。自動の目標で、計算に使える月が無ければnull。 */
+        val targetYen: Long?
+            get() = if (item.autoTarget != null) auto?.targetYen else item.targetYen
+
         /** 進捗(1.0で達成)。目標額を超えても頭打ちにしない。 */
         val progress: Double?
-            get() = currentYen?.takeIf { item.targetYen > 0 }?.let { it.toDouble() / item.targetYen }
+            get() {
+                val target = targetYen?.takeIf { it > 0 } ?: return null
+                return currentYen?.let { it.toDouble() / target }
+            }
     }
 
     data class Reminder(
@@ -41,7 +50,13 @@ sealed interface ItemOverview {
          * 項目と、その項目が参照する系列の点から1行を作る。
          * @param pointsByKey metricKeyごとの点(順序は問わない)
          */
-        fun of(item: Item, pointsByKey: Map<String, List<MetricPointEntity>>, today: LocalDate): ItemOverview =
+        fun of(
+            item: Item,
+            pointsByKey: Map<String, List<MetricPointEntity>>,
+            today: LocalDate,
+            /** 月ごとの入出金。支出から目標額を出すGoal(E07-06)で使う。 */
+            monthlyCashflow: List<Cashflow> = emptyList(),
+        ): ItemOverview =
             when (item) {
                 is Item.Metric -> {
                     val points = pointsByKey[item.metricKey].orEmpty()
@@ -59,6 +74,7 @@ sealed interface ItemOverview {
                         ?.let { pointsByKey[it] }
                         ?.maxByOrNull { it.date }
                         ?.valueYen,
+                    auto = item.autoTarget?.let { AutoTargets.compute(it, monthlyCashflow, today) },
                 )
                 is Item.Reminder -> Reminder(item, ChronoUnit.DAYS.between(today, item.dueDate))
             }
@@ -74,7 +90,13 @@ sealed interface ItemOverview {
                 }
             }.distinct()
             val pointsByKey = keys.associateWith { db.metricPointDao().series(it) }
-            return items.map { of(it, pointsByKey, today) }
+            // 支出から目標額を出すGoalがあるときだけ明細を読む
+            val monthly = if (items.any { it is Item.Goal && it.autoTarget != null }) {
+                Summary.monthlyCashflow(db.bankTransactionDao().all())
+            } else {
+                emptyList()
+            }
+            return items.map { of(it, pointsByKey, today, monthly) }
         }
     }
 }

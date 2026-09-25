@@ -35,7 +35,16 @@ data class ItemEntity(
     val repeat: Repeat? = null,
     val sortOrder: Int = 0,
     val hidden: Boolean = false,
+    /** 目標額を支出から自動で出すとき(E07-06)。平均を取る月数と、何か月分か。 */
+    val autoAverageMonths: Int? = null,
+    val autoCoverMonths: Int? = null,
 )
+
+/**
+ * 目標額を支出の実績から出す決まり(E07-06)。
+ * 「直近[averageMonths]か月の生活費の平均 × [coverMonths]か月」。
+ */
+data class AutoTarget(val averageMonths: Int = 6, val coverMonths: Int = 6)
 
 /** 型の付いた項目。[ItemEntity]との行き来は[toItem] / [toEntity]。 */
 sealed interface Item {
@@ -58,15 +67,19 @@ sealed interface Item {
      *
      * [metricKey]は進捗を測る系列。Goalを先に作って系列は後で
      * 紐づける、という順番もありうるのでnullを許す(その間は進捗不明)。
+     *
+     * 目標額は[targetYen](決まった額)か[autoTarget](支出から出す。E07-06)の
+     * どちらか。両方あれば自動のほうを使う。実際の額は[ItemOverview.Goal.targetYen]。
      */
     data class Goal(
         override val id: String,
         override val name: String,
-        val targetYen: Long,
+        val targetYen: Long?,
         val metricKey: String? = null,
         val dueDate: LocalDate? = null,
         override val sortOrder: Int = 0,
         override val hidden: Boolean = false,
+        val autoTarget: AutoTarget? = null,
     ) : Item
 
     data class Reminder(
@@ -99,8 +112,15 @@ fun ItemEntity.toItem(): Item? = when (type) {
     ItemType.METRIC -> metricKey?.let {
         Item.Metric(id, name, it, sortOrder, hidden)
     }
-    ItemType.GOAL -> targetYen?.let {
-        Item.Goal(id, name, it, metricKey, dueDate, sortOrder, hidden)
+    ItemType.GOAL -> {
+        val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
+            AutoTarget(autoAverageMonths, autoCoverMonths)
+        } else {
+            null
+        }
+        // 目標額の決め方がどちらも無いGoalは読めない
+        if (targetYen == null && auto == null) null
+        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto)
     }
     ItemType.REMINDER -> dueDate?.let {
         Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden)
@@ -117,6 +137,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         id = id, type = ItemType.GOAL, name = name,
         metricKey = metricKey, targetYen = targetYen, dueDate = dueDate,
         sortOrder = sortOrder, hidden = hidden,
+        autoAverageMonths = autoTarget?.averageMonths, autoCoverMonths = autoTarget?.coverMonths,
     )
     is Item.Reminder -> ItemEntity(
         id = id, type = ItemType.REMINDER, name = name,

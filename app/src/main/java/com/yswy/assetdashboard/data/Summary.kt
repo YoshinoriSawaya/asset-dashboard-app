@@ -28,6 +28,8 @@ data class Cashflow(
     val incomeYen: Long,
     val spendingYen: Long,
     val count: Int,
+    /** 支出のうち、振替などを除いた生活費(E07-06)。除く決まりが無ければ支出と同じ。 */
+    val livingSpendingYen: Long = spendingYen,
 ) {
     val netYen: Long get() = incomeYen - spendingYen
 }
@@ -69,6 +71,7 @@ object Summary {
             incomeYen = inPeriod.sumOf { it.deposit ?: 0L },
             spendingYen = inPeriod.sumOf { it.withdrawal ?: 0L },
             count = inPeriod.size,
+            livingSpendingYen = inPeriod.filterNot { it.excludedFromSpending }.sumOf { it.withdrawal ?: 0L },
         )
     }
 

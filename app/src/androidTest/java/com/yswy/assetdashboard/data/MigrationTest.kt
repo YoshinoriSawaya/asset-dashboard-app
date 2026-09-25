@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +48,33 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v2からv3で既存の行が残り新しい列が既定値になる() {
+        helper.createDatabase(DB3, 2).use { v2 ->
+            v2.execSQL(
+                "INSERT INTO ingested_file (driveFileId, name, modifiedTime, md5Checksum, ingestedAt) " +
+                    "VALUES ('id-1', 'meisai.csv', '2026-09-25T00:00:00Z', NULL, 1)",
+            )
+            v2.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden) " +
+                    "VALUES ('g1', 'GOAL', '車', NULL, 1000, NULL, NULL, 0, 0)",
+            )
+            v2.execSQL(
+                "INSERT INTO bank_transaction (dedupKey, date, description, withdrawal, deposit, balance, memo, label, sourceFileId) " +
+                    "VALUES ('k', '2026-09-01', 'x', 100, NULL, NULL, NULL, NULL, 'f')",
+            )
+        }
+        helper.runMigrationsAndValidate(DB3, 3, true).use { v3 ->
+            v3.query("SELECT COUNT(*) FROM ingested_file").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+            v3.query("SELECT autoAverageMonths, autoCoverMonths FROM item").use { c ->
+                c.moveToFirst(); assertTrue(c.isNull(0) && c.isNull(1))
+            }
+            v3.query("SELECT excludedFromSpending FROM bank_transaction").use { c ->
+                c.moveToFirst(); assertEquals(0, c.getInt(0))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -81,5 +109,6 @@ class MigrationTest {
         const val APP_DB = "app-config-test.db"
 
         const val DB = "migration-test.db"
+        const val DB3 = "migration-test-3.db"
     }
 }

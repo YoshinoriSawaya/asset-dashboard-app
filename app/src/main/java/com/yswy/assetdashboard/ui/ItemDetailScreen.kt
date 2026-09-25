@@ -198,7 +198,19 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             modifier = Modifier.fillMaxWidth(),
         )
         detail.overview.currentYen?.let { Label("現在 ${Formatters.yen(it)}") }
-        Label("目標 ${Formatters.yen(goal.targetYen)}")
+        Label(detail.overview.targetYen?.let { "目標 ${Formatters.yen(it)}" } ?: "目標 不明")
+        // 支出から出した目標なら、どう計算したかを出す(E07-06)
+        goal.autoTarget?.let { rule ->
+            val auto = detail.overview.auto
+            Label(
+                if (auto?.monthlyAverageYen == null) {
+                    "生活費の${rule.averageMonths}か月平均 × ${rule.coverMonths}か月(使える月の明細がまだ無い)"
+                } else {
+                    "生活費の平均 ${Formatters.yen(auto.monthlyAverageYen)}(${auto.monthsUsed}か月分)× ${rule.coverMonths}か月" +
+                        if (auto.monthsUsed < rule.averageMonths) "。明細が${rule.averageMonths}か月分そろうまでは少ない月で平均" else ""
+                },
+            )
+        }
         detail.remainingYen?.let { Label(if (it == 0L) "達成済み" else "あと ${Formatters.yen(it)}") }
         goal.dueDate?.let { Label("期日 $it") }
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")

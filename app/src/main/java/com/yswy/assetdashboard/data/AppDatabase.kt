@@ -28,11 +28,13 @@ import androidx.room.TypeConverters
         MetricPointEntity::class,
         BankTransactionEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
     autoMigrations = [
         // E02-02: item / metric_point / bank_transaction を追加
         AutoMigration(from = 1, to = 2),
+        // E07-06: 目標額の自動計算の列と、生活費から除く印を追加
+        AutoMigration(from = 2, to = 3),
     ],
 )
 @TypeConverters(Converters::class)

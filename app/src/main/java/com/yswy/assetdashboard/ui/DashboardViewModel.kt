@@ -27,6 +27,7 @@ import com.yswy.assetdashboard.drive.FullSync
 import com.yswy.assetdashboard.drive.LastSync
 import com.yswy.assetdashboard.drive.LastSyncStore
 import com.yswy.assetdashboard.drive.Settings
+import com.yswy.assetdashboard.drive.SpendingRules
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.Instant
 import java.time.LocalDate
@@ -166,6 +167,43 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
     }
+
+    /** 生活費から除く言葉(E07-06)をDriveから読む。 */
+    suspend fun loadSpendingRules(): Result<List<String>> {
+        val outcome = DriveSession.withDrive(getApplication()) { api ->
+            SpendingRules.load(api, DriveFolderSetup.ensure(api).folders)
+        }
+        return when (outcome) {
+            is DriveSession.Outcome.Success ->
+                outcome.value?.let { Result.success(it) } ?: Result.failure(Exception("Driveの設定を読めない"))
+            is DriveSession.Outcome.Offline -> Result.failure(Exception("オフライン"))
+            is DriveSession.Outcome.Failed -> Result.failure(Exception(outcome.message))
+            is DriveSession.Outcome.ConsentRequired -> {
+                _state.update { it.copy(consentRequest = outcome.pendingIntent) }
+                Result.failure(Exception("Googleの同意が必要"))
+            }
+        }
+    }
+
+    /** 生活費から除く言葉を保存し、キャッシュを作り直して明細の印を付け直す。 */
+    fun saveSpendingRules(keywords: List<String>, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                editOnDrive { api, folders ->
+                    if (SpendingRules.save(api, folders, keywords)) null else "Driveに書けないので保存しない"
+                },
+            )
+        }
+    }
+
+    /** 手元の出金の摘要と件数(多い順)。除く言葉を考える手がかりに、画面にだけ出す。 */
+    suspend fun withdrawalDescriptions(): List<Pair<String, Int>> =
+        db.bankTransactionDao().all()
+            .filter { (it.withdrawal ?: 0) > 0 }
+            .groupingBy { it.description }
+            .eachCount()
+            .toList()
+            .sortedByDescending { it.second }
 
     fun deleteGoal(id: String, onResult: (String?) -> Unit) {
         viewModelScope.launch { onResult(editSettings { Settings.remove(it, id) }) }

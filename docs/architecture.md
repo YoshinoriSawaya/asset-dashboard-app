@@ -82,7 +82,7 @@ Driveのデータは作り直せるかどうかで2つに分かれる。
 
 | 作り直せる | 作り直せない(人が入力した) |
 |-----------|--------------------------|
-| `backup/`(CSVを再取り込みすれば出る) | `corrections/`(数値の補正)、`settings/`(Goal・Reminderなど項目の定義) |
+| `backup/`(CSVを再取り込みすれば出る) | `corrections/`(数値の補正)、`settings/`(Goal・Reminderなど項目の定義、生活費から除く決まり) |
 
 Roomにだけ書いてよいものは無い。項目の定義もアプリで入力するが、
 正はDriveの `settings/items.json` に置く。

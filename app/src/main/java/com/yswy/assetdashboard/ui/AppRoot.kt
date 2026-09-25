@@ -38,6 +38,7 @@ object Routes {
     const val SUMMARY = "summary"
     const val SYNC_LOG = "synclog"
     const val EXPORT = "export"
+    const val SPENDING_RULES = "spending_rules"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -119,6 +120,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             },
             onBack = { close(route) },
             modifier = modifier,
+            onOpenSpendingRules = { stack.add(Routes.SPENDING_RULES) },
         )
         correctKey != null -> {
             val latest = state.overviews
@@ -153,6 +155,14 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 modifier = modifier,
             )
         }
+        route == Routes.SPENDING_RULES -> SpendingRulesScreen(
+            load = viewModel::loadSpendingRules,
+            withdrawals = viewModel::withdrawalDescriptions,
+            saving = state.syncing,
+            onSave = viewModel::saveSpendingRules,
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.EXPORT -> {
             val text by produceState<String?>(null, state.overviews) { value = viewModel.aiExport() }
             ExportScreen(text = text, onBack = { close(route) }, modifier = modifier)
@@ -172,6 +182,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 unit = unit,
                 summaries = summaries,
                 onUnitChange = { unit = it },
+                onOpenSpendingRules = { stack.add(Routes.SPENDING_RULES) },
                 onBack = { stack.removeAt(stack.lastIndex) },
                 modifier = modifier,
             )

@@ -40,6 +40,7 @@ fun SummaryScreen(
     onUnitChange: (PeriodUnit) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSpendingRules: () -> Unit = {},
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
@@ -49,6 +50,7 @@ fun SummaryScreen(
                 FilterChip(unit == PeriodUnit.MONTH, onClick = { onUnitChange(PeriodUnit.MONTH) }, label = { Text("月次") })
                 FilterChip(unit == PeriodUnit.YEAR, onClick = { onUnitChange(PeriodUnit.YEAR) }, label = { Text("年次") })
             }
+            TextButton(onClick = onOpenSpendingRules) { Text("生活費から除く出金を設定") }
         }
 
         when {
@@ -90,6 +92,10 @@ private fun MetricLine(name: String, change: MetricChange) {
 private fun CashflowLines(cashflow: Cashflow) {
     SubLine("収入", Formatters.yen(cashflow.incomeYen))
     SubLine("支出", Formatters.yen(cashflow.spendingYen))
+    // 振替などを除いた生活費(E07-06)。除く決まりに当たる出金があるときだけ出す
+    if (cashflow.livingSpendingYen != cashflow.spendingYen) {
+        SubLine("うち生活費", Formatters.yen(cashflow.livingSpendingYen))
+    }
     Line(label = "収支", value = "${cashflow.count}件", change = cashflow.netYen)
 }
 

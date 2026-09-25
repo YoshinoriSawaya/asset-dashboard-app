@@ -185,7 +185,8 @@ private fun values(overview: ItemOverview): Pair<String, String?> = when (overvi
     }
     is ItemOverview.Goal -> {
         val progress = overview.progress
-        (progress?.let(Formatters::percent) ?: "進捗不明") to "目標 ${Formatters.yen(overview.item.targetYen)}"
+        (progress?.let(Formatters::percent) ?: "進捗不明") to
+            (overview.targetYen?.let { "目標 ${Formatters.yen(it)}" } ?: "目標 不明(支出データ不足)")
     }
     is ItemOverview.Reminder ->
         Formatters.daysLeft(overview.daysLeft) to overview.item.dueDate.toString()

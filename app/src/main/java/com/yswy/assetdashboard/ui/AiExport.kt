@@ -68,11 +68,13 @@ object AiExport {
             appendLine()
             for (goal in goals) {
                 val item = goal.item
-                append("- ${item.name}: 目標 ${yen(item.targetYen)}")
+                val target = goal.targetYen
+                append("- ${item.name}: 目標 ${target?.let(::yen) ?: "不明"}")
+                item.autoTarget?.let { append("(生活費の${it.averageMonths}か月平均 × ${it.coverMonths}か月から自動計算)") }
                 goal.currentYen?.let { current ->
                     append(" / 現在 ${yen(current)}")
                     goal.progress?.let { append("(${(it * 100).toInt()}%)") }
-                    append(" / 残り ${yen((item.targetYen - current).coerceAtLeast(0))}")
+                    target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
                 item.dueDate?.let { append(" / 期日 $it") }
                 appendLine()

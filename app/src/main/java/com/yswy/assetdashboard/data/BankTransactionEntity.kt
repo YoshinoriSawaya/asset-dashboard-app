@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -30,6 +31,13 @@ data class BankTransactionEntity(
     val label: String?,
     /** どのCSVから来たか(DriveのファイルID)。backupのJSONと突き合わせられる。 */
     val sourceFileId: String,
+    /**
+     * 生活費から除く(振替・カード引き落としなど)。E07-06。
+     * 摘要のキーワード(Driveの settings/spending_rules.json)から、キャッシュを
+     * 作り直すたびに決める。
+     */
+    @ColumnInfo(defaultValue = "0")
+    val excludedFromSpending: Boolean = false,
 ) {
     companion object {
         fun from(transaction: BankTransaction, sourceFileId: String) = BankTransactionEntity(
