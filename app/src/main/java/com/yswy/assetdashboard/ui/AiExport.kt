@@ -2,6 +2,7 @@ package com.yswy.assetdashboard.ui
 
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
+import com.yswy.assetdashboard.data.RecoveryPlan
 import java.time.LocalDate
 
 /**
@@ -77,6 +78,10 @@ object AiExport {
                     target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
                 item.dueDate?.let { append(" / 期日 $it") }
+                RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort }?.let { plan ->
+                    append(" / 不足分を埋めるには ")
+                    append(plan.options.joinToString("、") { "${it.months}か月なら月々${yen(it.monthlyYen)}" })
+                }
                 appendLine()
             }
             appendLine()

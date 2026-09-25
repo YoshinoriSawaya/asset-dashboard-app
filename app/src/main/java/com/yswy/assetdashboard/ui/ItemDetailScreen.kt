@@ -212,6 +212,13 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             )
         }
         detail.remainingYen?.let { Label(if (it == 0L) "達成済み" else "あと ${Formatters.yen(it)}") }
+        // 届いていなければ、月々いくらで何か月で届くか(E07-07)
+        detail.recovery?.takeIf { it.isShort }?.let { plan ->
+            Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
+            plan.options.forEach { option ->
+                Label("${option.months}か月で: 月々 ${Formatters.yen(option.monthlyYen)}")
+            }
+        }
         goal.dueDate?.let { Label("期日 $it") }
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
     }

@@ -25,6 +25,10 @@ sealed interface ItemDetail {
                 val target = overview.targetYen ?: return null
                 return overview.currentYen?.let { (target - it).coerceAtLeast(0) }
             }
+
+        /** 届いていないとき、月々いくらで何か月で届くか(E07-07)。 */
+        val recovery: RecoveryPlan?
+            get() = RecoveryPlan.of(overview.targetYen, overview.currentYen)
     }
 
     data class Reminder(override val overview: ItemOverview.Reminder) : ItemDetail
