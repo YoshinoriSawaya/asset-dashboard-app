@@ -124,11 +124,12 @@ fun ItemDetailScreen(
 private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
     val latest = detail.overview.latest
     item {
+        val money = LocalMoney.current
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (latest == null) {
                 Text("データなし", style = MaterialTheme.typography.titleLarge)
             } else {
-                Text(Formatters.yen(latest.valueYen), style = MaterialTheme.typography.titleLarge)
+                Text(money.amount(latest.valueYen), style = MaterialTheme.typography.titleLarge)
                 Label("${latest.date}時点")
             }
             // 名前を変えていても、どのCSV列から来ているか分かるように出す
@@ -147,14 +148,18 @@ private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
 
 private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
     item {
+        val money = LocalMoney.current
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (detail.series.size >= 2) {
                 Spacer8()
-                LineChart(detail.series.map { it.date to it.valueYen })
+                LineChart(detail.series.map { it.date to it.valueYen }, axisLabel = money::lineAxis)
                 Spacer8()
                 Text("月ごとの増減", style = MaterialTheme.typography.titleMedium)
                 // グラフは古い月から右へ。表(新しい月が先頭)とは逆順
-                ChangeBarChart(detail.monthly.reversed().map { "${it.period.start.monthValue}月" to it.changeYen })
+                ChangeBarChart(
+                    detail.monthly.reversed().map { "${it.period.start.monthValue}月" to it.changeYen },
+                    axisLabel = money::barAxis,
+                )
             }
             Spacer8()
             Text("月ごとの推移", style = MaterialTheme.typography.titleMedium)
@@ -163,10 +168,11 @@ private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
         }
     }
     items(detail.monthly, key = { it.period.start.toString() }) { change ->
+        val money = LocalMoney.current
         MonthlyRow(
             month = YearMonth.from(change.period.start).toString(),
-            value = change.closingYen?.let(Formatters::yen) ?: "データなし",
-            change = change.changeYen?.let(Formatters::yenChange) ?: "−",
+            value = change.closingYen?.let(money::amount) ?: "データなし",
+            change = change.changeYen?.let { money.change(it, change.openingYen) } ?: "−",
         )
     }
 }
@@ -187,9 +193,10 @@ private fun LazyListScope.correctionContent(
         message?.let { Label(it) }
     }
     items(corrected, key = { "corr-" + it.date }) { point ->
+        val money = LocalMoney.current
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("${point.date}  ${Formatters.yen(point.valueYen)}", style = MaterialTheme.typography.bodyMedium)
+                Text("${point.date}  ${money.amount(point.valueYen)}", style = MaterialTheme.typography.bodyMedium)
                 Label(if (point.origin == MetricOrigin.OVERRIDE) "CSVの値を補正" else "手入力")
             }
             TextButton(onClick = { onDelete(key, point.date) }, enabled = !busy) { Text("取り消す") }
@@ -211,15 +218,16 @@ private fun MonthlyRow(month: String, value: String, change: String, header: Boo
 private fun GoalContent(detail: ItemDetail.Goal) {
     val goal = detail.overview.item
     val progress = detail.overview.progress
+    val money = LocalMoney.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(progress?.let(Formatters::percent) ?: "進捗不明", style = MaterialTheme.typography.titleLarge)
+        Text(progress?.let(money::percent) ?: "進捗不明", style = MaterialTheme.typography.titleLarge)
         LinearProgressIndicator(
             progress = { (progress ?: 0.0).coerceIn(0.0, 1.0).toFloat() },
             modifier = Modifier.fillMaxWidth(),
         )
         val yearly = goal.resetsYearly
-        detail.overview.currentYen?.let { Label((if (yearly) "今年使った額 " else "現在 ") + Formatters.yen(it)) }
-        Label(detail.overview.targetYen?.let { (if (yearly) "枠 " else "目標 ") + Formatters.yen(it) } ?: "目標 不明")
+        detail.overview.currentYen?.let { Label((if (yearly) "今年使った額 " else "現在 ") + money.amount(it)) }
+        Label(detail.overview.targetYen?.let { (if (yearly) "枠 " else "目標 ") + money.amount(it) } ?: "目標 不明")
         // 支出から出した目標なら、どう計算したかを出す(E07-06)
         goal.autoTarget?.let { rule ->
             val auto = detail.overview.auto
@@ -227,7 +235,7 @@ private fun GoalContent(detail: ItemDetail.Goal) {
                 if (auto?.monthlyAverageYen == null) {
                     "生活費の${rule.averageMonths}か月平均 × ${rule.coverMonths}か月(使える月の明細がまだ無い)"
                 } else {
-                    "生活費の平均 ${Formatters.yen(auto.monthlyAverageYen)}(${auto.monthsUsed}か月分)× ${rule.coverMonths}か月" +
+                    "生活費の平均 ${money.amount(auto.monthlyAverageYen)}(${auto.monthsUsed}か月分)× ${rule.coverMonths}か月" +
                         if (auto.monthsUsed < rule.averageMonths) "。明細が${rule.averageMonths}か月分そろうまでは少ない月で平均" else ""
                 },
             )
@@ -236,9 +244,9 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             Label(
                 when {
                     // 毎年の枠(E07-09)は「使い切った」、目標は「達成」
-                    yearly -> if (it == 0L) "枠を使い切った" else "残りの枠 ${Formatters.yen(it)}(${LocalDate.now().year}年末まで)"
+                    yearly -> if (it == 0L) "枠を使い切った" else "残りの枠 ${money.amount(it)}(${LocalDate.now().year}年末まで)"
                     it == 0L -> "達成済み"
-                    else -> "あと ${Formatters.yen(it)}"
+                    else -> "あと ${money.amount(it)}"
                 },
             )
         }
@@ -247,7 +255,7 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         detail.recovery?.takeIf { it.isShort && !yearly }?.let { plan ->
             Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
             plan.options.forEach { option ->
-                Label("${option.months}か月で: 月々 ${Formatters.yen(option.monthlyYen)}")
+                Label("${option.months}か月で: 月々 ${money.amount(option.monthlyYen)}")
             }
         }
         goal.dueDate?.let { Label("期日 $it") }
@@ -278,14 +286,15 @@ private fun OutlookLabels(detail: ItemDetail.Goal) {
 @Composable
 private fun ForecastLabels(detail: ItemDetail.Goal) {
     val forecast = detail.forecast ?: return
+    val money = LocalMoney.current
     Text("今のペースなら", style = MaterialTheme.typography.titleSmall)
     when (forecast) {
         GoalForecast.Achieved -> Label("達成済み")
         GoalForecast.NotEnoughData -> Label("データが短く、まだペースを出せない(2か月分ほど要る)")
         is GoalForecast.NotReaching ->
-            Label("届かない(この半年は月あたり ${Formatters.yenChange(forecast.monthlyPaceYen)})")
+            Label("届かない(この半年は月あたり ${money.change(forecast.monthlyPaceYen, detail.overview.currentYen)})")
         is GoalForecast.Reaching -> {
-            Label("${forecast.month.year}年${forecast.month.monthValue}月ごろ達成(月あたり ${Formatters.yenChange(forecast.monthlyPaceYen)})")
+            Label("${forecast.month.year}年${forecast.month.monthValue}月ごろ達成(月あたり ${money.change(forecast.monthlyPaceYen, detail.overview.currentYen)})")
             when (forecast.onTime) {
                 true -> Label("期日に間に合う見込み")
                 false -> Label("期日には間に合わない見込み")
@@ -300,7 +309,7 @@ private fun ForecastLabels(detail: ItemDetail.Goal) {
     val late = forecast is GoalForecast.NotReaching || (forecast is GoalForecast.Reaching && forecast.onTime == false)
     if (late && goal.dueDate != null && target != null && current != null) {
         GoalForecast.monthlyNeededForDue(target, current, goal.dueDate, LocalDate.now())?.let {
-            Label("期日に間に合わせるには 月々 ${Formatters.yen(it)}")
+            Label("期日に間に合わせるには 月々 ${money.amount(it)}")
         }
     }
     Label("積立だけでなく値動きも入った目安です")
@@ -309,10 +318,11 @@ private fun ForecastLabels(detail: ItemDetail.Goal) {
 @Composable
 private fun ReminderContent(detail: ItemDetail.Reminder) {
     val reminder = detail.overview.item
+    val money = LocalMoney.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(Formatters.daysLeft(detail.overview.daysLeft), style = MaterialTheme.typography.titleLarge)
         Label("期日 ${reminder.dueDate}")
-        reminder.amountYen?.let { Label("見込み額 ${Formatters.yen(it)}") }
+        reminder.amountYen?.let { Label("見込み額 ${money.amount(it)}") }
         Label(
             when (reminder.repeat) {
                 Repeat.NONE -> "繰り返さない"

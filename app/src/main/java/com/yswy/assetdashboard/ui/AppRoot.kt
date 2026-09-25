@@ -5,25 +5,28 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.time.LocalDate
-import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ExpenseCalendar
 import com.yswy.assetdashboard.data.Item
+import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
+import java.time.LocalDate
 
 /**
  * 画面遷移。
@@ -85,6 +88,22 @@ object Routes {
 @Composable
 fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
+    // 金額の見せ方(E06-04)。端末に覚えておき、全画面に効かせる
+    val privacyPrefs = remember { PrivacyPrefs(context) }
+    var privacy by remember { mutableStateOf(privacyPrefs.mode) }
+    CompositionLocalProvider(LocalMoney provides MoneyFormat(privacy)) {
+        Screens(state, viewModel, modifier) { privacy = it; privacyPrefs.mode = it }
+    }
+}
+
+@Composable
+private fun Screens(
+    state: DashboardViewModel.UiState,
+    viewModel: DashboardViewModel,
+    modifier: Modifier,
+    onPrivacyChange: (PrivacyMode) -> Unit,
+) {
 
     val stack = rememberSaveable(saver = routeStackSaver) { mutableStateListOf(Routes.TOP) }
     BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
@@ -249,6 +268,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onAddGoal = { stack.add(Routes.goal(null)) },
             onAddReminder = { stack.add(Routes.reminder(null)) },
             onOpenCalendar = { stack.add(Routes.CALENDAR) },
+            onPrivacyChange = onPrivacyChange,
             onRunDailyCheck = viewModel::runDailyCheckNow,
             onEditMetric = { stack.add(Routes.metric(it)) },
             modifier = modifier,

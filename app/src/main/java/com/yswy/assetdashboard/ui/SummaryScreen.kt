@@ -81,32 +81,37 @@ private fun PeriodBlock(summary: PeriodSummary) {
 
 @Composable
 private fun MetricLine(name: String, change: MetricChange) {
+    val money = LocalMoney.current
     Line(
         label = name,
-        value = change.closingYen?.let(Formatters::yen) ?: "データなし",
+        value = change.closingYen?.let(money::amount) ?: "データなし",
         change = change.changeYen,
+        // %のときは期首の値に対する増減率(E06-04)
+        changeText = change.changeYen?.let { money.change(it, change.openingYen) },
     )
 }
 
 @Composable
 private fun CashflowLines(cashflow: Cashflow) {
-    SubLine("収入", Formatters.yen(cashflow.incomeYen))
-    SubLine("支出", Formatters.yen(cashflow.spendingYen))
+    val money = LocalMoney.current
+    SubLine("収入", money.amount(cashflow.incomeYen))
+    SubLine("支出", money.amount(cashflow.spendingYen))
     // 振替などを除いた生活費(E07-06)。除く決まりに当たる出金があるときだけ出す
     if (cashflow.livingSpendingYen != cashflow.spendingYen) {
-        SubLine("うち生活費", Formatters.yen(cashflow.livingSpendingYen))
+        SubLine("うち生活費", money.amount(cashflow.livingSpendingYen))
     }
-    Line(label = "収支", value = "${cashflow.count}件", change = cashflow.netYen)
+    // %のときは収入に対する収支の割合
+    Line(label = "収支", value = "${cashflow.count}件", change = cashflow.netYen, changeText = money.change(cashflow.netYen, cashflow.incomeYen))
 }
 
 /** 名前・その期間の最後の値・増減の3列。 */
 @Composable
-private fun Line(label: String, value: String, change: Long?) {
+private fun Line(label: String, value: String, change: Long?, changeText: String?) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, modifier = Modifier.weight(1.3f))
         Text(
-            change?.let(Formatters::yenChange) ?: "−",
+            changeText ?: "−",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = changeColor(change),

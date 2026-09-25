@@ -30,6 +30,7 @@ fun ExpenseCalendarScreen(
     modifier: Modifier = Modifier,
 ) {
     val totals = ExpenseCalendar.totalsByYear(entries)
+    val money = LocalMoney.current
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
             TextButton(onClick = onBack) { Text("← 戻る") }
@@ -51,7 +52,7 @@ fun ExpenseCalendarScreen(
             item(key = "y$year") {
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp)) {
                     Text("${year}年", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Text("計 ${Formatters.yen(totals[year] ?: 0)}", style = MaterialTheme.typography.titleMedium)
+                    Text("計 ${money.amount(totals[year] ?: 0)}", style = MaterialTheme.typography.titleMedium)
                 }
                 HorizontalDivider()
             }
@@ -64,7 +65,7 @@ fun ExpenseCalendarScreen(
                         entry.name + if (entry.source == ExpenseCalendar.Source.GOAL) "(目標)" else "",
                         modifier = Modifier.weight(2f),
                     )
-                    Text(Formatters.yen(entry.amountYen), textAlign = TextAlign.End, modifier = Modifier.weight(1.4f))
+                    Text(money.amount(entry.amountYen), textAlign = TextAlign.End, modifier = Modifier.weight(1.4f))
                 }
             }
         }

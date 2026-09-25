@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -61,6 +62,7 @@ fun TopScreen(
     onOpenCalendar: () -> Unit,
     onRunDailyCheck: ((Int) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    onPrivacyChange: (PrivacyMode) -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -82,6 +84,15 @@ fun TopScreen(
                     TextButton(onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
                         Text("通知を許可する")
                     }
+                }
+            }
+        }
+        item {
+            // 金額の見せ方(E06-04)。人前で開くときにすぐ切り替えられるよう、いちばん上に置く
+            val current = LocalMoney.current.mode
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 4.dp)) {
+                PrivacyMode.entries.forEach { mode ->
+                    FilterChip(current == mode, onClick = { onPrivacyChange(mode) }, label = { Text(mode.label) })
                 }
             }
         }
@@ -225,7 +236,7 @@ private fun ItemRow(overview: ItemOverview, onClick: () -> Unit) {
             Text(kindLabel(overview.item), style = MaterialTheme.typography.labelSmall)
         }
         Column(horizontalAlignment = Alignment.End) {
-            val (main, sub) = values(overview)
+            val (main, sub) = values(overview, LocalMoney.current)
             Text(main, style = MaterialTheme.typography.titleMedium)
             sub?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
@@ -239,20 +250,20 @@ private fun kindLabel(item: Item): String = when (item) {
 }
 
 /** 右側に出す主な値と、補足。 */
-private fun values(overview: ItemOverview): Pair<String, String?> = when (overview) {
+private fun values(overview: ItemOverview, money: MoneyFormat): Pair<String, String?> = when (overview) {
     is ItemOverview.Metric -> {
         val latest = overview.latest
         if (latest == null) {
             "データなし" to null
         } else {
-            Formatters.yen(latest.valueYen) to
-                (overview.monthChangeYen?.let { "今月 ${Formatters.yenChange(it)}" } ?: "${latest.date}時点")
+            money.amount(latest.valueYen) to
+                (overview.monthChangeYen?.let { "今月 ${money.change(it, latest.valueYen - it)}" } ?: "${latest.date}時点")
         }
     }
     is ItemOverview.Goal -> {
         val progress = overview.progress
-        (progress?.let(Formatters::percent) ?: "進捗不明") to
-            (overview.targetYen?.let { (if (overview.item.resetsYearly) "枠 " else "目標 ") + Formatters.yen(it) }
+        (progress?.let(money::percent) ?: "進捗不明") to
+            (overview.targetYen?.let { (if (overview.item.resetsYearly) "枠 " else "目標 ") + money.amount(it) }
                 ?: "目標 不明(支出データ不足)")
     }
     is ItemOverview.Reminder ->

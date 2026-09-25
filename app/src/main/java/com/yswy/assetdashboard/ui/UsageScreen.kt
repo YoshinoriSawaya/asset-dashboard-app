@@ -49,12 +49,13 @@ fun UsageScreen(
             return@Column
         }
         Text("${goal.item.name}: 使った分を足す", style = MaterialTheme.typography.headlineSmall)
+        val money = LocalMoney.current
         val used = goal.currentYen ?: 0L
         val limit = goal.targetYen
-        Text("今年使った額 ${Formatters.yen(used)}" + (limit?.let { " / 枠 ${Formatters.yen(it)}" } ?: ""))
+        Text("今年使った額 ${money.amount(used)}" + (limit?.let { " / 枠 ${money.amount(it)}" } ?: ""))
         limit?.let {
             Text(
-                "残り ${Formatters.yen((it - used).coerceAtLeast(0))}",
+                "残り ${money.amount((it - used).coerceAtLeast(0))}",
                 color = if (used > it) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
         }

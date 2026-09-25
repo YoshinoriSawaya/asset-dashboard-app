@@ -58,7 +58,12 @@ private fun chartColors() = ChartColors(
  * (資産推移CSVの点は等間隔ではないので、点の順番で並べると形が歪む)。
  */
 @Composable
-fun LineChart(points: List<Pair<LocalDate, Long>>, modifier: Modifier = Modifier) {
+fun LineChart(
+    points: List<Pair<LocalDate, Long>>,
+    modifier: Modifier = Modifier,
+    /** 目盛りの文字。(値, 最初の点の値) → 文字。nullなら出さない(プライバシーモード。E06-04) */
+    axisLabel: (Long, Long) -> String? = { v, _ -> Formatters.yenCompact(v) },
+) {
     val colors = chartColors()
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.label)
@@ -67,7 +72,8 @@ fun LineChart(points: List<Pair<LocalDate, Long>>, modifier: Modifier = Modifier
 
     Canvas(modifier = modifier.fillMaxWidth().height(200.dp)) {
         if (sorted.isEmpty()) return@Canvas
-        val plot = drawValueAxis(axis, measurer, labelStyle, colors)
+        val first = sorted.first().second
+        val plot = drawValueAxis(axis, measurer, labelStyle, colors) { axisLabel(it, first) }
 
         val firstDay = sorted.first().first.toEpochDay()
         val span = (sorted.last().first.toEpochDay() - firstDay).coerceAtLeast(1)
@@ -96,7 +102,12 @@ fun LineChart(points: List<Pair<LocalDate, Long>>, modifier: Modifier = Modifier
  * 値がnull(データの無い期間)は棒を描かずに間を空ける。
  */
 @Composable
-fun ChangeBarChart(bars: List<Pair<String, Long?>>, modifier: Modifier = Modifier) {
+fun ChangeBarChart(
+    bars: List<Pair<String, Long?>>,
+    modifier: Modifier = Modifier,
+    /** 目盛りの文字。nullなら出さない(プライバシーモード。E06-04) */
+    axisLabel: (Long) -> String? = { Formatters.yenCompact(it) },
+) {
     val colors = chartColors()
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.label)
@@ -104,7 +115,7 @@ fun ChangeBarChart(bars: List<Pair<String, Long?>>, modifier: Modifier = Modifie
 
     Canvas(modifier = modifier.fillMaxWidth().height(160.dp)) {
         if (bars.isEmpty()) return@Canvas
-        val plot = drawValueAxis(axis, measurer, labelStyle, colors)
+        val plot = drawValueAxis(axis, measurer, labelStyle, colors, axisLabel)
         val zeroY = plot.bottom - plot.height * axis.fraction(0)
         drawLine(colors.baseline, Offset(plot.left, zeroY), Offset(plot.right, zeroY), 1.dp.toPx())
 
@@ -141,9 +152,11 @@ private fun DrawScope.drawValueAxis(
     measurer: TextMeasurer,
     style: TextStyle,
     colors: ChartColors,
+    label: (Long) -> String?,
 ): Plot {
-    val labels = axis.ticks.map { measurer.measure(Formatters.yenCompact(it), style) }
-    val gutter = (labels.maxOfOrNull { it.size.width } ?: 0) + 6.dp.toPx()
+    // 目盛りの文字が出ないとき(マスク)は、線だけ引いて左の余白も詰める
+    val labels = axis.ticks.map { tick -> label(tick)?.let { measurer.measure(it, style) } }
+    val gutter = (labels.maxOfOrNull { it?.size?.width ?: 0 } ?: 0) + 6.dp.toPx()
     val bottomLabel = measurer.measure("0", style).size.height + 4.dp.toPx()
     // 右と上は、端の点(最新の点は半径4.5dp)が切れない分だけ空ける
     val plot = Plot(gutter, 6.dp.toPx(), size.width - 6.dp.toPx(), size.height - bottomLabel)
@@ -151,7 +164,7 @@ private fun DrawScope.drawValueAxis(
     axis.ticks.zip(labels).forEach { (tick, text) ->
         val y = plot.bottom - plot.height * axis.fraction(tick)
         drawLine(colors.grid, Offset(plot.left, y), Offset(plot.right, y), 1.dp.toPx())
-        drawText(text, topLeft = Offset(gutter - 6.dp.toPx() - text.size.width, y - text.size.height / 2))
+        text?.let { drawText(it, topLeft = Offset(gutter - 6.dp.toPx() - it.size.width, y - it.size.height / 2)) }
     }
     return plot
 }
