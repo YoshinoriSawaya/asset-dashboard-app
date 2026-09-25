@@ -7,7 +7,7 @@
 担う。
 
 ## 子イシュー
-- [ ] [E09-01: Goal達成予測日の計算](../tasks/E09-01-goal-achievement-forecast.md)
+- [x] [E09-01: Goal達成予測日の計算](../tasks/E09-01-goal-achievement-forecast.md)
 - [ ] [E09-02: 生活防衛資金の枯渇予測](../tasks/E09-02-emergency-fund-depletion-forecast.md)
 - [ ] [E09-03: NISA資産の将来価値シミュレーション](../tasks/E09-03-nisa-future-value-simulation.md)
 - [ ] [E09-04: 年間の大型出費カレンダー](../tasks/E09-04-annual-expense-calendar.md)

@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.yswy.assetdashboard.data.GoalForecast
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
@@ -249,8 +250,41 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             }
         }
         goal.dueDate?.let { Label("期日 $it") }
+        ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
     }
+}
+
+/** 今のペースならいつ届くか(E09-01)。 */
+@Composable
+private fun ForecastLabels(detail: ItemDetail.Goal) {
+    val forecast = detail.forecast ?: return
+    Text("今のペースなら", style = MaterialTheme.typography.titleSmall)
+    when (forecast) {
+        GoalForecast.Achieved -> Label("達成済み")
+        GoalForecast.NotEnoughData -> Label("データが短く、まだペースを出せない(2か月分ほど要る)")
+        is GoalForecast.NotReaching ->
+            Label("届かない(この半年は月あたり ${Formatters.yenChange(forecast.monthlyPaceYen)})")
+        is GoalForecast.Reaching -> {
+            Label("${forecast.month.year}年${forecast.month.monthValue}月ごろ達成(月あたり ${Formatters.yenChange(forecast.monthlyPaceYen)})")
+            when (forecast.onTime) {
+                true -> Label("期日に間に合う見込み")
+                false -> Label("期日には間に合わない見込み")
+                null -> Unit
+            }
+        }
+    }
+    // 期日に間に合わないなら、間に合わせるための月額
+    val goal = detail.overview.item
+    val target = detail.overview.targetYen
+    val current = detail.overview.currentYen
+    val late = forecast is GoalForecast.NotReaching || (forecast is GoalForecast.Reaching && forecast.onTime == false)
+    if (late && goal.dueDate != null && target != null && current != null) {
+        GoalForecast.monthlyNeededForDue(target, current, goal.dueDate, LocalDate.now())?.let {
+            Label("期日に間に合わせるには 月々 ${Formatters.yen(it)}")
+        }
+    }
+    Label("積立だけでなく値動きも入った目安です")
 }
 
 @Composable

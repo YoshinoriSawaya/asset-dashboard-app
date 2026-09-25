@@ -18,7 +18,11 @@ sealed interface ItemDetail {
         val correctedCount: Int,
     ) : ItemDetail
 
-    data class Goal(override val overview: ItemOverview.Goal) : ItemDetail {
+    data class Goal(
+        override val overview: ItemOverview.Goal,
+        /** 今のペースならいつ届くか(E09-01)。予測しない目標ならnull。 */
+        val forecast: GoalForecast? = null,
+    ) : ItemDetail {
         /** 目標まであといくら。達成済みなら0。進捗不明ならnull。 */
         val remainingYen: Long?
             get() {
@@ -43,14 +47,18 @@ sealed interface ItemDetail {
                 pointCount = series.size,
                 correctedCount = series.count { it.origin != MetricOrigin.CSV },
             )
-            is ItemOverview.Goal -> Goal(overview)
+            is ItemOverview.Goal -> Goal(overview, GoalForecast.of(overview.item, overview.targetYen, series))
             is ItemOverview.Reminder -> Reminder(overview)
         }
 
         suspend fun load(db: AppDatabase, overview: ItemOverview): ItemDetail {
-            val series = (overview.item as? Item.Metric)
-                ?.let { db.metricPointDao().series(it.metricKey) }
-                .orEmpty()
+            // Metricは推移の表とグラフに、Goalは達成の予測(E09-01)に、系列の点を使う
+            val key = when (val item = overview.item) {
+                is Item.Metric -> item.metricKey
+                is Item.Goal -> item.metricKey
+                is Item.Reminder -> null
+            }
+            val series = key?.let { db.metricPointDao().series(it) }.orEmpty()
             return of(overview, series)
         }
     }
