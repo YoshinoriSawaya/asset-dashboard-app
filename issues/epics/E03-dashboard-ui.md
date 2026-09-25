@@ -8,7 +8,7 @@
 ## 子イシュー
 - [x] [E03-01: ナビゲーション構造・トップ画面](../tasks/E03-01-navigation-top-screen.md)
 - [x] [E03-02: 項目詳細画面(Metric/Goal/Reminder共通テンプレート)](../tasks/E03-02-item-detail-screen.md)
-- [ ] [E03-03: 月次・年次サマリー画面](../tasks/E03-03-monthly-yearly-summary-screen.md)
+- [x] [E03-03: 月次・年次サマリー画面](../tasks/E03-03-monthly-yearly-summary-screen.md)
 - [ ] [E03-04: 手動補正入力画面(E01-10と連動)](../tasks/E03-04-manual-correction-screen.md)
 - [ ] [E03-05: 前回同期結果の要約表示(成功/失敗件数)](../tasks/E03-05-sync-result-summary.md)
 - [ ] [E03-06: グラフ実装(チャートライブラリ選定・配色)](../tasks/E03-06-chart-implementation.md)

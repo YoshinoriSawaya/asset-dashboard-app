@@ -59,6 +59,16 @@ interface BankTransactionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(transactions: List<BankTransactionEntity>): List<Long>
 
+    @Query("SELECT * FROM bank_transaction ORDER BY date")
+    suspend fun all(): List<BankTransactionEntity>
+
+    /**
+     * 期間の明細。両端を含む。
+     *
+     * 日付はISO文字列で持っているので、`LocalDate.MIN/MAX` を渡すと
+     * `+999999999-12-31` のような文字列になり、並びが崩れて何も返らない。
+     * 全件が欲しいときは[all]を使う。
+     */
     @Query("SELECT * FROM bank_transaction WHERE date BETWEEN :from AND :to ORDER BY date")
     suspend fun between(from: LocalDate, to: LocalDate): List<BankTransactionEntity>
 

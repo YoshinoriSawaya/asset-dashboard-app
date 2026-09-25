@@ -9,6 +9,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,6 +18,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yswy.assetdashboard.data.ItemDetail
+import com.yswy.assetdashboard.data.PeriodSummary
+import com.yswy.assetdashboard.data.PeriodUnit
 
 /**
  * 画面遷移。
@@ -28,6 +32,7 @@ import com.yswy.assetdashboard.data.ItemDetail
  */
 object Routes {
     const val TOP = "top"
+    const val SUMMARY = "summary"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -69,10 +74,25 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 modifier = modifier,
             )
         }
+        route == Routes.SUMMARY -> {
+            var unit by rememberSaveable { mutableStateOf(PeriodUnit.MONTH) }
+            // 同期でデータが変わったら(一覧が更新されたら)読み直す
+            val summaries by produceState<List<PeriodSummary>?>(null, unit, state.overviews) {
+                value = viewModel.summaries(unit)
+            }
+            SummaryScreen(
+                unit = unit,
+                summaries = summaries,
+                onUnitChange = { unit = it },
+                onBack = { stack.removeAt(stack.lastIndex) },
+                modifier = modifier,
+            )
+        }
         else -> TopScreen(
             state = state,
             onSync = viewModel::sync,
             onOpenItem = { stack.add(Routes.item(it)) },
+            onOpenSummary = { stack.add(Routes.SUMMARY) },
             modifier = modifier,
         )
     }

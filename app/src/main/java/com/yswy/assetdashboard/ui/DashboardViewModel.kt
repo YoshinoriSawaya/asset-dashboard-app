@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
 import com.yswy.assetdashboard.data.ItemDetail
+import com.yswy.assetdashboard.data.PeriodSummary
+import com.yswy.assetdashboard.data.PeriodUnit
+import com.yswy.assetdashboard.data.SummaryBoard
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncPolicy
 import com.yswy.assetdashboard.data.SyncStatus
@@ -84,6 +87,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 詳細画面(E03-02)の中身。一覧の行に、系列の点などを足して組み立てる。 */
     suspend fun detail(overview: ItemOverview): ItemDetail = ItemDetail.load(db, overview)
+
+    /** サマリー画面(E03-03)の中身。 */
+    suspend fun summaries(unit: PeriodUnit): List<PeriodSummary> = SummaryBoard.load(db, unit)
 
     private suspend fun runSync(askConsent: Boolean) {
         _state.update { it.copy(syncing = true, message = "同期中...") }

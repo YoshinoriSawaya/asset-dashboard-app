@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,11 +36,12 @@ fun TopScreen(
     state: DashboardViewModel.UiState,
     onSync: () -> Unit,
     onOpenItem: (String) -> Unit,
+    onOpenSummary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
-            SyncHeader(state, onSync)
+            SyncHeader(state, onSync, onOpenSummary)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
 
@@ -69,7 +71,7 @@ fun TopScreen(
 }
 
 @Composable
-private fun SyncHeader(state: DashboardViewModel.UiState, onSync: () -> Unit) {
+private fun SyncHeader(state: DashboardViewModel.UiState, onSync: () -> Unit, onOpenSummary: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("資産ダッシュボード", style = MaterialTheme.typography.headlineSmall)
         state.syncStatus?.let {
@@ -81,6 +83,7 @@ private fun SyncHeader(state: DashboardViewModel.UiState, onSync: () -> Unit) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = onSync, enabled = !state.syncing) { Text("Driveと同期") }
+            OutlinedButton(onClick = onOpenSummary) { Text("月次・年次サマリー") }
         }
         if (state.message.isNotBlank()) {
             Text(state.message, style = MaterialTheme.typography.bodySmall)
@@ -152,6 +155,7 @@ private fun TopScreenPreview() {
             ),
             onSync = {},
             onOpenItem = {},
+            onOpenSummary = {},
         )
     }
 }
