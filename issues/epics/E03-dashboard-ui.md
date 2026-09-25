@@ -6,7 +6,7 @@
 詳細・月次年次サマリー・手動補正が行える状態にする。
 
 ## 子イシュー
-- [ ] [E03-01: ナビゲーション構造・トップ画面](../tasks/E03-01-navigation-top-screen.md)
+- [x] [E03-01: ナビゲーション構造・トップ画面](../tasks/E03-01-navigation-top-screen.md)
 - [ ] [E03-02: 項目詳細画面(Metric/Goal/Reminder共通テンプレート)](../tasks/E03-02-item-detail-screen.md)
 - [ ] [E03-03: 月次・年次サマリー画面](../tasks/E03-03-monthly-yearly-summary-screen.md)
 - [ ] [E03-04: 手動補正入力画面(E01-10と連動)](../tasks/E03-04-manual-correction-screen.md)
