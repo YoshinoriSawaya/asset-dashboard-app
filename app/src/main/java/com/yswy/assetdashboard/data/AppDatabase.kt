@@ -47,18 +47,22 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
 
+        private const val NAME = "asset-dashboard.db"
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "asset-dashboard.db",
-                )
-                    // キャッシュなので、マイグレーションを書くのが面倒な段階では
-                    // 作り直してDriveから入れ直すほうが安全で速い。
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .build()
-                    .also { instance = it }
+                instance ?: build(context, NAME).also { instance = it }
             }
+
+        /**
+         * アプリと同じ設定でDBを開く。テストが本物のDB(`asset-dashboard.db`)を
+         * 消さずに、同じ設定を別の名前で試せるように分けてある。
+         */
+        internal fun build(context: Context, name: String): AppDatabase =
+            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, name)
+                // キャッシュなので、マイグレーションを書くのが面倒な段階では
+                // 作り直してDriveから入れ直すほうが安全で速い。
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .build()
     }
 }

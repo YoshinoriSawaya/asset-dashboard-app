@@ -69,7 +69,7 @@ E02-03はパース結果を変換して流し込むだけでよい。
 |--------|-------------|
 | `AppDatabaseTest` 4件 | 3テーブルのCRUD。取引の先勝ち、Metricの後勝ち、期間指定が両端を含む |
 | `MigrationTest.v1からv2で...` | v1のDBにある`ingested_file`がv2でも残り、新テーブルが空でできる |
-| `MigrationTest.アプリの設定で...` | 本番の`AppDatabase.get()`で開いても残る |
+| `MigrationTest.アプリの設定で...` | 本番と同じ設定(`AppDatabase.build`)で開いても残る |
 
 最後の1件は、テストが本当に効いているかを確かめるため、
 `AutoMigration` を外して走らせた(対照実験)。

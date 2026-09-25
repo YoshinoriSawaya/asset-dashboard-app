@@ -48,7 +48,7 @@ class MigrationTest {
     }
 
     /**
-     * アプリが実際に使う[AppDatabase.get]で開いても消えないこと。
+     * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
      * 上のテストはマイグレーション単体の確認。こちらは本番のビルダー設定
      * (`fallbackToDestructiveMigration`と併用している)で、作り直しではなく
@@ -65,7 +65,7 @@ class MigrationTest {
             )
         }
 
-        val db = AppDatabase.get(context)
+        val db = AppDatabase.build(context, APP_DB)
         try {
             val files = runBlocking { db.ingestedFileDao().getAll() }
             assertEquals(listOf("meisai.csv"), files.map { it.name })
@@ -77,8 +77,8 @@ class MigrationTest {
     }
 
     private companion object {
-        /** [AppDatabase.get]が使う名前。 */
-        const val APP_DB = "asset-dashboard.db"
+        /** 本物のDB(asset-dashboard.db)は消さないよう別の名前にする。 */
+        const val APP_DB = "app-config-test.db"
 
         const val DB = "migration-test.db"
     }

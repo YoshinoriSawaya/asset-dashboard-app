@@ -94,6 +94,25 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun 同期状態はMetricと明細の新しいほうの日付で決まる() = runBlocking {
+        val empty = SyncStatus.load(db, today = LocalDate.of(2026, 9, 25))
+        assertNull(empty.latestDataDate)
+        assertEquals(true, empty.isDue)
+
+        db.metricPointDao().upsertAll(
+            listOf(MetricPointEntity.from(MetricPoint("合計", LocalDate.of(2026, 8, 31), 1))),
+        )
+        db.bankTransactionDao().insertAll(
+            listOf(BankTransactionEntity.from(BankTransaction(LocalDate.of(2026, 9, 25), "x", 1, null, null), "f")),
+        )
+
+        val status = SyncStatus.load(db, today = LocalDate.of(2026, 10, 25))
+        assertEquals(LocalDate.of(2026, 9, 25), status.latestDataDate)
+        assertEquals(false, status.isDue)
+        assertEquals(true, SyncStatus.load(db, today = LocalDate.of(2026, 10, 26)).isDue)
+    }
+
+    @Test
     fun bank_transactionの期間指定は両端を含む() = runBlocking {
         val dao = db.bankTransactionDao()
         val days = listOf(1, 15, 30).map { LocalDate.of(2026, 9, it) }

@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard
 
+import android.app.PendingIntent
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +31,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.AppDatabase
+import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.SyncPolicy
+import com.yswy.assetdashboard.data.SyncStatus
 import com.yswy.assetdashboard.drive.CacheSync
 import com.yswy.assetdashboard.drive.CacheSync.summary
 import com.yswy.assetdashboard.drive.DriveFolderSetup
@@ -36,6 +41,8 @@ import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.InboxSync
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,30 +60,74 @@ class MainActivity : ComponentActivity() {
 
 /**
  * E03でダッシュボード本体に置き換わる暫定画面。
- * 今はDrive連携(E01)の疎通確認だけができる。
+ * 今はDrive連携(E01)と、開いたときの同期判定(E02-04)の確認ができる。
  */
 @Composable
 private fun Placeholder(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf("未同期") }
+    var status by remember { mutableStateOf("") }
+    var syncStatus by remember { mutableStateOf<SyncStatus?>(null) }
 
-    suspend fun sync() {
-        status = when (val outcome = DriveSession.withDrive(context) { syncInbox(context, it) }) {
+    /**
+     * 同期して結果を出す。
+     * @param onConsent 同意画面が要るときの起動方法。同意から戻った直後の
+     *   再試行ではnull(もう一度同意画面を出して無限に回さない)。
+     */
+    suspend fun runSync(onConsent: ((PendingIntent) -> Unit)?) {
+        status = "同期中..."
+        val outcome = DriveSession.withDrive(context) { syncInbox(context, it) }
+        status = when (outcome) {
             is DriveSession.Outcome.Success -> outcome.value
             is DriveSession.Outcome.Offline ->
                 "オフライン: 同期をスキップしました\n(${outcome.message})"
             is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
-            // 同意画面の起動は呼び出し元で扱う
-            is DriveSession.Outcome.ConsentRequired -> "同意が必要"
+            is DriveSession.Outcome.ConsentRequired ->
+                if (onConsent != null) {
+                    onConsent(outcome.pendingIntent)
+                    "同意画面を表示中"
+                } else {
+                    "同意が必要"
+                }
         }
+        syncStatus = SyncStatus.load(AppDatabase.get(context))
     }
 
     // 同意画面から戻ってきたら、そのまま同期をやり直す。
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) {
-        scope.launch { sync() }
+        scope.launch { runSync(onConsent = null) }
+    }
+    val launchConsent: (PendingIntent) -> Unit = { intent ->
+        consentLauncher.launch(IntentSenderRequest.Builder(intent.intentSender).build())
+    }
+
+    // 開いたときに「同期が必要か」を判定し、必要なら同期する(E02-04)。
+    // バックグラウンドの定期実行には頼らない(CLAUDE.md)。
+    LaunchedEffect(Unit) {
+        val current = SyncStatus.load(AppDatabase.get(context))
+        syncStatus = current
+
+        val prefs = AutoSyncPrefs(context)
+        val now = Instant.now()
+        val auto = SyncPolicy.shouldAutoSync(
+            latestDataDate = current.latestDataDate,
+            today = LocalDate.now(),
+            lastAutoSyncAt = prefs.lastAttemptAt,
+            now = now,
+        )
+        if (auto) {
+            // 試した時点で記録する。失敗しても1時間は自動では試さない。
+            prefs.lastAttemptAt = now
+            runSync(launchConsent)
+        } else {
+            status = if (current.isDue) {
+                "自動同期は1時間以内に試したので見送り"
+            } else {
+                "期限内なので同期しない"
+            }
+        }
     }
 
     Column(
@@ -92,29 +143,11 @@ private fun Placeholder(modifier: Modifier = Modifier) {
             text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})",
             style = MaterialTheme.typography.labelSmall,
         )
+        syncStatus?.let {
+            Text(text = it.describe(), style = MaterialTheme.typography.bodySmall)
+        }
 
-        Button(
-            onClick = {
-                status = "同期中..."
-                scope.launch {
-                    val outcome = DriveSession.withDrive(context) { syncInbox(context, it) }
-                    if (outcome is DriveSession.Outcome.ConsentRequired) {
-                        status = "同意画面を表示中"
-                        consentLauncher.launch(
-                            IntentSenderRequest.Builder(outcome.pendingIntent.intentSender).build(),
-                        )
-                    } else {
-                        status = when (outcome) {
-                            is DriveSession.Outcome.Success -> outcome.value
-                            is DriveSession.Outcome.Offline ->
-                                "オフライン: 同期をスキップしました\n(${outcome.message})"
-                            is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
-                            else -> status
-                        }
-                    }
-                }
-            },
-        ) {
+        Button(onClick = { scope.launch { runSync(launchConsent) } }) {
             Text("Driveと同期")
         }
 

@@ -47,6 +47,10 @@ interface MetricPointDao {
     @Query("SELECT * FROM metric_point WHERE metricKey = :metricKey ORDER BY date DESC LIMIT 1")
     suspend fun latest(metricKey: String): MetricPointEntity?
 
+    /** いちばん新しい点の日付。同期の要否に使う([SyncPolicy])。 */
+    @Query("SELECT MAX(date) FROM metric_point")
+    suspend fun latestDate(): LocalDate?
+
     /** 現れたことのある項目。Metric項目を自動で生やすのに使う(E02-01)。 */
     @Query("SELECT DISTINCT metricKey FROM metric_point ORDER BY metricKey")
     suspend fun keys(): List<String>

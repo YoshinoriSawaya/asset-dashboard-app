@@ -62,6 +62,10 @@ interface BankTransactionDao {
     @Query("SELECT * FROM bank_transaction WHERE date BETWEEN :from AND :to ORDER BY date")
     suspend fun between(from: LocalDate, to: LocalDate): List<BankTransactionEntity>
 
+    /** いちばん新しい取引の日付。同期の要否に使う([SyncPolicy])。 */
+    @Query("SELECT MAX(date) FROM bank_transaction")
+    suspend fun latestDate(): LocalDate?
+
     @Query("SELECT COUNT(*) FROM bank_transaction")
     suspend fun count(): Int
 
