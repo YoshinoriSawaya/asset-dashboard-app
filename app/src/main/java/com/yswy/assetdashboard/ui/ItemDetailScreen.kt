@@ -15,9 +15,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -41,7 +47,16 @@ import java.time.YearMonth
  * Metricは推移の折れ線と月ごとの増減の棒(E03-06)を、月次の表の上に出す。
  */
 @Composable
-fun ItemDetailScreen(detail: ItemDetail?, loading: Boolean, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun ItemDetailScreen(
+    detail: ItemDetail?,
+    loading: Boolean,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    onCorrect: (String) -> Unit = {},
+    onDeleteCorrection: (String, LocalDate, (String?) -> Unit) -> Unit = { _, _, _ -> },
+    busy: Boolean = false,
+) {
+    var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item { TextButton(onClick = onBack) { Text("← 戻る") } }
 
@@ -59,14 +74,22 @@ fun ItemDetailScreen(detail: ItemDetail?, loading: Boolean, onBack: () -> Unit, 
         }
 
         when (detail) {
-            is ItemDetail.Metric -> metricContent(detail)
+            is ItemDetail.Metric -> {
+                metricHeader(detail)
+                // 補正の入口は上に置く。月次の表の下だと、スクロールしないと見つからない
+                correctionContent(detail, busy, message, onCorrect) { key, date ->
+                    message = "取り消し中..."
+                    onDeleteCorrection(key, date) { error -> message = error ?: "取り消しました" }
+                }
+                metricContent(detail)
+            }
             is ItemDetail.Goal -> item { GoalContent(detail) }
             is ItemDetail.Reminder -> item { ReminderContent(detail) }
         }
     }
 }
 
-private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
+private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
     val latest = detail.overview.latest
     item {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -86,6 +109,13 @@ private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
                     if (detail.correctedCount > 0) append(" / うち手動補正 ${detail.correctedCount}点")
                 },
             )
+        }
+    }
+}
+
+private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
+    item {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (detail.series.size >= 2) {
                 Spacer8()
                 LineChart(detail.series.map { it.date to it.valueYen })
@@ -106,6 +136,32 @@ private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
             value = change.closingYen?.let(Formatters::yen) ?: "データなし",
             change = change.changeYen?.let(Formatters::yenChange) ?: "−",
         )
+    }
+}
+
+/** 補正の入口と、手で直した・足した点の一覧(E03-04)。 */
+private fun LazyListScope.correctionContent(
+    detail: ItemDetail.Metric,
+    busy: Boolean,
+    message: String?,
+    onCorrect: (String) -> Unit,
+    onDelete: (String, LocalDate) -> Unit,
+) {
+    val key = detail.overview.item.metricKey
+    val corrected = detail.series.filter { it.origin != MetricOrigin.CSV }.sortedByDescending { it.date }
+    item {
+        Spacer8()
+        OutlinedButton(onClick = { onCorrect(key) }, enabled = !busy) { Text("値を補正・手入力") }
+        message?.let { Label(it) }
+    }
+    items(corrected, key = { "corr-" + it.date }) { point ->
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("${point.date}  ${Formatters.yen(point.valueYen)}", style = MaterialTheme.typography.bodyMedium)
+                Label(if (point.origin == MetricOrigin.OVERRIDE) "CSVの値を補正" else "手入力")
+            }
+            TextButton(onClick = { onDelete(key, point.date) }, enabled = !busy) { Text("取り消す") }
+        }
     }
 }
 

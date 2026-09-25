@@ -127,6 +127,18 @@ object Corrections {
         .groupBy { "${it.metricKey}|${it.date}" }
         .mapValues { (_, list) -> list.maxBy { it.correctedAt } }
 
+    /**
+     * 補正を足す。同じ「項目 + 日付」の古い補正は置き換える。
+     * [effective]は後勝ちなので残しても結果は同じだが、ファイルが
+     * 取り消せない古い補正で膨らんでいくのを避ける。
+     */
+    fun upsert(entries: List<Entry>, entry: Entry): List<Entry> =
+        entries.filterNot { it.metricKey == entry.metricKey && it.date == entry.date } + entry
+
+    /** 「項目 + 日付」の補正を消す。元データ(CSV)があれば、そちらの値に戻る。 */
+    fun remove(entries: List<Entry>, metricKey: String, date: LocalDate): List<Entry> =
+        entries.filterNot { it.metricKey == metricKey && it.date == date }
+
     /** JSONの組み立て。テストから直接確かめられるよう分けてある。 */
     fun render(entries: List<Entry>): String {
         val array = JSONArray()

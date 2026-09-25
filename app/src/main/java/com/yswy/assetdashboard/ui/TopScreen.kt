@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ fun TopScreen(
     onSync: () -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenSummary: () -> Unit,
+    onAddManual: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -58,6 +60,12 @@ fun TopScreen(
         items(state.overviews, key = { it.item.id }) { overview ->
             ItemRow(overview, onClick = { onOpenItem(overview.item.id) })
             HorizontalDivider()
+        }
+
+        item {
+            TextButton(onClick = onAddManual, modifier = Modifier.padding(top = 8.dp)) {
+                Text("+ 手入力の系列を追加(現金など)")
+            }
         }
 
         item {
@@ -156,6 +164,7 @@ private fun TopScreenPreview() {
             onSync = {},
             onOpenItem = {},
             onOpenSummary = {},
+            onAddManual = {},
         )
     }
 }
