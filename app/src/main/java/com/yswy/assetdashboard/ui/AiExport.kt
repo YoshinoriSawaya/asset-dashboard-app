@@ -1,0 +1,91 @@
+package com.yswy.assetdashboard.ui
+
+import com.yswy.assetdashboard.data.ItemOverview
+import com.yswy.assetdashboard.data.PeriodSummary
+import java.time.LocalDate
+
+/**
+ * AIに貼り付けて相談するためのテキスト(E03-07)。
+ *
+ * ## 入れないもの
+ * - **明細の摘要**: 振込相手の氏名などが入る(`振込 ﾀﾅｶ ﾀﾛｳ` のような形)。
+ *   入出金は月ごとの合計だけにする
+ * - 口座番号・銀行名: そもそもキャッシュに持っていない
+ *
+ * 金額・系列名・推移だけを整形する。どこかへ自動で送ることはせず、
+ * コピーした人が貼る先を選ぶ。
+ */
+object AiExport {
+
+    /** 各系列・入出金の月次を何か月ぶん入れるか。 */
+    const val MONTHS = 6
+
+    fun build(
+        today: LocalDate,
+        latestDataDate: LocalDate?,
+        months: List<PeriodSummary>,
+        goals: List<ItemOverview.Goal>,
+    ): String = buildString {
+        appendLine("# 資産の状況(${today}時点)")
+        appendLine()
+        appendLine("個人の資産管理アプリから書き出したデータです。金額は円。")
+        latestDataDate?.let { appendLine("手元のデータは ${it} までのものです。") }
+        appendLine()
+
+        val recent = months.take(MONTHS)
+        val metricItems = recent.firstOrNull()?.metrics?.map { it.first }.orEmpty()
+        if (metricItems.isNotEmpty()) {
+            appendLine("## 系列ごとの推移(直近${recent.size}か月、各月の最後の値と前月からの増減)")
+            appendLine()
+            for (item in metricItems) {
+                appendLine("### ${item.name}")
+                appendLine("| 月 | 値 | 増減 |")
+                appendLine("|---|---:|---:|")
+                for (month in recent) {
+                    val change = month.metrics.firstOrNull { it.first.id == item.id }?.second ?: continue
+                    appendLine("| ${month.label} | ${change.closingYen?.let(::yen) ?: "データなし"} | ${change.changeYen?.let(::signed) ?: "-"} |")
+                }
+                appendLine()
+            }
+        }
+
+        val withCash = recent.filter { it.cashflow != null }
+        if (withCash.isNotEmpty()) {
+            appendLine("## 入出金(銀行明細の月ごとの合計)")
+            appendLine()
+            appendLine("| 月 | 収入 | 支出 | 収支 | 件数 | 明細の期間 |")
+            appendLine("|---|---:|---:|---:|---:|---|")
+            for (month in withCash) {
+                val c = month.cashflow ?: continue
+                val coverage = month.cashflowCoverage?.let { "${it.start}〜${it.endInclusive}" } ?: ""
+                appendLine("| ${month.label} | ${yen(c.incomeYen)} | ${yen(c.spendingYen)} | ${signed(c.netYen)} | ${c.count} | $coverage |")
+            }
+            appendLine()
+        }
+
+        if (goals.isNotEmpty()) {
+            appendLine("## 目標")
+            appendLine()
+            for (goal in goals) {
+                val item = goal.item
+                append("- ${item.name}: 目標 ${yen(item.targetYen)}")
+                goal.currentYen?.let { current ->
+                    append(" / 現在 ${yen(current)}")
+                    goal.progress?.let { append("(${(it * 100).toInt()}%)") }
+                    append(" / 残り ${yen((item.targetYen - current).coerceAtLeast(0))}")
+                }
+                item.dueDate?.let { append(" / 期日 $it") }
+                appendLine()
+            }
+            appendLine()
+        }
+
+        appendLine("## 読むときの注意")
+        appendLine("- 系列は資産推移CSVの列そのまま。「合計」のような列は他の列の合計なので、系列同士を足すと二重に数えることになる")
+        appendLine("- 支出には自分の口座間の振替やカードの引き落としも含まれる")
+        appendLine("- 入出金は銀行から取得した期間の分しか無い(明細の期間を参照)")
+    }
+
+    private fun yen(v: Long) = Formatters.yen(v)
+    private fun signed(v: Long) = Formatters.yenChange(v)
+}

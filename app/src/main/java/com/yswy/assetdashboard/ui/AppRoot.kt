@@ -36,6 +36,7 @@ object Routes {
     const val TOP = "top"
     const val SUMMARY = "summary"
     const val SYNC_LOG = "synclog"
+    const val EXPORT = "export"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -108,6 +109,10 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 modifier = modifier,
             )
         }
+        route == Routes.EXPORT -> {
+            val text by produceState<String?>(null, state.overviews) { value = viewModel.aiExport() }
+            ExportScreen(text = text, onBack = { close(route) }, modifier = modifier)
+        }
         route == Routes.SYNC_LOG -> SyncLogScreen(
             lastSync = state.lastSync,
             onBack = { close(route) },
@@ -134,6 +139,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onOpenSummary = { stack.add(Routes.SUMMARY) },
             onAddManual = { stack.add(Routes.correct(null)) },
             onOpenSyncLog = { stack.add(Routes.SYNC_LOG) },
+            onOpenExport = { stack.add(Routes.EXPORT) },
             modifier = modifier,
         )
     }

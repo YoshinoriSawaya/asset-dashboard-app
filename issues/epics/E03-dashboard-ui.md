@@ -12,7 +12,7 @@
 - [x] [E03-04: 手動補正入力画面(E01-10と連動)](../tasks/E03-04-manual-correction-screen.md)
 - [x] [E03-05: 前回同期結果の要約表示(成功/失敗件数)](../tasks/E03-05-sync-result-summary.md)
 - [x] [E03-06: グラフ実装(チャートライブラリ選定・配色)](../tasks/E03-06-chart-implementation.md)
-- [ ] [E03-07: AI解析用データ出力機能](../tasks/E03-07-ai-export-prompt.md)
+- [x] [E03-07: AI解析用データ出力機能](../tasks/E03-07-ai-export-prompt.md)
 - ~~E03-08: 口座残高の積み上げ色分けグラフ~~ → [E07-13](../tasks/E07-13-stacked-account-graph.md)へ移動(E07-10が前提のため)
 
 ## 完了条件

@@ -154,6 +154,17 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** AI相談用の書き出し(E03-07)。 */
+    suspend fun aiExport(): String {
+        val today = LocalDate.now()
+        return AiExport.build(
+            today = today,
+            latestDataDate = SyncStatus.load(db, today).latestDataDate,
+            months = SummaryBoard.load(db, PeriodUnit.MONTH, today),
+            goals = ItemOverview.load(db, today).filterIsInstance<ItemOverview.Goal>(),
+        )
+    }
+
     /** サマリー画面(E03-03)の中身。 */
     suspend fun summaries(unit: PeriodUnit): List<PeriodSummary> = SummaryBoard.load(db, unit)
 
