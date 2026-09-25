@@ -1,5 +1,9 @@
 package com.yswy.assetdashboard.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +21,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +37,7 @@ import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Repeat
 import com.yswy.assetdashboard.data.SyncStatus
+import com.yswy.assetdashboard.notify.DailyCheck
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.LocalDate
@@ -45,9 +54,33 @@ fun TopScreen(
     onOpenExport: () -> Unit,
     onAddGoal: () -> Unit,
     onEditMetric: (String) -> Unit,
+    onAddReminder: () -> Unit,
+    onRunDailyCheck: ((Int) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
+    var canNotify by remember { mutableStateOf(DailyCheck.canNotify(context)) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        canNotify = granted
+    }
+    var debugMessage by remember { mutableStateOf<String?>(null) }
+
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+        if (!canNotify && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            item {
+                Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                    Text(
+                        "通知が許可されていません。CSVの催促やリマインダーを受け取るには許可してください。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
+                        Text("通知を許可する")
+                    }
+                }
+            }
+        }
         item {
             SyncHeader(state, onSync, onOpenSummary, onOpenSyncLog)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -87,6 +120,7 @@ fun TopScreen(
             TextButton(onClick = onAddGoal, modifier = Modifier.padding(top = 8.dp)) {
                 Text("+ 目標を追加")
             }
+            TextButton(onClick = onAddReminder) { Text("+ リマインダーを追加(点検・保険の更新など)") }
             TextButton(onClick = onAddManual) {
                 Text("+ 手入力の系列を追加(現金など)")
             }
@@ -100,6 +134,15 @@ fun TopScreen(
             }
         }
 
+        // 確認用。毎日の確認(E05)を今すぐ走らせる。リリース版には出さない
+        if (BuildConfig.DEBUG) {
+            item {
+                TextButton(onClick = { onRunDailyCheck { debugMessage = "通知 ${it}件" } }) {
+                    Text("(デバッグ)今すぐ通知を確認")
+                }
+                debugMessage?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+            }
+        }
         item {
             Text(
                 "v${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})",
@@ -217,6 +260,8 @@ private fun TopScreenPreview() {
             onOpenExport = {},
             onAddGoal = {},
             onEditMetric = {},
+            onAddReminder = {},
+            onRunDailyCheck = {},
         )
     }
 }

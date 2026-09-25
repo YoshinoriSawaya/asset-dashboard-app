@@ -47,6 +47,12 @@ object Routes {
     private const val GOAL = "goal/"
     private const val METRIC = "metric/"
     private const val USAGE = "usage/"
+    private const val REMINDER = "reminder/"
+
+    /** リマインダーの編集(E05-05/06)。[id]がnullなら新規。 */
+    fun reminder(id: String?) = REMINDER + id.orEmpty()
+
+    fun reminderId(route: String): String? = route.removePrefix(REMINDER).takeIf { route.startsWith(REMINDER) }
 
     /** 毎年リセットする枠に使った分を足す(E07-09)。 */
     fun usage(goalId: String) = USAGE + goalId
@@ -97,11 +103,25 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     val goalId = Routes.goalId(route)
     val metricKey = Routes.metricKey(route)
     val usageGoalId = Routes.usageGoalId(route)
+    val reminderId = Routes.reminderId(route)
     /** [target]がまだ一番上なら閉じる。保存の完了が画面を離れた後に届いても、別の画面を閉じない。 */
     fun close(target: String) {
         if (stack.size > 1 && stack.last() == target) stack.removeAt(stack.lastIndex)
     }
     when {
+        reminderId != null -> ReminderEditScreen(
+            existing = state.overviews.map { it.item }.filterIsInstance<Item.Reminder>().firstOrNull { it.id == reminderId },
+            saving = state.syncing,
+            onSave = viewModel::saveReminder,
+            onDelete = { id, onResult ->
+                viewModel.deleteItem(id) { error ->
+                    if (error == null) while (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    onResult(error)
+                }
+            },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         usageGoalId != null -> {
             val goal = state.overviews.filterIsInstance<ItemOverview.Goal>().firstOrNull { it.item.id == usageGoalId }
             UsageScreen(
@@ -131,7 +151,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onSave = viewModel::saveGoal,
             // 削除したら詳細画面も意味が無いので、トップまで戻る
             onDelete = { id, onResult ->
-                viewModel.deleteGoal(id) { error ->
+                viewModel.deleteItem(id) { error ->
                     if (error == null) {
                         while (stack.size > 1) stack.removeAt(stack.lastIndex)
                     }
@@ -171,6 +191,8 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 onEditGoal = { stack.add(Routes.goal(it)) },
                 onEditMetric = { stack.add(Routes.metric(it)) },
                 onAddUsage = { stack.add(Routes.usage(it)) },
+                onEditReminder = { stack.add(Routes.reminder(it)) },
+                onCompleteReminder = { reminder, onResult -> viewModel.completeReminder(reminder, onResult) },
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,
@@ -217,6 +239,8 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onOpenSyncLog = { stack.add(Routes.SYNC_LOG) },
             onOpenExport = { stack.add(Routes.EXPORT) },
             onAddGoal = { stack.add(Routes.goal(null)) },
+            onAddReminder = { stack.add(Routes.reminder(null)) },
+            onRunDailyCheck = viewModel::runDailyCheckNow,
             onEditMetric = { stack.add(Routes.metric(it)) },
             modifier = modifier,
         )

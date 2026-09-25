@@ -28,6 +28,7 @@ import com.yswy.assetdashboard.drive.LastSync
 import com.yswy.assetdashboard.drive.LastSyncStore
 import com.yswy.assetdashboard.drive.Settings
 import com.yswy.assetdashboard.drive.SpendingRules
+import com.yswy.assetdashboard.notify.DailyCheck
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.Instant
 import java.time.LocalDate
@@ -67,6 +68,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         _state.update { it.copy(lastSync = lastSyncStore.load()) }
+        // 端末で出す通知(E05)の毎日の確認を予約する。予約は再起動で消えるので、開くたびに入れ直す
+        DailyCheck.schedule(app)
         viewModelScope.launch {
             refresh()
             autoSyncIfNeeded()
@@ -222,7 +225,30 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             .toList()
             .sortedByDescending { it.second }
 
-    fun deleteGoal(id: String, onResult: (String?) -> Unit) {
+    /** リマインダーの保存(E05-05/06)。目標と同じくDriveの settings に書く。 */
+    fun saveReminder(reminder: Item.Reminder, onResult: (String?) -> Unit) {
+        viewModelScope.launch { onResult(editSettings { Settings.upsert(it, reminder.toEntity()) }) }
+    }
+
+    /** 済みにする。繰り返すものは次の期日へ、繰り返さないものは消す。 */
+    fun completeReminder(reminder: Item.Reminder, onResult: (String?) -> Unit) {
+        val next = ReminderForm.completed(reminder, LocalDate.now())
+        viewModelScope.launch {
+            onResult(
+                editSettings {
+                    if (next == null) Settings.remove(it, reminder.id) else Settings.upsert(it, next.toEntity())
+                },
+            )
+        }
+    }
+
+    /** デバッグ用: 毎日の確認を今すぐ走らせる。出した通知の数を返す。 */
+    fun runDailyCheckNow(onResult: (Int) -> Unit) {
+        viewModelScope.launch { onResult(DailyCheck.run(getApplication())) }
+    }
+
+    /** 目標・リマインダーを消す(settingsから外す)。 */
+    fun deleteItem(id: String, onResult: (String?) -> Unit) {
         viewModelScope.launch { onResult(editSettings { Settings.remove(it, id) }) }
     }
 

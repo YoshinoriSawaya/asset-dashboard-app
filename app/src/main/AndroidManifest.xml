@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 圏外なら同期を諦めるため(E01-13)。 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 端末で出す催促・リマインダー(E05)。Android 13以降は実行時に許可を求める。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 再起動のあと、毎日の確認のアラームを予約し直すため(E05)。 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="false"
@@ -23,6 +27,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 毎日の確認(E05)。アラームで起き、手元のDBを見て通知する。同期はしない。 -->
+        <receiver
+            android:name=".notify.DailyCheckReceiver"
+            android:exported="false" />
+        <!-- 再起動・アプリの更新で消えたアラームを予約し直す(E05)。 -->
+        <receiver
+            android:name=".notify.RescheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- 同期が必要かを色で示すウィジェット(E04)。 -->
         <receiver

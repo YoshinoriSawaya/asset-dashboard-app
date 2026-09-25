@@ -12,9 +12,9 @@
 - [x] ~~[E07-04: 目標金額・期日の設定](../tasks/E07-04-goal-amount-and-due-date.md)~~ → E07-01・E07-11に統合
 - [x] [E07-05: iDeCo Metricの追加](../tasks/E07-05-idoco-metric.md)
 - [x] [E07-06: 生活防衛資金Goalの目標額自動計算](../tasks/E07-06-emergency-fund-auto-target.md)
-- [ ] [E07-07: 生活防衛資金の回復プラン提示](../tasks/E07-07-emergency-fund-recovery-plan.md)
+- [x] [E07-07: 生活防衛資金の回復プラン提示](../tasks/E07-07-emergency-fund-recovery-plan.md)
 - [ ] [E07-08: NISA積立の一時減額提案(生活防衛資金連動)](../tasks/E07-08-nisa-temporary-reduction.md)
-- [ ] [E07-09: ふるさと納税枠の管理](../tasks/E07-09-furusato-nozei.md)
+- [x] [E07-09: ふるさと納税枠の管理](../tasks/E07-09-furusato-nozei.md)
 - [ ] [E07-10: 単一口座内での仮想配分管理(封筒予算方式)](../tasks/E07-10-envelope-allocation.md)
 - [ ] [E07-11: Goalの目標期日とランプアップ(積み増し開始)通知](../tasks/E07-11-goal-due-date-rampup.md)
 - [ ] [E07-12: ランプアップGoal未達時の生活防衛資金取り崩し許容](../tasks/E07-12-rampup-shortfall-emergency-fund-drawdown.md)

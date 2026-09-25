@@ -59,6 +59,8 @@ fun ItemDetailScreen(
     onEditGoal: (String) -> Unit = {},
     onEditMetric: (String) -> Unit = {},
     onAddUsage: (String) -> Unit = {},
+    onEditReminder: (String) -> Unit = {},
+    onCompleteReminder: (Item.Reminder, (String?) -> Unit) -> Unit = { _, _ -> },
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -101,7 +103,18 @@ fun ItemDetailScreen(
                     Text("編集・削除")
                 }
             }
-            is ItemDetail.Reminder -> item { ReminderContent(detail) }
+            is ItemDetail.Reminder -> item {
+                ReminderContent(detail)
+                val reminder = detail.overview.item
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    Button(enabled = !busy, onClick = {
+                        message = "保存中..."
+                        onCompleteReminder(reminder) { error -> message = error ?: "済みにしました" }
+                    }) { Text(if (reminder.repeat == Repeat.NONE) "済みにする(消す)" else "済みにする(次の期日へ)") }
+                    OutlinedButton(onClick = { onEditReminder(reminder.id) }, enabled = !busy) { Text("編集・削除") }
+                }
+                message?.let { Label(it) }
+            }
         }
     }
 }
