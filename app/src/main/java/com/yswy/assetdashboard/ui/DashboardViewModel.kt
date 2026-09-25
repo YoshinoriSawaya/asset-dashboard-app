@@ -20,6 +20,7 @@ import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.FullSync
 import com.yswy.assetdashboard.drive.LastSync
 import com.yswy.assetdashboard.drive.LastSyncStore
+import com.yswy.assetdashboard.widget.SyncStatusWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -204,5 +205,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val overviews = ItemOverview.load(db)
         val status = SyncStatus.load(db)
         _state.update { it.copy(overviews = overviews, syncStatus = status) }
+        // ウィジェットの色も同じ判定なので、キャッシュが変わるたびに描き直す(E04)
+        SyncStatusWidget.refresh(getApplication())
     }
 }

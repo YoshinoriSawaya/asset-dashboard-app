@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">資産ダッシュボード</string>
+    <string name="widget_description">同期が必要になると赤くなります(金額は出しません)</string>
 </resources>

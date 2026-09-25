@@ -176,3 +176,6 @@ Console側の設定手順(どのスコープを選んだか、テストユーザ
 | ドキュメント中のパスが壊れる | Pythonで書くとき `\a` がBEL文字になる |
 | エミュレータのアプリとDBが消えた | `connectedDebugAndroidTest` は終了時にアンインストールする。上の `-P` を付ける |
 | `MigrationTestHelper` が `AbstractMethodError`(kotlinx.serialization) | AGPがテストをアプリと同じ版に固定する。アプリ側を `constraints` で上げる |
+| ウィジェットをタップしても開かない | `am force-stop` がPendingIntentを取り消した。アプリを開けば直る。確認で強制停止を使わない |
+| ウィジェットの色が同期しても変わらない | Glanceのセッション中は `provideGlance` が呼び直されない。判定は `updateAppWidgetState` に書いて `currentState` で読む |
+| ホームに置いたウィジェットが見つからない | HOMEキーは1ページ目に戻る。置いたページ(2ページ目など)へスワイプする |

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  同期が必要かどうかだけを色で示すウィジェット(E04)。
+  updatePeriodMillis: アプリを開かなくても、データが古くなれば赤に変わるように
+  6時間ごとに描き直す。描き直しはローカルのDBを読むだけで、同期はしない
+  (CLAUDE.mdの「バックグラウンドの定期実行には頼らない」は同期の話)。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="21600000"
+    android:widgetCategory="home_screen" />

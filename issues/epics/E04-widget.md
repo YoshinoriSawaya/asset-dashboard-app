@@ -5,9 +5,9 @@
 「同期が必要かどうか」を色で示す通知専用の役割に絞る。
 
 ## 子イシュー
-- [ ] [E04-01: Glanceウィジェットの基本実装](../tasks/E04-01-glance-widget-basic.md)
-- [ ] [E04-02: 同期期限判定→色切り替え(平常/赤)](../tasks/E04-02-sync-status-color.md)
-- [ ] [E04-03: ウィジェットタップ→アプリ起動導線](../tasks/E04-03-widget-tap-to-app.md)
+- [x] [E04-01: Glanceウィジェットの基本実装](../tasks/E04-01-glance-widget-basic.md)
+- [x] [E04-02: 同期期限判定→色切り替え(平常/赤)](../tasks/E04-02-sync-status-color.md)
+- [x] [E04-03: ウィジェットタップ→アプリ起動導線](../tasks/E04-03-widget-tap-to-app.md)
 
 ## 完了条件
 ホーム画面にウィジェットを置ける。CSV取得の期限が来るとウィジェットが

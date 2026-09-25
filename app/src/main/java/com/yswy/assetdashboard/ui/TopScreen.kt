@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.BuildConfig
@@ -29,6 +30,7 @@ import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Repeat
 import com.yswy.assetdashboard.data.SyncStatus
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
+import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.LocalDate
 
 /** トップ画面(E03-01)。同期の状態と、項目の一覧。 */
@@ -69,6 +71,13 @@ fun TopScreen(
                 Text("+ 手入力の系列を追加(現金など)")
             }
             TextButton(onClick = onOpenExport) { Text("AI相談用にコピー") }
+            // まだ置いていなければ、ウィジェットを置く入口を出す(E04-01)
+            val context = LocalContext.current
+            if (!SyncStatusWidget.isPlaced(context)) {
+                TextButton(onClick = { SyncStatusWidget.requestPin(context) }) {
+                    Text("ホーム画面にウィジェットを置く")
+                }
+            }
         }
 
         item {
