@@ -47,7 +47,7 @@ object InboxSync {
             if (skipped.isNotEmpty()) skippedByFile[file.name] = skipped
         }
 
-        val report = Report(entries)
+        val report = Report(entries, skippedByFile)
         Log.i(TAG, "同期完了: ${report.summary()}")
 
         // 問題があればDriveのlogsに残す。書けなくても同期は成立している。
@@ -148,7 +148,14 @@ object InboxSync {
 
     data class Entry(val fileName: String, val status: Status, val detail: String)
 
-    data class Report(val entries: List<Entry>) {
+    data class Report(
+        val entries: List<Entry>,
+        /**
+         * ファイルごとの読めなかった行。**生の行(`raw`)には口座番号などが入る**ので、
+         * 画面やファイルに出すときは[SyncLog.render]を通して行番号と理由だけにする。
+         */
+        val skipped: Map<String, List<SkippedRow>> = emptyMap(),
+    ) {
         fun count(status: Status): Int = entries.count { it.status == status }
 
         val hasProblem: Boolean

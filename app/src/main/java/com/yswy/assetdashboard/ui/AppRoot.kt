@@ -35,6 +35,7 @@ import com.yswy.assetdashboard.data.PeriodUnit
 object Routes {
     const val TOP = "top"
     const val SUMMARY = "summary"
+    const val SYNC_LOG = "synclog"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -107,6 +108,11 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 modifier = modifier,
             )
         }
+        route == Routes.SYNC_LOG -> SyncLogScreen(
+            lastSync = state.lastSync,
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.SUMMARY -> {
             var unit by rememberSaveable { mutableStateOf(PeriodUnit.MONTH) }
             // 同期でデータが変わったら(一覧が更新されたら)読み直す
@@ -127,6 +133,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
             onOpenItem = { stack.add(Routes.item(it)) },
             onOpenSummary = { stack.add(Routes.SUMMARY) },
             onAddManual = { stack.add(Routes.correct(null)) },
+            onOpenSyncLog = { stack.add(Routes.SYNC_LOG) },
             modifier = modifier,
         )
     }

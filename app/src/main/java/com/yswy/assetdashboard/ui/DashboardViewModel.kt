@@ -18,6 +18,8 @@ import com.yswy.assetdashboard.drive.Corrections
 import com.yswy.assetdashboard.drive.DriveFolderSetup
 import com.yswy.assetdashboard.drive.DriveSession
 import com.yswy.assetdashboard.drive.FullSync
+import com.yswy.assetdashboard.drive.LastSync
+import com.yswy.assetdashboard.drive.LastSyncStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,17 +41,21 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val overviews: List<ItemOverview> = emptyList(),
         val syncStatus: SyncStatus? = null,
         val syncing: Boolean = false,
-        /** 直近の同期の結果、または同期しなかった理由。 */
+        /** 今起きていること(同期中、同期しなかった理由など)の短い一言。 */
         val message: String = "",
+        /** 前回の同期の結果(E03-05)。まだ一度も同期していなければnull。 */
+        val lastSync: LastSync? = null,
         /** 同意画面を出してほしい。出したら[consentLaunched]を呼ぶ。 */
         val consentRequest: PendingIntent? = null,
     )
 
     private val db = AppDatabase.get(app)
+    private val lastSyncStore = LastSyncStore(app)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
+        _state.update { it.copy(lastSync = lastSyncStore.load()) }
         viewModelScope.launch {
             refresh()
             autoSyncIfNeeded()
@@ -154,9 +160,21 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun runSync(askConsent: Boolean) {
         _state.update { it.copy(syncing = true, message = "同期中...") }
         val outcome = DriveSession.withDrive(getApplication()) { FullSync.run(it, db) }
+        val now = Instant.now()
+        // 同期を試し終えたものだけ記録する。同意待ちは試し終えていないので残さない。
+        val last = when (outcome) {
+            is DriveSession.Outcome.Success -> LastSync.of(outcome.value, now)
+            is DriveSession.Outcome.Offline -> LastSync.notSynced("オフラインでスキップ", now, isProblem = false)
+            is DriveSession.Outcome.Failed -> LastSync.notSynced("失敗: ${outcome.message}", now, isProblem = true)
+            is DriveSession.Outcome.ConsentRequired -> null
+        }
+        last?.let {
+            lastSyncStore.save(it)
+            _state.update { s -> s.copy(lastSync = it) }
+        }
         val message = when (outcome) {
-            is DriveSession.Outcome.Success -> outcome.value.describe()
-            is DriveSession.Outcome.Offline -> "オフライン: 同期をスキップしました\n(${outcome.message})"
+            is DriveSession.Outcome.Success -> ""
+            is DriveSession.Outcome.Offline -> "オフライン: 同期をスキップしました(${outcome.message})"
             is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
             is DriveSession.Outcome.ConsentRequired -> {
                 if (askConsent) {

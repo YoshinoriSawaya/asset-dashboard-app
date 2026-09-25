@@ -39,11 +39,12 @@ fun TopScreen(
     onOpenItem: (String) -> Unit,
     onOpenSummary: () -> Unit,
     onAddManual: () -> Unit,
+    onOpenSyncLog: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
-            SyncHeader(state, onSync, onOpenSummary)
+            SyncHeader(state, onSync, onOpenSummary, onOpenSyncLog)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
 
@@ -79,7 +80,12 @@ fun TopScreen(
 }
 
 @Composable
-private fun SyncHeader(state: DashboardViewModel.UiState, onSync: () -> Unit, onOpenSummary: () -> Unit) {
+private fun SyncHeader(
+    state: DashboardViewModel.UiState,
+    onSync: () -> Unit,
+    onOpenSummary: () -> Unit,
+    onOpenSyncLog: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("資産ダッシュボード", style = MaterialTheme.typography.headlineSmall)
         state.syncStatus?.let {
@@ -95,6 +101,15 @@ private fun SyncHeader(state: DashboardViewModel.UiState, onSync: () -> Unit, on
         }
         if (state.message.isNotBlank()) {
             Text(state.message, style = MaterialTheme.typography.bodySmall)
+        }
+        // 前回の同期(E03-05)。問題があれば目立たせる。タップで詳細
+        state.lastSync?.let { last ->
+            Text(
+                last.line() + if (last.hasProblem) "(タップで詳細)" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (last.hasProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(onClick = onOpenSyncLog).padding(vertical = 4.dp),
+            )
         }
     }
 }
@@ -165,6 +180,7 @@ private fun TopScreenPreview() {
             onOpenItem = {},
             onOpenSummary = {},
             onAddManual = {},
+            onOpenSyncLog = {},
         )
     }
 }
