@@ -6,11 +6,12 @@
 (E04)とは別に、アプリを開いていなくても届く通知経路を整える。
 
 ## 子イシュー
-- [ ] E05-01: FCM(Firebase Cloud Messaging)セットアップ
-- [ ] E05-02: 月1CSV取得リマインダー通知
-- [ ] E05-03: 未対応時の再通知ロジック(催促)
-- [ ] E05-04: 既存NISAトレーリング通知との統合(PC側スクレイピング→FCM経由でスマホに転送)
-- [ ] E05-05: 車メンテ年1点検リマインダー通知
+- [ ] [E05-01: FCM(Firebase Cloud Messaging)セットアップ](../tasks/E05-01-fcm-setup.md)
+- [ ] [E05-02: 月1CSV取得リマインダー通知](../tasks/E05-02-monthly-csv-reminder.md)
+- [ ] [E05-03: 未対応時の再通知ロジック(催促)](../tasks/E05-03-followup-reminder.md)
+- [ ] [E05-04: 既存NISAトレーリング通知との統合(PC側スクレイピング→FCM経由でスマホに転送)](../tasks/E05-04-nisa-alert-integration.md)
+- [ ] [E05-05: 車メンテ年1点検リマインダー通知](../tasks/E05-05-car-maintenance-reminder.md)
+- [ ] [E05-06: 保険・税金の更新リマインダー](../tasks/E05-06-insurance-tax-reminder.md)
 
 ## 完了条件
 CSV取得期限が来ると、アプリを開いていなくてもプッシュ通知が届く。

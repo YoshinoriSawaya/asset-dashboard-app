@@ -5,13 +5,13 @@ Androidアプリ開発に必要なローカル環境を整える。ここが終�
 Claude Codeでコードを書いても実行・確認ができない。
 
 ## 子イシュー
-- [x] E00-01: プロジェクトフォルダの作成・git init
-- [x] E00-02: Android Studioインストール
-- [x] E00-03: プロジェクト作成(Kotlin + Jetpack Compose)
-- [ ] E00-04: 実機デバッグ環境のセットアップ(USBデバッグ有効化)
-- [x] E00-05: エミュレータのセットアップ(実機が使えない場面用)
-- [ ] E00-06: 署名用キーストア作成・安全な保管
-- [x] E00-07: Claude Codeとの連携確認(プロジェクトを開いて簡単な変更→ビルドできるか)
+- [x] [E00-01: プロジェクトフォルダの作成・git init](../tasks/E00-01-project-folder-setup.md)
+- [x] [E00-02: Android Studioインストール](../tasks/E00-02-android-studio-install.md)
+- [x] [E00-03: プロジェクト作成(Kotlin + Jetpack Compose)](../tasks/E00-03-project-creation.md)
+- [ ] [E00-04: 実機デバッグ環境のセットアップ(USBデバッグ有効化)](../tasks/E00-04-device-debug-setup.md)
+- [x] [E00-05: エミュレータのセットアップ(実機が使えない場面用)](../tasks/E00-05-emulator-setup.md)
+- [ ] [E00-06: 署名用キーストア作成・安全な保管](../tasks/E00-06-keystore-creation.md)
+- [x] [E00-07: Claude Codeとの連携確認(プロジェクトを開いて簡単な変更→ビルドできるか)](../tasks/E00-07-claude-code-integration.md)
 
 ## 完了条件
 空のAndroidプロジェクトが実機またはエミュレータでビルド・起動できる状態。

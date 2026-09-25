@@ -6,19 +6,20 @@ inboxフォルダに置かれたCSVを検知・取得し、パースしてロー
 の土台になるエピック。
 
 ## 子イシュー
-- [x] E01-01: Google Cloud Console設定・OAuth認証
-- [x] E01-02: Driveフォルダ構成の作成(inbox/processed/backup/corrections/logs)
-- [x] E01-03: inboxファイル一覧取得・新規判定ロジック
-- [x] E01-04: 既知ヘッダー判定パーサー(銀行ごとのアダプター)
-- [x] E01-05: 汎用金額抽出パーサー(未知フォーマットのフォールバック)
-- [x] E01-06: バリデーション(文字コード/区切り文字/異常値チェック)
-- [x] E01-07: inbox→processed移動処理
-- [x] E01-08: エラー時のlogs書き込み処理
-- [x] E01-09: 整形済みデータのbackup書き込み処理
-- [x] E01-10: 手動補正データの書き戻し(corrections)
-- [x] E01-11: 重複トランザクション検出
-- [ ] E01-12: 既存データ(マネーフォワード等)の初回移行
-- [x] E01-13: 認証切れ・オフライン時の挙動
+- [x] [E01-01: Google Cloud Console設定・OAuth認証](../tasks/E01-01-oauth-setup.md)
+- [x] [E01-02: Driveフォルダ構成の作成(inbox/processed/backup/corrections/logs)](../tasks/E01-02-folder-structure.md)
+- [x] [E01-03: inboxファイル一覧取得・新規判定ロジック](../tasks/E01-03-inbox-detection.md)
+- [x] [E01-04: 既知ヘッダー判定パーサー(銀行ごとのアダプター)](../tasks/E01-04-known-header-parser.md)
+- [x] [E01-05: 汎用金額抽出パーサー(未知フォーマットのフォールバック)](../tasks/E01-05-fallback-parser.md)
+- [x] [E01-06: バリデーション(文字コード/区切り文字/異常値チェック)](../tasks/E01-06-validation.md)
+- [x] [E01-07: inbox→processed移動処理](../tasks/E01-07-move-to-processed.md)
+- [x] [E01-08: エラー時のlogs書き込み処理](../tasks/E01-08-error-logging.md)
+- [x] [E01-09: 整形済みデータのbackup書き込み処理](../tasks/E01-09-backup-write.md)
+- [x] [E01-10: 手動補正データの書き戻し(corrections)](../tasks/E01-10-corrections-write-back.md)
+- [x] [E01-11: 重複トランザクション検出](../tasks/E01-11-duplicate-detection.md)
+- [ ] [E01-12: 既存データ(マネーフォワード等)の初回移行](../tasks/E01-12-initial-data-migration.md)
+- [x] [E01-13: 認証切れ・オフライン時の挙動](../tasks/E01-13-auth-and-offline-handling.md)
+- [ ] [E01-14: クレジットカード利用明細CSVの対応](../tasks/E01-14-credit-card-csv.md)
 
 ## 完了条件
 CSVをinboxに置いてアプリを起動すると、自動でパース・バリデーションが走り、

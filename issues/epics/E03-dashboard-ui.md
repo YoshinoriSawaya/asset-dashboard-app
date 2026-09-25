@@ -6,11 +6,14 @@
 詳細・月次年次サマリー・手動補正が行える状態にする。
 
 ## 子イシュー
-- [ ] E03-01: ナビゲーション構造・トップ画面
-- [ ] E03-02: 項目詳細画面(Metric/Goal/Reminder共通テンプレート)
-- [ ] E03-03: 月次・年次サマリー画面
-- [ ] E03-04: 手動補正入力画面(E01-10と連動)
-- [ ] E03-05: 前回同期結果の要約表示(成功/失敗件数)
+- [ ] [E03-01: ナビゲーション構造・トップ画面](../tasks/E03-01-navigation-top-screen.md)
+- [ ] [E03-02: 項目詳細画面(Metric/Goal/Reminder共通テンプレート)](../tasks/E03-02-item-detail-screen.md)
+- [ ] [E03-03: 月次・年次サマリー画面](../tasks/E03-03-monthly-yearly-summary-screen.md)
+- [ ] [E03-04: 手動補正入力画面(E01-10と連動)](../tasks/E03-04-manual-correction-screen.md)
+- [ ] [E03-05: 前回同期結果の要約表示(成功/失敗件数)](../tasks/E03-05-sync-result-summary.md)
+- [ ] [E03-06: グラフ実装(チャートライブラリ選定・配色)](../tasks/E03-06-chart-implementation.md)
+- [ ] [E03-07: AI解析用データ出力機能](../tasks/E03-07-ai-export-prompt.md)
+- [ ] [E03-08: 口座残高の積み上げ色分けグラフ](../tasks/E03-08-stacked-account-graph.md)
 
 ## 完了条件
 アプリを開くとトップにサマリーが並び、各項目をタップすると時系列
