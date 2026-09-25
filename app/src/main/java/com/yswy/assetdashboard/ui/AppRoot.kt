@@ -9,11 +9,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yswy.assetdashboard.data.ItemDetail
 
 /**
  * 画面遷移。
@@ -54,11 +56,19 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     val route = stack.last()
     val itemId = Routes.itemId(route)
     when {
-        itemId != null -> ItemDetailScreen(
-            overview = state.overviews.firstOrNull { it.item.id == itemId },
-            onBack = { stack.removeAt(stack.lastIndex) },
-            modifier = modifier,
-        )
+        itemId != null -> {
+            val overview = state.overviews.firstOrNull { it.item.id == itemId }
+            // 同期で一覧が更新されたら、詳細も読み直す
+            val detail by produceState<ItemDetail?>(null, overview) {
+                value = overview?.let { viewModel.detail(it) }
+            }
+            ItemDetailScreen(
+                detail = detail,
+                loading = overview != null && detail == null,
+                onBack = { stack.removeAt(stack.lastIndex) },
+                modifier = modifier,
+            )
+        }
         else -> TopScreen(
             state = state,
             onSync = viewModel::sync,

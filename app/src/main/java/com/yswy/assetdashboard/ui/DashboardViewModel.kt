@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncPolicy
 import com.yswy.assetdashboard.data.SyncStatus
@@ -80,6 +81,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     fun consentLaunched() {
         _state.update { it.copy(consentRequest = null) }
     }
+
+    /** 詳細画面(E03-02)の中身。一覧の行に、系列の点などを足して組み立てる。 */
+    suspend fun detail(overview: ItemOverview): ItemDetail = ItemDetail.load(db, overview)
 
     private suspend fun runSync(askConsent: Boolean) {
         _state.update { it.copy(syncing = true, message = "同期中...") }
