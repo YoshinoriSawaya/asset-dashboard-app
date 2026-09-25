@@ -111,7 +111,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
                 ?.latest
             CorrectionScreen(
                 fixedKey = correctKey.ifEmpty { null },
-                initialDate = (latest?.date ?: LocalDate.now()).toString(),
+                initialDate = CorrectionForm.defaultDate(latest, LocalDate.now()).toString(),
                 initialValue = latest?.valueYen?.toString().orEmpty(),
                 saving = state.syncing,
                 onSave = viewModel::saveCorrection,

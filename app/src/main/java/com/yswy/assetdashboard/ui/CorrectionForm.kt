@@ -1,6 +1,7 @@
 package com.yswy.assetdashboard.ui
 
 import com.yswy.assetdashboard.data.MetricOrigin
+import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.drive.Corrections
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -47,6 +48,16 @@ object CorrectionForm {
         if (digits.isEmpty() || !digits.all { it.isDigit() } || digits.length > 14) return null
         return digits.toLong().let { if (negative) -it else it }
     }
+
+    /**
+     * 入力画面を開いたときの日付。
+     *
+     * CSVから来る系列は「読み違えた値を直す」ことが多いので、最新の点の日付。
+     * 手入力だけの系列(iDeCo・現金など。E07-05)は「今月の値を足す」ことが
+     * 多いので今日。最新の点に上書きしてしまう事故を防ぐ。
+     */
+    fun defaultDate(latest: MetricPointEntity?, today: LocalDate): LocalDate =
+        if (latest == null || latest.origin == MetricOrigin.MANUAL) today else latest.date
 
     /**
      * 補正の種類。CSV由来の点を直すならOVERRIDE、CSVに無い点を足すならMANUAL。

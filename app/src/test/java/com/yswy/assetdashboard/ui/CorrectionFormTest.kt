@@ -1,6 +1,7 @@
 package com.yswy.assetdashboard.ui
 
 import com.yswy.assetdashboard.data.MetricOrigin
+import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.drive.Corrections
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,6 +42,19 @@ class CorrectionFormTest {
         )) {
             assertTrue("$key $date $value", CorrectionForm.parse(key, date, value, "") is CorrectionForm.Result.Invalid)
         }
+    }
+
+    @Test
+    fun `開いたときの日付は、CSVの系列なら最新の点、手入力の系列なら今日`() {
+        val today = LocalDate.of(2026, 9, 25)
+        val lastMonth = LocalDate.of(2026, 8, 31)
+        fun point(origin: MetricOrigin) =
+            MetricPointEntity("iDeCo", lastMonth, 1000, origin)
+
+        assertEquals(lastMonth, CorrectionForm.defaultDate(point(MetricOrigin.CSV), today))
+        assertEquals(lastMonth, CorrectionForm.defaultDate(point(MetricOrigin.OVERRIDE), today))
+        assertEquals(today, CorrectionForm.defaultDate(point(MetricOrigin.MANUAL), today))
+        assertEquals(today, CorrectionForm.defaultDate(null, today))
     }
 
     @Test

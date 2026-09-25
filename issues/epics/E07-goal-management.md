@@ -10,7 +10,7 @@
 - [x] ~~[E07-02: 口座残高との自動連動](../tasks/E07-02-account-balance-linking.md)~~ → E07-10に統合
 - [x] ~~[E07-03: 初期Goalデータ投入](../tasks/E07-03-initial-goal-data.md)~~ → E07-01に統合(実額をリポジトリに入れないため、画面から入れる)
 - [x] ~~[E07-04: 目標金額・期日の設定](../tasks/E07-04-goal-amount-and-due-date.md)~~ → E07-01・E07-11に統合
-- [ ] [E07-05: iDeCo Metricの追加](../tasks/E07-05-idoco-metric.md)
+- [x] [E07-05: iDeCo Metricの追加](../tasks/E07-05-idoco-metric.md)
 - [ ] [E07-06: 生活防衛資金Goalの目標額自動計算](../tasks/E07-06-emergency-fund-auto-target.md)
 - [ ] [E07-07: 生活防衛資金の回復プラン提示](../tasks/E07-07-emergency-fund-recovery-plan.md)
 - [ ] [E07-08: NISA積立の一時減額提案(生活防衛資金連動)](../tasks/E07-08-nisa-temporary-reduction.md)
