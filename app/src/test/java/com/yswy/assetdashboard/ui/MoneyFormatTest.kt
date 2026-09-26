@@ -56,4 +56,13 @@ class MoneyFormatTest {
         // 基準が負(マイナス残高など)でも、増えたらプラス
         assertEquals("+10.0%", percent.change(10, -100))
     }
+
+    @Test
+    fun `積み上げの目盛りは、%のとき最新の合計に対する割合`() {
+        assertEquals("50万", real.shareAxis(500_000, 1_000_000))
+        assertEquals("0%", percent.shareAxis(0, 1_000_000))
+        assertEquals("50%", percent.shareAxis(500_000, 1_000_000))
+        assertNull(percent.shareAxis(500_000, 0))
+        assertNull(mask.shareAxis(500_000, 1_000_000))
+    }
 }

@@ -58,6 +58,16 @@ class MoneyFormat(val mode: PrivacyMode) {
         PrivacyMode.MASK -> null
     }
 
+    /**
+     * 積み上げグラフ(E07-13)の目盛り。0から積むので、%のときは最初の点からの増減率ではなく
+     * 最新の合計に対する割合にする(増減率だと0円が「-100%」になる)。マスクなら出さない。
+     */
+    fun shareAxis(value: Long, total: Long): String? = when (mode) {
+        PrivacyMode.REAL -> Formatters.yenCompact(value)
+        PrivacyMode.PERCENT -> total.takeIf { it > 0 }?.let { Formatters.percent(value.toDouble() / it) }
+        PrivacyMode.MASK -> null
+    }
+
     /** 増減の棒の目盛り。棒ごとに基準が違い率にできないので、%とマスクでは出さない。 */
     fun barAxis(value: Long): String? = if (mode == PrivacyMode.REAL) Formatters.yenCompact(value) else null
 

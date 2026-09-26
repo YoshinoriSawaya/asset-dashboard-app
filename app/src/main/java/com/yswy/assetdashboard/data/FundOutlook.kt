@@ -25,8 +25,10 @@ data class FundOutlook(
 
             val target = overview.targetYen
             val monthly = overview.monthlyPaceYen
-            val until = if (target != null && monthly != null && monthly < 0 && current >= target) {
-                ((current - target) / -monthly).toInt()
+            // 系列を分け合っていると割当額は目標額で止まるので、使える額で数える(E07-10)
+            val available = overview.availableYen ?: current
+            val until = if (target != null && monthly != null && monthly < 0 && available >= target) {
+                ((available - target) / -monthly).toInt()
             } else {
                 null
             }

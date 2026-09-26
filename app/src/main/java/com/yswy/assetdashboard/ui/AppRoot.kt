@@ -214,6 +214,7 @@ private fun Screens(
                 onAddUsage = { stack.add(Routes.usage(it)) },
                 onEditReminder = { stack.add(Routes.reminder(it)) },
                 onCompleteReminder = { reminder, onResult -> viewModel.completeReminder(reminder, onResult) },
+                onMoveGoal = { id, up, onResult -> viewModel.moveGoal(id, up, onResult) },
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,

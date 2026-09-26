@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.FundOutlook
+import com.yswy.assetdashboard.data.Allocation
 import com.yswy.assetdashboard.data.Drawdown
 import com.yswy.assetdashboard.data.GoalForecast
 import com.yswy.assetdashboard.data.RampUp
@@ -43,6 +44,9 @@ import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Repeat
 import com.yswy.assetdashboard.ui.chart.ChangeBarChart
 import com.yswy.assetdashboard.ui.chart.LineChart
+import com.yswy.assetdashboard.ui.chart.ColorDot
+import com.yswy.assetdashboard.ui.chart.GoalColors
+import com.yswy.assetdashboard.ui.chart.StackedChart
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import java.time.LocalDate
 import java.time.YearMonth
@@ -66,6 +70,8 @@ fun ItemDetailScreen(
     onAddUsage: (String) -> Unit = {},
     onEditReminder: (String) -> Unit = {},
     onCompleteReminder: (Item.Reminder, (String?) -> Unit) -> Unit = { _, _ -> },
+    /** 目標を一覧で1つ上(true)・下(false)へ。配分の順番になる(E07-10) */
+    onMoveGoal: (String, Boolean, (String?) -> Unit) -> Unit = { _, _, _ -> },
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -101,6 +107,10 @@ fun ItemDetailScreen(
             }
             is ItemDetail.Goal -> item {
                 GoalContent(detail)
+                ShareContent(detail, busy, message) { up ->
+                    message = "保存中..."
+                    onMoveGoal(detail.overview.item.id, up) { error -> message = error ?: "順番を変えました" }
+                }
                 if (detail.overview.item.resetsYearly) {
                     Button(onClick = { onAddUsage(detail.overview.item.id) }, enabled = !busy) { Text("使った分を足す") }
                 }
@@ -155,7 +165,14 @@ private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (detail.series.size >= 2) {
                 Spacer8()
-                LineChart(detail.series.map { it.date to it.valueYen }, axisLabel = money::lineAxis)
+                val stack = detail.stack
+                if (stack != null) {
+                    // 複数の目標で分け合っていれば、配分で塗り分ける(E07-13)
+                    StackedChart(stack, axisLabel = money::shareAxis)
+                    StackLegend(stack)
+                } else {
+                    LineChart(detail.series.map { it.date to it.valueYen }, axisLabel = money::lineAxis)
+                }
                 Spacer8()
                 Text("月ごとの増減", style = MaterialTheme.typography.titleMedium)
                 // グラフは古い月から右へ。表(新しい月が先頭)とは逆順
@@ -279,6 +296,48 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 積み上げグラフの凡例。上の層(自由に使えるお金)から、最新の点の内訳を出す。 */
+@Composable
+private fun StackLegend(stack: Allocation.Stack) {
+    val money = LocalMoney.current
+    val total = stack.layers.sumOf { it.values.last() }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 4.dp)) {
+        stack.layers.reversed().forEach { layer ->
+            val value = layer.values.last()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ColorDot(GoalColors.of(layer.colorIndex))
+                Text(
+                    "${layer.name}  ${money.amount(value)}" +
+                        (total.takeIf { it > 0 }?.let { "(${money.percent(value.toDouble() / it)})" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        Label("一覧で上の目標から順に、目標額まで割り当てています。過去の点にも今の目標額を当てています")
+    }
+}
+
+/** 同じ系列を分け合っているときの内訳と、配分の順番(E07-10)。 */
+@Composable
+private fun ShareContent(detail: ItemDetail.Goal, busy: Boolean, message: String?, onMove: (Boolean) -> Unit) {
+    val share = detail.overview.share ?: return
+    val money = LocalMoney.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ColorDot(GoalColors.of(detail.colorIndex))
+            Text("${share.metricKey}を${share.count}つの目標で分けています", style = MaterialTheme.typography.titleSmall)
+        }
+        Label("${share.metricKey} ${money.amount(share.seriesYen)}のうち、上から${share.position}番目。この目標に ${detail.overview.currentYen?.let(money::amount) ?: "不明"}")
+        Label("上の目標に回した分 ${money.amount(share.aheadYen.coerceAtMost(share.seriesYen))} / 自由に使えるお金 ${money.amount(share.freeYen)}")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onMove(true) }, enabled = !busy && share.position > 1) { Text("上へ") }
+            OutlinedButton(onClick = { onMove(false) }, enabled = !busy && share.position < share.count) { Text("下へ") }
+        }
+        Label("上の目標から先に満たします。生活防衛資金を上に置くと、余った分が下の目標に回ります")
+        message?.let { Label(it) }
     }
 }
 

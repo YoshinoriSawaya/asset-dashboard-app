@@ -34,9 +34,9 @@ import java.time.LocalDate
  * | 0の基準線 | outline |
  * | 目盛りの文字 | onSurfaceVariant |
  *
- * 複数系列を1枚に描くとき(E07-13の積み上げ)は、ここに系列ごとの色を足す。
+ * 目標ごとの積み上げ(E07-13)の色は [GoalColors]。
  */
-private data class ChartColors(
+internal data class ChartColors(
     val line: Color,
     val negative: Color,
     val grid: Color,
@@ -45,7 +45,7 @@ private data class ChartColors(
 )
 
 @Composable
-private fun chartColors() = ChartColors(
+internal fun chartColors() = ChartColors(
     line = MaterialTheme.colorScheme.primary,
     negative = MaterialTheme.colorScheme.error,
     grid = MaterialTheme.colorScheme.outlineVariant,
@@ -140,14 +140,14 @@ fun ChangeBarChart(
 }
 
 /** 描画する矩形。左に縦軸の文字、下に横軸の文字の余白を取った残り。 */
-private data class Plot(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+internal data class Plot(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
     val height get() = bottom - top
     val center get() = Offset((left + right) / 2, (top + bottom) / 2)
 }
 
 /** 縦軸の目盛り線と文字を描き、残りの描画領域を返す。 */
-private fun DrawScope.drawValueAxis(
+internal fun DrawScope.drawValueAxis(
     axis: ValueAxis,
     measurer: TextMeasurer,
     style: TextStyle,
@@ -169,7 +169,7 @@ private fun DrawScope.drawValueAxis(
     return plot
 }
 
-private fun DrawScope.drawBottomLabel(
+internal fun DrawScope.drawBottomLabel(
     measurer: TextMeasurer,
     text: String,
     style: TextStyle,
@@ -187,4 +187,4 @@ private fun DrawScope.drawBottomLabel(
     drawText(layout, topLeft = Offset(left, plot.bottom + 2.dp.toPx()))
 }
 
-private fun LocalDate.yearMonthText() = "%d-%02d".format(year, monthValue)
+internal fun LocalDate.yearMonthText() = "%d-%02d".format(year, monthValue)

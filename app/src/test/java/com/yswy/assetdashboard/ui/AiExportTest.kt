@@ -74,6 +74,18 @@ class AiExportTest {
     }
 
     @Test
+    fun `系列を分け合う目標は、割当額と何番目かを出す`() {
+        val goals = com.yswy.assetdashboard.data.Allocation.apply(
+            listOf(
+                ItemOverview.Goal(Item.Goal("f", "防衛", 600_000, "合計"), 1_000_000),
+                ItemOverview.Goal(Item.Goal("c", "車", 300_000, "合計"), 1_000_000),
+            ),
+        ).filterIsInstance<ItemOverview.Goal>()
+        val text = export(goals = goals)
+        assertTrue(text.contains("- 車: 目標 300,000円 / 現在 300,000円(100%) / 残り 0円 / 合計(1,000,000円)を2つの目標で上から順に分けた2番目。自由に使えるお金 100,000円"))
+    }
+
+    @Test
     fun `読むときの注意を付ける`() {
         val text = export()
         assertTrue(text.contains("二重に数える"))

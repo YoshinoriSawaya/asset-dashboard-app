@@ -22,13 +22,26 @@ sealed interface ItemOverview {
 
     data class Goal(
         override val item: Item.Goal,
-        /** 紐づけた系列の最新値。系列が未設定かデータが無ければnull。 */
+        /**
+         * 紐づけた系列の最新値。系列が未設定かデータが無ければnull。
+         * 同じ系列を複数の目標で分け合っていれば、この目標への割当額(E07-10)。
+         */
         val currentYen: Long?,
         /** 支出から自動で出したときの計算結果(E07-06)。決まった額の目標ならnull。 */
         val auto: AutoTargets.Result? = null,
         /** 系列の月あたりの増え方(E09)。点が足りなければnull。 */
         val monthlyPaceYen: Long? = null,
+        /** 同じ系列を分け合っているときの内訳(E07-10)。分け合っていなければnull。 */
+        val share: Allocation.Share? = null,
     ) : ItemOverview {
+        /**
+         * この目標から下が使える額。分け合っていなければ[currentYen]と同じ。
+         * 割当額は目標額で頭打ちになるので、「このペースでいつ目標を割るか」には
+         * こちらを使う(E09-02)。
+         */
+        val availableYen: Long?
+            get() = share?.let { it.seriesYen - it.aheadYen } ?: currentYen
+
         /** 実際に使う目標額。自動の目標で、計算に使える月が無ければnull。 */
         val targetYen: Long?
             get() = if (item.autoTarget != null) auto?.targetYen else item.targetYen
@@ -112,7 +125,8 @@ sealed interface ItemOverview {
             } else {
                 emptyList()
             }
-            return items.map { of(it, pointsByKey, today, monthly) }
+            // 同じ系列を測る目標どうしで、一覧の上から残高を分ける(E07-10)
+            return Allocation.apply(items.map { of(it, pointsByKey, today, monthly) })
         }
     }
 }

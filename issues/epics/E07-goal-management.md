@@ -15,10 +15,10 @@
 - [x] [E07-07: 生活防衛資金の回復プラン提示](../tasks/E07-07-emergency-fund-recovery-plan.md)
 - [ ] [E07-08: NISA積立の一時減額提案(生活防衛資金連動)](../tasks/E07-08-nisa-temporary-reduction.md)
 - [x] [E07-09: ふるさと納税枠の管理](../tasks/E07-09-furusato-nozei.md)
-- [ ] [E07-10: 単一口座内での仮想配分管理(封筒予算方式)](../tasks/E07-10-envelope-allocation.md)
+- [x] [E07-10: 単一口座内での仮想配分管理(封筒予算方式)](../tasks/E07-10-envelope-allocation.md)
 - [x] [E07-11: Goalの目標期日とランプアップ(積み増し開始)通知](../tasks/E07-11-goal-due-date-rampup.md)
 - [x] [E07-12: ランプアップGoal未達時の生活防衛資金取り崩し許容](../tasks/E07-12-rampup-shortfall-emergency-fund-drawdown.md)
-- [ ] [E07-13: 口座残高の積み上げ色分けグラフ](../tasks/E07-13-stacked-account-graph.md)
+- [x] [E07-13: 口座残高の積み上げ色分けグラフ](../tasks/E07-13-stacked-account-graph.md)
 - [x] [E07-14: Metric項目の表示名・非表示](../tasks/E07-14-metric-display-settings.md)
 
 ## 完了条件

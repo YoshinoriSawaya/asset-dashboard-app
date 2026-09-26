@@ -79,6 +79,10 @@ object AiExport {
                     goal.progress?.let { append("(${(it * 100).toInt()}%)") }
                     target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
+                // 同じ系列を分け合っていれば、「現在」はこの目標への割当額(E07-10)
+                goal.share?.let {
+                    append(" / ${it.metricKey}(${yen(it.seriesYen)})を${it.count}つの目標で上から順に分けた${it.position}番目。自由に使えるお金 ${yen(it.freeYen)}")
+                }
                 item.dueDate?.let { append(" / 期日 $it") }
                 // 生活防衛資金の下限(E07-12)。ここまでは取り崩してよい
                 item.autoTarget?.floorMonths?.let { months ->

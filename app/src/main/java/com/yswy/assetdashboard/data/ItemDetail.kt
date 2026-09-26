@@ -18,6 +18,8 @@ sealed interface ItemDetail {
         val pointCount: Int,
         /** 手で直した・足した点の数(E01-10)。 */
         val correctedCount: Int,
+        /** 複数の目標で分け合っていれば、配分の積み上げ(E07-13)。 */
+        val stack: Allocation.Stack? = null,
     ) : ItemDetail
 
     data class Goal(
@@ -26,6 +28,8 @@ sealed interface ItemDetail {
         val forecast: GoalForecast? = null,
         /** 期日に向けた目標の足りない分を、生活防衛資金で補えるか(E07-12)。 */
         val cover: Drawdown.Cover? = null,
+        /** 目標の色の番号(E07-13)。積み上げグラフと同じ色を使う。 */
+        val colorIndex: Int? = null,
     ) : ItemDetail {
         /** 目標まであといくら。達成済みなら0。進捗不明ならnull。 */
         val remainingYen: Long?
@@ -51,6 +55,20 @@ sealed interface ItemDetail {
             series: List<MetricPointEntity>,
             all: List<ItemOverview> = emptyList(),
             today: LocalDate = LocalDate.now(),
+        ): ItemDetail {
+            val goals = all.filterIsInstance<ItemOverview.Goal>()
+            return build(overview, series, goals, today)
+        }
+
+        /** 目標の色の番号。一覧に出ている目標の中で上から何番目か(0始まり)。 */
+        fun colorIndexOf(goals: List<ItemOverview.Goal>, id: String): Int? =
+            goals.indexOfFirst { it.item.id == id }.takeIf { it >= 0 }
+
+        private fun build(
+            overview: ItemOverview,
+            series: List<MetricPointEntity>,
+            goals: List<ItemOverview.Goal>,
+            today: LocalDate,
         ): ItemDetail = when (overview) {
             is ItemOverview.Metric -> Metric(
                 overview = overview,
@@ -58,11 +76,17 @@ sealed interface ItemDetail {
                 series = series.sortedBy { it.date },
                 pointCount = series.size,
                 correctedCount = series.count { it.origin != MetricOrigin.CSV },
+                stack = Allocation.stack(
+                    series,
+                    goals.filter { it.share?.metricKey == overview.item.metricKey },
+                ) { colorIndexOf(goals, it) },
             )
             is ItemOverview.Goal -> Goal(
                 overview,
-                GoalForecast.of(overview.item, overview.targetYen, series),
-                Drawdown.cover(overview, all.filterIsInstance<ItemOverview.Goal>(), today),
+                // 分け合っているなら、系列が上の目標の分と自分の目標額の合計に届いたときが達成(E07-10)
+                GoalForecast.of(overview.item, overview.targetYen?.let { it + (overview.share?.aheadYen ?: 0) }, series),
+                Drawdown.cover(overview, goals, today),
+                colorIndexOf(goals, overview.item.id),
             )
             is ItemOverview.Reminder -> Reminder(overview)
         }

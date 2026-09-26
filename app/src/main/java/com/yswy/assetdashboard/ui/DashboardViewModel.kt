@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemEntity
@@ -173,6 +174,20 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun saveGoal(goal: Item.Goal, onResult: (String?) -> Unit) {
         viewModelScope.launch { onResult(editSettings { Settings.upsert(it, goal.toEntity()) }) }
+    }
+
+    /**
+     * 目標を一覧で1つ上・下へ動かす(E07-10)。同じ系列を分け合う目標の配分の順番になる。
+     *
+     * 目標の並び順は、作ったときは全部同じ(-1)で名前順に並んでいる。動かすときに
+     * 一覧に出ている目標全部へ、今の並びどおりの番号を振り直してまとめて保存する。
+     */
+    fun moveGoal(id: String, up: Boolean, onResult: (String?) -> Unit) {
+        val goals = _state.value.overviews.filterIsInstance<ItemOverview.Goal>().map { it.item }
+        val reordered = GoalOrder.move(goals, id, up) ?: return onResult(null)
+        viewModelScope.launch {
+            onResult(editSettings { items -> reordered.fold(items) { acc, goal -> Settings.upsert(acc, goal.toEntity()) } })
+        }
     }
 
     /** Metric項目の表示名・非表示(E07-14)。既定に戻すならsettingsから消す。 */
