@@ -260,3 +260,5 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 | PowerShellで自作の関数 `Where` が動かない | `where` は `Where-Object` の別名。別の名前にする |
 | リリース版を入れると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | デバッグ版と署名が違う。デバッグ版を消してから入れる |
 | リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |
+| adbのスワイプで、入力欄に「to to to…」と文字が入る | 入力欄にフォーカスが残ってソフトキーボードが開いたまま、スワイプがジェスチャー入力になった。文字を打ったあとは `input keyevent 4` でキーボードを閉じ、`dumpsys input_method` の `mInputShown=false` を見てからスクロールする([E07-23](../issues/tasks/E07-23-uncategorized-review.md)) |
+| エミュレータの入力欄に日本語を入れたい | `input text` は英数字だけ。Windowsで `Set-Clipboard` してから入力欄をタップし、`input keyevent 279`(貼り付け)。エミュレータとクリップボードが共有される |

@@ -32,7 +32,13 @@ data class InvestPlan(
     val currentYen: Long,
     /** 目安。0を下回れば0。 */
     val suggestedYen: Long,
+    /** 消費のうち、カテゴリの無い明細(月平均。E07-23)。生活費として数えている */
+    val uncategorizedYen: Long = 0,
 ) {
+    /** 消費のうちカテゴリの無い明細の割合(E07-23)。消費が無ければnull。 */
+    val uncategorizedShare: Double?
+        get() = if (consumptionYen > 0) uncategorizedYen.toDouble() / consumptionYen else null
+
     /** 収入から全部を引いた残り(ゆとりを引く前)。 */
     val surplusYen: Long get() = incomeYen - consumptionYen - refillYen - sinkingYen - rampUpYen
 
@@ -60,7 +66,8 @@ data class InvestPlan(
             val rampUp = goals.sumOf { (RampUp.of(it.item, it.targetYen, it.currentYen, today) as? RampUp.Active)?.monthlyYen ?: 0L }
             val surplus = income - consumption - refill - sinking - rampUp
             val suggested = if (surplus <= 0) 0L else (surplus * (1 - MARGIN)).toLong() / 1_000 * 1_000
-            return InvestPlan(n, income, consumption, refill, sinking, rampUp, current, suggested)
+            val uncategorized = usable.sumOf { it.uncategorizedYen } / n
+            return InvestPlan(n, income, consumption, refill, sinking, rampUp, current, suggested, uncategorized)
         }
 
         /**

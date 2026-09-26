@@ -46,6 +46,14 @@ class SpendingCandidatesTest {
     }
 
     @Test
+    fun `カテゴリなしの出金だけに絞る。入金だけの摘要とカードの引き落としは出さない`() {
+        val c = SpendingRules.candidates(rows) +
+            SpendingRules.Candidate("カード会社", 1, 9_000, LocalDate.parse("2026-09-27"), fromCard = false, excludedNow = true, cardPaymentOnly = true)
+        val shown = SpendingRules.uncategorizedSpending(c) { it == "スーパーA" }
+        assertEquals(setOf("家具店B", "カード引落"), shown.map { it.description }.toSet())
+    }
+
+    @Test
     fun `タップで切り替え、当たっていなければ摘要を足し、当たっていれば当たる言葉を外す`() {
         assertEquals(listOf("振替", "家具店B"), SpendingRules.toggle(listOf("振替"), "家具店B"))
         assertEquals(listOf("振替"), SpendingRules.toggle(listOf("振替", "家具店B"), "家具店B"))

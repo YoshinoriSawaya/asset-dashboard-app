@@ -28,6 +28,7 @@
 - [x] [E07-20: 生活費から除く出金の登録を楽にする](../tasks/E07-20-spending-rules-ux.md)
 - [x] [E07-21: 明細のカテゴリ(生活費・遊び代・大型出費・振替・積立投資)](../tasks/E07-21-transaction-categories.md)
 - [x] [E07-22: カテゴリの決まりのまとめ取り込み](../tasks/E07-22-category-import.md)
+- [x] [E07-23: カテゴリの無い明細を見直しやすくする](../tasks/E07-23-uncategorized-review.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

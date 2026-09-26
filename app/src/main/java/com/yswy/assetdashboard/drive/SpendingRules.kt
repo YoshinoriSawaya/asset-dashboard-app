@@ -68,6 +68,14 @@ object SpendingRules {
     }
 
     /**
+     * カテゴリの無い出金の摘要だけ(E07-23)。カテゴリの無い出金は生活費として消費に入るので、
+     * 振替・大型出費・積立投資が混ざっていないかを見直すのに使う。
+     * 入金だけの摘要(給与など)と、カードの引き落とし(内訳はカードの明細)は出さない。
+     */
+    fun uncategorizedSpending(candidates: List<Candidate>, isCategorized: (String) -> Boolean): List<Candidate> =
+        candidates.filter { it.totalYen > 0 && !it.cardPaymentOnly && !isCategorized(it.description) }
+
+    /**
      * 摘要1つを除く・除かないに切り替えたあとの言葉(E07-20)。
      * 当たっていなければ摘要そのものを足す。当たっていれば、当たっている言葉を外す
      * (部分の言葉で当たっていれば、その言葉で除いていたほかの摘要も戻る)。

@@ -94,6 +94,7 @@ class CategoriesTest {
         assertEquals(50_000L, aug.livingSpendingYen) // 電気代 + スーパー
         assertEquals(70_000L, aug.consumptionYen) // + レジャー
         assertEquals(30_000L, aug.investmentYen)
+        assertEquals(10_000L, aug.uncategorizedYen) // 電気代だけ。給与(入金)と振替は入らない
     }
 
     @Test
@@ -116,7 +117,9 @@ class CategoriesTest {
         val rampUp = (RampUp.of(car.item, 100_000, 40_000, LocalDate.of(2026, 9, 26)) as RampUp.Active).monthlyYen
         // (300,000 − 70,000 − 10,000 − 20,000 − 積み増し) × 0.8(1000円未満切り捨て)
         val surplus = 200_000L - rampUp
-        assertEquals(InvestPlan(1, 300_000, 70_000, 10_000, 20_000, rampUp, 30_000, (surplus * 0.8).toLong() / 1000 * 1000), plan)
+        // カテゴリの無い電気代(1万)は生活費として消費に入り、その分を別に持つ(E07-23)
+        assertEquals(InvestPlan(1, 300_000, 70_000, 10_000, 20_000, rampUp, 30_000, (surplus * 0.8).toLong() / 1000 * 1000, 10_000), plan)
+        assertEquals(10_000.0 / 70_000, plan.uncategorizedShare!!, 1e-9)
         assertEquals(surplus, plan.surplusYen)
         // 今月しか無ければ出さない
         assertNull(InvestPlan.of(monthly, emptyList(), LocalDate.of(2026, 8, 30)))

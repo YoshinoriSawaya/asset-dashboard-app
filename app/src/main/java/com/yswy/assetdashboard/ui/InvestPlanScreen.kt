@@ -78,6 +78,14 @@ fun InvestPlanScreen(
         Text("計算(直近${p.months}か月の月平均)", style = MaterialTheme.typography.titleSmall)
         Line("収入(ボーナスを含む。振替は除く)", money.amount(p.incomeYen))
         Line("− 消費(生活費 + 遊び代)", money.amount(p.consumptionYen))
+        // カテゴリの無い明細は生活費として数える。振替・大型出費・積立投資が混ざると消費が多めに出る(E07-23)
+        p.uncategorizedShare?.takeIf { p.uncategorizedYen > 0 }?.let {
+            Text(
+                "　うちカテゴリなし ${money.share(it)}(生活費として数えています)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Line("− 生活防衛資金の月額(足りない分)", money.amount(p.refillYen))
         Line("− 大型出費の積立の月額", money.amount(p.sinkingYen))
         Line("− 積み増し中の目標の月額(車の頭金など)", money.amount(p.rampUpYen))
@@ -92,7 +100,7 @@ fun InvestPlanScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
-        TextButton(onClick = onOpenCategories) { Text("明細のカテゴリを見直す") }
+        TextButton(onClick = onOpenCategories) { Text("明細のカテゴリを見直す(カテゴリなしだけに絞れます)") }
     }
 }
 

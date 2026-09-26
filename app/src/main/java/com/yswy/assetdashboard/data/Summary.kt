@@ -35,6 +35,8 @@ data class Cashflow(
     val consumptionYen: Long = livingSpendingYen,
     /** 積立投資に回した額(E07-21)。カテゴリの種類が積立投資の出金 */
     val investmentYen: Long = 0,
+    /** 消費のうち、カテゴリの無い明細(E07-23)。生活費として数えている分 */
+    val uncategorizedYen: Long = 0,
 ) {
     val netYen: Long get() = incomeYen - spendingYen
 }
@@ -90,6 +92,7 @@ object Summary {
             livingSpendingYen = used(inPeriod.filterNot { it.excludedFromSpending }),
             consumptionYen = used(inPeriod.filter { it.categoryKind?.isConsumption ?: true }),
             investmentYen = used(inPeriod.filter { it.categoryKind == CategoryKind.INVESTMENT }),
+            uncategorizedYen = used(inPeriod.filter { it.categoryKind == null }),
         )
     }
 

@@ -48,6 +48,8 @@ import com.yswy.assetdashboard.drive.SpendingRules
  * - カテゴリは自分で足せる(食費・遊び代・家具など)。種類(生活費・遊び代・大型出費・振替・積立投資)で計算での扱いが決まる
  * - 明細を摘要ごとにまとめ、件数・合計・最後に使った日を出す。行をタップしてカテゴリを選ぶと、
  *   同じ摘要の明細が(過去もこれからも)そのカテゴリになる。部分の言葉で広く付けることもできる
+ * - 「カテゴリなしの出金だけ」に絞れる(E07-23)。カテゴリの無い出金は生活費として数えるので、
+ *   振替・大型出費・積立投資が混ざっていないかを見直す
  * - 保存ボタンは画面の下に固定する
  *
  * 摘要はこの端末の画面に出すだけで、どこにも書き出さない。
@@ -70,6 +72,7 @@ fun CategoriesScreen(
     var attempt by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     var order by rememberSaveable { mutableStateOf(SpendingRules.Order.COUNT) }
+    var onlyUncategorized by rememberSaveable { mutableStateOf(false) }
     // カテゴリを選ぶ小窓を開いている摘要
     var choosing by remember { mutableStateOf<String?>(null) }
     val money = LocalMoney.current
@@ -113,10 +116,29 @@ fun CategoriesScreen(
                         FilterChip(order == o, onClick = { order = o }, label = { Text(o.label) })
                     }
                 }
+                val uncategorized = SpendingRules.uncategorizedSpending(candidates) { current.categoryOf(it) != null }
+                FilterChip(
+                    onlyUncategorized,
+                    onClick = { onlyUncategorized = !onlyUncategorized },
+                    label = { Text("カテゴリなしの出金だけ(${uncategorized.size})") },
+                )
+                if (onlyUncategorized) {
+                    Text(
+                        "生活費として数えている出金です。振替・大型出費(積立で準備するもの)・積立投資が混ざっていれば" +
+                            "付け直します。付けると一覧から消えます。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 HorizontalDivider()
             }
 
-            items(SpendingRules.sorted(candidates, order), key = { it.description }) { c ->
+            val shown = if (onlyUncategorized) {
+                SpendingRules.uncategorizedSpending(candidates) { current.categoryOf(it) != null }
+            } else {
+                candidates
+            }
+            items(SpendingRules.sorted(shown, order), key = { it.description }) { c ->
                 val category = current.categoryOf(c.description)
                 Row(
                     modifier = Modifier.fillMaxWidth()
