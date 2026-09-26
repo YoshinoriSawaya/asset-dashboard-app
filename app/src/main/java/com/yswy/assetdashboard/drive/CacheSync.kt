@@ -1,6 +1,8 @@
 package com.yswy.assetdashboard.drive
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import java.security.MessageDigest
 import androidx.room.withTransaction
 import com.yswy.assetdashboard.data.AppDatabase
@@ -42,6 +44,36 @@ import com.yswy.assetdashboard.csv.ParsedData
 object CacheSync {
 
     private const val TAG = "CacheSync"
+
+    /**
+     * backupを落とせなかったときに、読み直すまで待つ時間(E02-06)。
+     * 取り込んだ同じ同期の中で、書いたばかりのbackupを読むと失敗することがある
+     * (Drive側がまだ追いついていないらしい。2026-09-26に2回起きた)。
+     */
+    val RETRY_DELAYS_MS = listOf(2_000L, 5_000L)
+
+    /**
+     * [block]が例外を投げたら、[delaysMs]の時間を待って読み直す。全部失敗したら最後の例外を投げる。
+     * [wait]はテストで待たずに済ませるため差し替えられる。
+     */
+    suspend fun <T> withRetry(
+        delaysMs: List<Long> = RETRY_DELAYS_MS,
+        wait: suspend (Long) -> Unit = { delay(it) },
+        block: suspend () -> T,
+    ): T {
+        var attempt = 0
+        while (true) {
+            try {
+                return block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val pause = delaysMs.getOrNull(attempt++) ?: throw e
+                Log.w(TAG, "読み直す(${attempt}回目、${pause}ms後): ${e.message}")
+                wait(pause)
+            }
+        }
+    }
 
     /** Roomに入れるもの一式。 */
     data class Snapshot(
@@ -119,9 +151,12 @@ object CacheSync {
         val unreadable = mutableListOf<String>()
         for (file in files) {
             val bytes = try {
-                api.download(file.id)
+                // 書いた直後で読めないことがあるので、少し待って読み直す(E02-06)
+                withRetry { api.download(file.id) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                // 通信の問題なら次回は読める。欠けたまま入れ替えない。
+                // 読み直してもだめなら、通信の問題。次回は読める。欠けたまま入れ替えない。
                 Log.w(TAG, "backupを落とせない: ${file.name}", e)
                 return Outcome.Kept("backupを落とせない: ${file.name}")
             }
