@@ -106,6 +106,7 @@ fun ItemDetailScreen(
                         Text("名前・表示を変更")
                     }
                 }
+                futureContent(detail)
                 correctionContent(detail, busy, message, onCorrect) { key, date ->
                     message = "取り消し中..."
                     onDeleteCorrection(key, date) { error -> message = error ?: "取り消しました" }
@@ -162,6 +163,28 @@ private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
                     if (detail.correctedCount > 0) append(" / うち手動補正 ${detail.correctedCount}点")
                 },
             )
+        }
+    }
+}
+
+/** このまま積み立てたときの将来の評価額(E09-03)。想定利回りを決めた系列だけ。 */
+private fun LazyListScope.futureContent(detail: ItemDetail.Metric) {
+    val future = detail.future ?: return
+    item {
+        val money = LocalMoney.current
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            Text("このまま積み立てると(年${MetricForm.rateText(future.rateBp)}%)", style = MaterialTheme.typography.titleSmall)
+            future.rows.forEach { row ->
+                Text(
+                    "${row.years}年後 約${money.amount(row.valueYen)}(元本より ${money.change(row.valueYen - row.principalYen, row.principalYen)})",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Label(
+                future.monthlyYen?.let { "積立は明細の「積立投資」の月平均 ${money.amount(it)}" }
+                    ?: "積立額がまだ分からないので、今の評価額だけを運用した場合です(明細に「積立投資」のカテゴリを付けると入ります)",
+            )
+            Label("想定利回りで計算した目安で、値動きは読めません。投資の判断を保証するものではありません")
         }
     }
 }

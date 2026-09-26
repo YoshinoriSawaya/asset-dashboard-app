@@ -48,11 +48,7 @@ data class InvestPlan(
          * @return 使える月が無ければnull
          */
         fun of(monthly: List<Cashflow>, goals: List<ItemOverview.Goal>, today: LocalDate, months: Int = DEFAULT_MONTHS): InvestPlan? {
-            val thisMonth = YearMonth.from(today)
-            val usable = monthly
-                .filter { it.count > 0 && YearMonth.from(it.period.start) < thisMonth }
-                .sortedBy { it.period.start }
-                .takeLast(months)
+            val usable = usableMonths(monthly, today, months)
             if (usable.isEmpty()) return null
 
             val n = usable.size
@@ -65,6 +61,25 @@ data class InvestPlan(
             val surplus = income - consumption - refill - sinking - rampUp
             val suggested = if (surplus <= 0) 0L else (surplus * (1 - MARGIN)).toLong() / 1_000 * 1_000
             return InvestPlan(n, income, consumption, refill, sinking, rampUp, current, suggested)
+        }
+
+        /**
+         * 今の積立投資の月平均(E07-21)。将来の評価額(E09-03)にも使う。
+         * 使える月が無いか、積立投資の明細が1件も無ければnull(まだ分からない)。
+         */
+        fun currentMonthlyYen(monthly: List<Cashflow>, today: LocalDate, months: Int = DEFAULT_MONTHS): Long? {
+            val usable = usableMonths(monthly, today, months)
+            if (usable.isEmpty()) return null
+            return (usable.sumOf { it.investmentYen } / usable.size).takeIf { it > 0 }
+        }
+
+        /** 平均に使う月。今月と、明細の無い月は使わない(生活防衛資金(E07-06)とそろえる)。古い順。 */
+        private fun usableMonths(monthly: List<Cashflow>, today: LocalDate, months: Int): List<Cashflow> {
+            val thisMonth = YearMonth.from(today)
+            return monthly
+                .filter { it.count > 0 && YearMonth.from(it.period.start) < thisMonth }
+                .sortedBy { it.period.start }
+                .takeLast(months)
         }
     }
 }

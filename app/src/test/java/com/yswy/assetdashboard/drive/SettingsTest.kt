@@ -58,6 +58,16 @@ class SettingsTest {
     }
 
     @Test
+    fun `Metricの想定利回りを読み戻せ、書いていない古い設定では無し`() {
+        val metric = Item.Metric(Item.metricId("投資信託"), "NISA", "投資信託", expectedReturnBp = 300).toEntity()
+        val json = Settings.render(listOf(metric))
+        assertEquals(true, json.contains("\"expectedReturnBp\": 300"))
+        assertEquals(listOf(metric), Settings.parse(json))
+        val old = """{"formatVersion":1,"items":[{"id":"metric:合計","type":"METRIC","name":"合計","metricKey":"合計"}]}"""
+        assertEquals(null, Settings.parse(old).single().growthRateBp)
+    }
+
+    @Test
     fun `純資産に数える印を読み戻せ、書いていない古い設定では数えない`() {
         val metric = Item.Metric(Item.metricId("合計"), "合計", "合計", inNetWorth = true).toEntity()
         assertEquals(listOf(metric), Settings.parse(Settings.render(listOf(metric))))

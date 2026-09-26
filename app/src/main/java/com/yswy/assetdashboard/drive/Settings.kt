@@ -96,6 +96,10 @@ object Settings {
                         }
                     }
                     .also { json -> item.rampUpMonths?.let { json.put("rampUpMonths", it) } }
+                    // Metricの想定利回り(E09-03)。Goalの物価上昇率はsinkingFundの中に書く
+                    .also { json ->
+                        if (item.type == ItemType.METRIC) item.growthRateBp?.let { json.put("expectedReturnBp", it) }
+                    }
                     .also { json ->
                         item.metricKey?.let { json.put("metricKey", it) }
                         item.targetYen?.let { json.put("targetYen", it) }
@@ -152,7 +156,8 @@ object Settings {
                 groupKey = obj.optString("groupKey").takeIf { it.isNotBlank() },
                 refillMonths = if (obj.has("refillMonths")) obj.optInt("refillMonths").takeIf { it > 0 } else null,
                 sinkingYears = obj.optJSONObject("sinkingFund")?.optInt("horizonYears")?.takeIf { it > 0 },
-                growthRateBp = obj.optJSONObject("sinkingFund")?.optInt("growthRateBp"),
+                growthRateBp = obj.optJSONObject("sinkingFund")?.optInt("growthRateBp")
+                    ?: if (obj.has("expectedReturnBp")) obj.optInt("expectedReturnBp") else null,
                 rampUpMonths = if (obj.has("rampUpMonths")) obj.optInt("rampUpMonths").takeIf { it > 0 } else null,
             )
             if (item.toItem() == null) {

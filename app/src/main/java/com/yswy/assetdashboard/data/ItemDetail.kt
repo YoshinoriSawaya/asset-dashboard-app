@@ -20,6 +20,8 @@ sealed interface ItemDetail {
         val correctedCount: Int,
         /** 複数の目標で分け合っていれば、配分の積み上げ(E07-13)。 */
         val stack: Allocation.Stack? = null,
+        /** 想定利回りを決めた系列の、このまま積み立てたときの将来の評価額(E09-03)。 */
+        val future: FutureValue? = null,
     ) : ItemDetail
 
     data class Goal(
@@ -49,15 +51,19 @@ sealed interface ItemDetail {
     data class Reminder(override val overview: ItemOverview.Reminder) : ItemDetail
 
     companion object {
-        /** [series]はMetricならその系列の点。Goal・Reminderでは使わない。 */
+        /**
+         * [series]はMetricならその系列の点。Goal・Reminderでは使わない。
+         * [investMonthlyYen]は積立投資の月平均(E07-21)。想定利回りを決めたMetricの将来の評価額に使う。
+         */
         fun of(
             overview: ItemOverview,
             series: List<MetricPointEntity>,
             all: List<ItemOverview> = emptyList(),
             today: LocalDate = LocalDate.now(),
+            investMonthlyYen: Long? = null,
         ): ItemDetail {
             val goals = all.filterIsInstance<ItemOverview.Goal>()
-            return build(overview, series, goals, today)
+            return build(overview, series, goals, today, investMonthlyYen)
         }
 
         /** 目標の色の番号。一覧に出ている目標の中で上から何番目か(0始まり)。 */
@@ -69,6 +75,7 @@ sealed interface ItemDetail {
             series: List<MetricPointEntity>,
             goals: List<ItemOverview.Goal>,
             today: LocalDate,
+            investMonthlyYen: Long?,
         ): ItemDetail = when (overview) {
             is ItemOverview.Metric -> Metric(
                 overview = overview,
@@ -80,6 +87,7 @@ sealed interface ItemDetail {
                     series,
                     goals.filter { it.share?.metricKey == overview.item.metricKey },
                 ) { colorIndexOf(goals, it) },
+                future = FutureValue.of(overview.latest?.valueYen, overview.item.expectedReturnBp, investMonthlyYen),
             )
             is ItemOverview.Goal -> Goal(
                 overview,
@@ -100,7 +108,12 @@ sealed interface ItemDetail {
                 is Item.Reminder -> null
             }
             val series = key?.let { db.metricPointDao().series(it) }.orEmpty()
-            return of(overview, series, all)
+            // 想定利回りを決めた系列だけ、明細から積立投資の月平均を出す(E09-03)
+            val today = LocalDate.now()
+            val invest = (overview.item as? Item.Metric)?.expectedReturnBp?.let {
+                InvestPlan.currentMonthlyYen(Summary.monthlyCashflow(db.bankTransactionDao().all()), today)
+            }
+            return of(overview, series, all, today, invest)
         }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -24,11 +25,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.Item
 
 /**
- * Metric項目の表示名・非表示(E07-14)・純資産に数えるか(E10-01)・まとめ先(E07-18)。CSVの列名(metricKey)は変えない。
+ * Metric項目の表示名・非表示(E07-14)・純資産に数えるか(E10-01)・まとめ先(E07-18)・想定利回り(E09-03)。CSVの列名(metricKey)は変えない。
  * 保存先はDriveの settings/items.json。
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -56,6 +58,7 @@ fun MetricEditScreen(
         var hidden by rememberSaveable { mutableStateOf(metric.hidden) }
         var inNetWorth by rememberSaveable { mutableStateOf(metric.inNetWorth) }
         var groupKey by rememberSaveable { mutableStateOf(metric.groupKey) }
+        var returnRate by rememberSaveable { mutableStateOf(MetricForm.rateText(metric.expectedReturnBp)) }
         var message by rememberSaveable { mutableStateOf<String?>(null) }
 
         Text("名前・表示を変更", style = MaterialTheme.typography.headlineSmall)
@@ -111,11 +114,26 @@ fun MetricEditScreen(
             }
         }
 
+        // 想定利回り(E09-03)。入れた系列だけ、詳細に将来の評価額の目安を出す
+        Text("想定利回り", style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(
+            value = returnRate, onValueChange = { returnRate = it },
+            label = { Text("年%(例: 3)") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            "入れると、詳細にこのまま積み立てたときの10・20・30年後の評価額の目安を出します。" +
+                "積立額は明細の「積立投資」の月平均です。NISAなど投資の系列に使ってください。出さないなら空にします。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 enabled = !saving,
                 onClick = {
-                    val result = MetricForm.parse(metric, name, hidden, inNetWorth, groupKey)
+                    val result = MetricForm.parse(metric, name, hidden, inNetWorth, groupKey, returnRate)
                     if (result is MetricForm.Result.Invalid) {
                         message = result.message
                     } else {
@@ -124,7 +142,7 @@ fun MetricEditScreen(
                     }
                 },
             ) { Text("保存") }
-            // 列名に戻して、隠すのも純資産に数えるのもやめる(settingsから消す)
+            // 列名に戻して、隠す・純資産に数える・まとめ先・想定利回りをやめる(settingsから消す)
             TextButton(
                 enabled = !saving && !MetricForm.isDefault(metric),
                 onClick = {

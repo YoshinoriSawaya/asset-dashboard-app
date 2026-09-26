@@ -55,7 +55,10 @@ data class ItemEntity(
     val fundId: String? = null,
     /** 大型出費の積立の目標(E07-15)。何年分の予定をならして月々の額を出すか。 */
     val sinkingYears: Int? = null,
-    /** 大型出費の積立で使う物価上昇率(E07-15)。年率の1万分率(2% = 200)。 */
+    /**
+     * 年率の1万分率(2% = 200)。Goalでは大型出費の積立の物価上昇率(E07-15)、
+     * Metricでは将来の評価額を出す想定利回り(E09-03)。列を増やさない(汎用スキーマ)。
+     */
     val growthRateBp: Int? = null,
     /** 系列のまとめ先(E07-18)。親の系列のmetricKey。Metricだけが使う。 */
     val groupKey: String? = null,
@@ -112,6 +115,11 @@ sealed interface Item {
          * 親の詳細に内訳として並べる。親が一覧に無ければ(隠している・消えた)、自分の行を出す。
          */
         val groupKey: String? = null,
+        /**
+         * 想定利回り(E09-03)。年率の1万分率(3% = 300)。決めた系列だけ、このまま積み立てたときの
+         * 将来の評価額の目安を出す。行の `growthRateBp` 列に入れる。
+         */
+        val expectedReturnBp: Int? = null,
     ) : Item
 
     /**
@@ -188,7 +196,7 @@ sealed interface Item {
  */
 fun ItemEntity.toItem(): Item? = when (type) {
     ItemType.METRIC -> metricKey?.let {
-        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth, groupKey)
+        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth, groupKey, growthRateBp)
     }
     ItemType.GOAL -> {
         val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
@@ -216,6 +224,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         sortOrder = sortOrder, hidden = hidden,
         inNetWorth = inNetWorth,
         groupKey = groupKey,
+        growthRateBp = expectedReturnBp,
     )
     is Item.Goal -> ItemEntity(
         id = id, type = ItemType.GOAL, name = name,

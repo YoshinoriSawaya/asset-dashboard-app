@@ -120,5 +120,8 @@ class CategoriesTest {
         assertEquals(surplus, plan.surplusYen)
         // 今月しか無ければ出さない
         assertNull(InvestPlan.of(monthly, emptyList(), LocalDate.of(2026, 8, 30)))
+        // 将来の評価額(E09-03)に使う積立投資の月平均も、同じ月から出す
+        assertEquals(30_000L, InvestPlan.currentMonthlyYen(monthly, LocalDate.of(2026, 9, 26)))
+        assertNull(InvestPlan.currentMonthlyYen(monthly, LocalDate.of(2026, 8, 30)))
     }
 }
