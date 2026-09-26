@@ -243,6 +243,7 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 | テストで `JSONObject.put` がnullを返す | android.jarのorg.jsonはスタブ。`testImplementation("org.json:json")` を入れる |
 | 圏外で「同意が必要」と出る | 認可より先にネットワークを見る |
 | `adb shell` のパスが化ける | Git Bashが `/sdcard/...` を変換する。PowerShellを使う |
+| PowerShellに長いコマンドを貼ると壊れる | 改行が消えて1行につながる・途中で切れる・先頭の `&` が落ちる。スクリプトにして `powershell -ExecutionPolicy Bypass -File <スクリプト>` で動かす([E00-06](../issues/tasks/E00-06-keystore-creation.md)) |
 | ドキュメント中のパスが壊れる | Pythonで書くとき `\a` がBEL文字になる |
 | エミュレータのアプリとDBが消えた | `connectedDebugAndroidTest` は終了時にアンインストールする。上の `-P` を付ける |
 | `MigrationTestHelper` が `AbstractMethodError`(kotlinx.serialization) | AGPがテストをアプリと同じ版に固定する。アプリ側を `constraints` で上げる |
