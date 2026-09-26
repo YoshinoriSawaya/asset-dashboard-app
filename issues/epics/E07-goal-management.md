@@ -25,6 +25,7 @@
 - [x] [E07-17: 日付を yyyymmdd で入れる](../tasks/E07-17-date-input.md)
 - [x] [E07-18: 系列のまとめ先(内訳)](../tasks/E07-18-metric-groups.md)
 - [x] [E07-19: 足りないとき何か月で埋めるか(判定と月々の額を1つに)](../tasks/E07-19-refill-months.md)
+- [x] [E07-20: 生活費から除く出金の登録を楽にする](../tasks/E07-20-spending-rules-ux.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

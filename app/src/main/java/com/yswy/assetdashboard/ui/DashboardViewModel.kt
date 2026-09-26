@@ -271,14 +271,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 手元の出金の摘要と件数(多い順)。除く言葉を考える手がかりに、画面にだけ出す。 */
-    suspend fun withdrawalDescriptions(): List<Pair<String, Int>> =
-        db.bankTransactionDao().all()
-            .filter { (it.withdrawal ?: 0) > 0 }
-            .groupingBy { it.description }
-            .eachCount()
-            .toList()
-            .sortedByDescending { it.second }
+    /** 手元の出金を摘要ごとにまとめたもの(E07-20)。除く言葉を考える手がかりに、画面にだけ出す。 */
+    suspend fun withdrawalDescriptions(): List<SpendingRules.Candidate> =
+        SpendingRules.candidates(db.bankTransactionDao().all())
 
     /** リマインダーの保存(E05-05/06)。目標と同じくDriveの settings に書く。 */
     fun saveReminder(reminder: Item.Reminder, onResult: (String?) -> Unit) {

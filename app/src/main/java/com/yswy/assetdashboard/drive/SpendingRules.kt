@@ -1,9 +1,12 @@
 package com.yswy.assetdashboard.drive
 
 import android.util.Log
+import com.yswy.assetdashboard.csv.CardStatementAdapter
+import com.yswy.assetdashboard.data.BankTransactionEntity
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
+import java.time.LocalDate
 
 /**
  * 生活費から除く出金の決まり(E07-06)。Driveの `settings/spending_rules.json` が正。
@@ -19,6 +22,53 @@ object SpendingRules {
     private const val FILE_NAME = "spending_rules.json"
 
     const val FORMAT_VERSION = 1
+
+    /**
+     * 除くかどうかを決める手がかり(E07-20)。出金の摘要ごとに、件数・合計・最後に使った日。
+     * 画面にだけ出し、どこにも書き出さない。
+     */
+    data class Candidate(
+        val description: String,
+        val count: Int,
+        val totalYen: Long,
+        val lastDate: LocalDate,
+        /** カードの利用明細の摘要か(銀行の明細でなく)。 */
+        val fromCard: Boolean,
+        /** 今のキャッシュで全部が生活費から外れている(保存済みの言葉、カードの引き落としの突き合わせ)。 */
+        val excludedNow: Boolean,
+    )
+
+    enum class Order(val label: String) { COUNT("件数順"), AMOUNT("金額順"), RECENT("最近順") }
+
+    /** 出金を摘要ごとにまとめる。入金だけの摘要は出さない。 */
+    fun candidates(transactions: List<BankTransactionEntity>): List<Candidate> =
+        transactions.filter { (it.withdrawal ?: 0) > 0 }
+            .groupBy { it.description }
+            .map { (description, rows) ->
+                Candidate(
+                    description = description,
+                    count = rows.size,
+                    totalYen = rows.sumOf { it.withdrawal ?: 0 },
+                    lastDate = rows.maxOf { it.date },
+                    fromCard = rows.any { it.label == CardStatementAdapter.LABEL },
+                    excludedNow = rows.all { it.excludedFromSpending },
+                )
+            }
+
+    fun sorted(candidates: List<Candidate>, order: Order): List<Candidate> = when (order) {
+        Order.COUNT -> candidates.sortedWith(compareByDescending<Candidate> { it.count }.thenByDescending { it.totalYen })
+        Order.AMOUNT -> candidates.sortedByDescending { it.totalYen }
+        Order.RECENT -> candidates.sortedWith(compareByDescending<Candidate> { it.lastDate }.thenByDescending { it.count })
+    }
+
+    /**
+     * 摘要1つを除く・除かないに切り替えたあとの言葉(E07-20)。
+     * 当たっていなければ摘要そのものを足す。当たっていれば、当たっている言葉を外す
+     * (部分の言葉で当たっていれば、その言葉で除いていたほかの摘要も戻る)。
+     */
+    fun toggle(keywords: List<String>, description: String): List<String> =
+        if (matches(description, keywords)) keywords.filterNot { matches(description, listOf(it)) }
+        else keywords + description
 
     /**
      * 摘要が[keywords]のどれかを含むか。
