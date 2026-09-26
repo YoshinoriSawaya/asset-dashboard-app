@@ -12,7 +12,7 @@ plugins {
  * versionCode はここから決まる(1.2.3 → 10203)ので、上げ忘れて
  * 「更新なのにインストールできない」が起きない。
  */
-val appVersion = "2.3.0"
+val appVersion = "2.4.0"
 
 fun versionCodeOf(version: String): Int {
     val (major, minor, patch) = version.split(".").map { it.toInt() }

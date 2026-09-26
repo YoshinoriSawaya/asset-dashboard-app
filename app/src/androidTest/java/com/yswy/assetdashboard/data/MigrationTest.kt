@@ -166,6 +166,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v9からv10で目標が残り埋める期間が空になる() {
+        helper.createDatabase(DB10, 9).use { v9 ->
+            v9.execSQL(
+                "INSERT INTO item (id, type, name, targetYen, sortOrder, hidden, resetsYearly, inNetWorth) " +
+                    "VALUES ('g1', 'GOAL', '予備費', 1000, -1, 0, 0, 0)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB10, 10, true).use { v10 ->
+            v10.query("SELECT name, targetYen, refillMonths FROM item").use { c ->
+                c.moveToFirst(); assertEquals("予備費", c.getString(0)); assertEquals(1000, c.getInt(1)); assertTrue(c.isNull(2))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -207,5 +222,6 @@ class MigrationTest {
         const val DB7 = "migration-test-7.db"
         const val DB8 = "migration-test-8.db"
         const val DB9 = "migration-test-9.db"
+        const val DB10 = "migration-test-10.db"
     }
 }

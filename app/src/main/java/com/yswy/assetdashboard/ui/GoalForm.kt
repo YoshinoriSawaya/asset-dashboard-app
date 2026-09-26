@@ -39,6 +39,8 @@ object GoalForm {
         rampUp: String = "",
         floor: String = "",
         sinking: Pair<String, String>? = null,
+        /** 足りないとき何か月で埋めるか(E07-19)。空なら決めない */
+        refill: String = "",
     ): Result {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -91,6 +93,15 @@ object GoalForm {
             months
         }
 
+        val refillMonths = refill.trim().takeIf { it.isNotEmpty() }?.let {
+            val months = it.toIntOrNull()?.takeIf { m -> m in 1..MAX_REFILL_MONTHS }
+                ?: return Result.Invalid("埋める期間は1〜${MAX_REFILL_MONTHS}か月で入れてください")
+            if (resetsYearly || sinkingFund != null || rampUpMonths != null) {
+                return Result.Invalid("埋める期間は、毎年の枠・大型出費の積立・積み増しのある目標では使えません(月々の額を別に出すため)")
+            }
+            months
+        }
+
         return Result.Ok(
             Item.Goal(
                 id = existing?.id ?: newId(),
@@ -107,6 +118,7 @@ object GoalForm {
                 resetsYearly = resetsYearly,
                 rampUpMonths = rampUpMonths,
                 sinking = sinkingFund,
+                refillMonths = refillMonths,
             ),
         )
     }
@@ -115,4 +127,5 @@ object GoalForm {
     private const val MAX_RAMP_UP_MONTHS = 120
     private const val MAX_SINKING_YEARS = 30
     private const val MAX_GROWTH_PERCENT = 20
+    private const val MAX_REFILL_MONTHS = 120
 }

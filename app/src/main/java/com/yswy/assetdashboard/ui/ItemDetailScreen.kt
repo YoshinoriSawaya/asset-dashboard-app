@@ -35,6 +35,7 @@ import com.yswy.assetdashboard.data.Allocation
 import com.yswy.assetdashboard.data.Drawdown
 import com.yswy.assetdashboard.data.GoalForecast
 import com.yswy.assetdashboard.data.RampUp
+import com.yswy.assetdashboard.data.Refill
 import com.yswy.assetdashboard.data.RecoveryPlan
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
@@ -271,6 +272,8 @@ private fun GoalContent(detail: ItemDetail.Goal) {
     val money = LocalMoney.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(progress?.let(money::percent) ?: "進捗不明", style = MaterialTheme.typography.titleLarge)
+        // 満たしているかと、足りないときの月々の額(E07-19)。いちばん知りたいことなので上に
+        RefillLabels(detail.overview)
         LinearProgressIndicator(
             progress = { (progress ?: 0.0).coerceIn(0.0, 1.0).toFloat() },
             modifier = Modifier.fillMaxWidth(),
@@ -317,7 +320,8 @@ private fun GoalContent(detail: ItemDetail.Goal) {
                 }
             }
         }
-        detail.recovery?.takeIf { it.isShort && !yearly && rampUp == null }?.let { plan ->
+        // 埋める期間を決めていれば、上の1行が答えなので候補は出さない(E07-19)
+        detail.recovery?.takeIf { it.isShort && !yearly && rampUp == null && goal.refillMonths == null }?.let { plan ->
             Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
             plan.options.forEach { option ->
                 Label("${option.months}か月で: 月々 ${money.amount(option.monthlyYen)}")
@@ -327,6 +331,30 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 満たしているかの判定と、足りないときの月々の額(E07-19)。埋める期間を決めた目標だけ。 */
+@Composable
+private fun RefillLabels(overview: ItemOverview.Goal) {
+    val money = LocalMoney.current
+    when (val refill = Refill.of(overview) ?: return) {
+        is Refill.Full -> Text(
+            "満たしています" +
+                (refill.monthsCovered?.let { "(生活費の${"%.1f".format(it)}か月分)" } ?: "") +
+                "。積み立ては不要です",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        is Refill.Short -> {
+            if (refill.belowFloor) {
+                Text("下限を割っています", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error)
+            }
+            Text(
+                "足りません(あと ${money.amount(refill.shortfallYen)})。${refill.months}か月で埋めるなら 月々 ${money.amount(refill.monthlyYen)}",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 

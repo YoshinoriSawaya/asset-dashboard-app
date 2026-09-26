@@ -63,6 +63,7 @@ fun GoalEditScreen(
     var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
     // 大型出費の予定から出す(E07-15)。家電・車の買い替えなど、何年かごとに来る出費の積立
     var useSinking by rememberSaveable { mutableStateOf(existing?.sinking != null) }
+    var refill by rememberSaveable { mutableStateOf(existing?.refillMonths?.toString().orEmpty()) }
     var sinkingYears by rememberSaveable { mutableStateOf((existing?.sinking?.horizonYears ?: 5).toString()) }
     var growthPercent by rememberSaveable {
         mutableStateOf(existing?.sinking?.growthRateBp?.takeIf { it > 0 }?.let { (it / 100.0).toString().removeSuffix(".0") }.orEmpty())
@@ -180,6 +181,22 @@ fun GoalEditScreen(
             )
         }
 
+        // 足りないとき何か月で埋めるか(E07-19)。積み増し・毎年の枠・大型出費の積立は月額を別に出す
+        if (!resetsYearly && !useSinking && rampUp.isBlank()) {
+            OutlinedTextField(
+                value = refill, onValueChange = { refill = it },
+                label = { Text("足りないとき何か月で埋めるか(任意)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "生活防衛資金なら「取り崩したら6か月で戻す」のように決めておきます。決めると、詳細画面に" +
+                    "満たしているかと、足りないときの月々の積立額を1つ出します。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Switch(checked = resetsYearly, onCheckedChange = { resetsYearly = it })
             Column {
@@ -214,7 +231,9 @@ fun GoalEditScreen(
                     val sinking = if (useSinking) sinkingYears to growthPercent else null
                     // 積み増しの欄が隠れている(生活費から出す・毎年の枠・大型出費の積立)ときは、残っていた値を使わない
                     val rampUpInput = if (useAuto || resetsYearly || useSinking) "" else rampUp
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput, floor = floorMonths, sinking = sinking)) {
+                    // 埋める期間の欄が隠れているときは、残っていた値を使わない
+                    val refillInput = if (resetsYearly || useSinking || rampUpInput.isNotBlank()) "" else refill
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput, floor = floorMonths, sinking = sinking, refill = refillInput)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."

@@ -59,6 +59,8 @@ data class ItemEntity(
     val growthRateBp: Int? = null,
     /** 系列のまとめ先(E07-18)。親の系列のmetricKey。Metricだけが使う。 */
     val groupKey: String? = null,
+    /** 目標が足りないとき、何か月で埋めるか(E07-19)。Goalだけが使う。 */
+    val refillMonths: Int? = null,
 )
 
 /**
@@ -142,6 +144,11 @@ sealed interface Item {
         val rampUpMonths: Int? = null,
         /** 目標額を大型出費の予定から出す(E07-15)。決まった額・生活費から出す目標ならnull。 */
         val sinking: SinkingFund? = null,
+        /**
+         * 足りないとき何か月で埋めるか(E07-19)。決めておくと、月々の額を1つに決めて出す
+         * (生活防衛資金を取り崩したら、N か月で戻す、など)。
+         */
+        val refillMonths: Int? = null,
     ) : Item
 
     data class Reminder(
@@ -192,7 +199,7 @@ fun ItemEntity.toItem(): Item? = when (type) {
         val sinking = sinkingYears?.let { SinkingFund(it, growthRateBp ?: 0) }
         // 目標額の決め方がどれも無いGoalは読めない
         if (targetYen == null && auto == null && sinking == null) null
-        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly, rampUpMonths, sinking)
+        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly, rampUpMonths, sinking, refillMonths)
     }
     ItemType.REMINDER -> dueDate?.let {
         Item.Reminder(
@@ -220,6 +227,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         rampUpMonths = rampUpMonths,
         sinkingYears = sinking?.horizonYears,
         growthRateBp = sinking?.growthRateBp,
+        refillMonths = refillMonths,
     )
     is Item.Reminder -> ItemEntity(
         id = id, type = ItemType.REMINDER, name = name,
