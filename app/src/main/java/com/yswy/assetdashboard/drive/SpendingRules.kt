@@ -67,6 +67,15 @@ object SpendingRules {
         Order.RECENT -> candidates.sortedWith(compareByDescending<Candidate> { it.lastDate }.thenByDescending { it.count })
     }
 
+    /** カテゴリの画面に出す期間(E07-24)。計算に使うのは直近6〜12か月なので、それより前の摘要は見直さなくてよい。 */
+    const val RECENT_MONTHS = 18L
+
+    /** 最後に使った日が直近[RECENT_MONTHS]か月以内の摘要だけ(E07-24)。古い摘要の決まりは消さない。 */
+    fun recent(candidates: List<Candidate>, today: LocalDate): List<Candidate> {
+        val since = today.minusMonths(RECENT_MONTHS)
+        return candidates.filter { !it.lastDate.isBefore(since) }
+    }
+
     /**
      * カテゴリの無い出金の摘要だけ(E07-23)。カテゴリの無い出金は生活費として消費に入るので、
      * 振替・大型出費・積立投資が混ざっていないかを見直すのに使う。

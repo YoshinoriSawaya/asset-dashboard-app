@@ -29,6 +29,7 @@
 - [x] [E07-21: 明細のカテゴリ(生活費・遊び代・大型出費・振替・積立投資)](../tasks/E07-21-transaction-categories.md)
 - [x] [E07-22: カテゴリの決まりのまとめ取り込み](../tasks/E07-22-category-import.md)
 - [x] [E07-23: カテゴリの無い明細を見直しやすくする](../tasks/E07-23-uncategorized-review.md)
+- [x] [E07-24: カテゴリの画面には直近1年半の摘要だけを出す](../tasks/E07-24-recent-descriptions-only.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

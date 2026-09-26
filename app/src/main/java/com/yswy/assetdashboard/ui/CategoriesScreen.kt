@@ -40,6 +40,7 @@ import com.yswy.assetdashboard.data.Category
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.CategorySettings
 import com.yswy.assetdashboard.drive.SpendingRules
+import java.time.LocalDate
 
 /**
  * 明細のカテゴリ分け(E07-21)。前の「生活費から除く出金」(E07-06・E07-20)を置き換えたもの。
@@ -50,6 +51,7 @@ import com.yswy.assetdashboard.drive.SpendingRules
  *   同じ摘要の明細が(過去もこれからも)そのカテゴリになる。部分の言葉で広く付けることもできる
  * - 「カテゴリなしの出金だけ」に絞れる(E07-23)。カテゴリの無い出金は生活費として数えるので、
  *   振替・大型出費・積立投資が混ざっていないかを見直す
+ * - 最後に使った日が直近1年半以内の摘要だけを出す(E07-24)。計算に使うのは直近6〜12か月なので、古い摘要は見直さなくてよい
  * - 保存ボタンは画面の下に固定する
  *
  * 摘要はこの端末の画面に出すだけで、どこにも書き出さない。
@@ -69,6 +71,8 @@ fun CategoriesScreen(
     var settings by remember { mutableStateOf<CategorySettings?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var candidates by remember { mutableStateOf<List<SpendingRules.Candidate>>(emptyList()) }
+    // 直近1年半より前にしか出てこない摘要の数(E07-24)。出さないが、決まりは残る
+    var oldCount by remember { mutableStateOf(0) }
     var attempt by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     var order by rememberSaveable { mutableStateOf(SpendingRules.Order.COUNT) }
@@ -78,7 +82,9 @@ fun CategoriesScreen(
     val money = LocalMoney.current
 
     LaunchedEffect(attempt) {
-        candidates = candidatesOf()
+        val all = candidatesOf()
+        candidates = SpendingRules.recent(all, LocalDate.now())
+        oldCount = all.size - candidates.size
         load().fold(onSuccess = { settings = it; loadError = null }, onFailure = { loadError = it.message })
     }
 
@@ -126,6 +132,14 @@ fun CategoriesScreen(
                     Text(
                         "生活費として数えている出金です。振替・大型出費(積立で準備するもの)・積立投資が混ざっていれば" +
                             "付け直します。付けると一覧から消えます。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (oldCount > 0) {
+                    Text(
+                        "直近1年半より前にしか出てこない摘要(${oldCount}種類)は出しません。" +
+                            "計算に使うのは直近の月だけです。付けてあるカテゴリはそのまま残ります。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

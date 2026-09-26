@@ -46,6 +46,16 @@ class SpendingCandidatesTest {
     }
 
     @Test
+    fun `カテゴリの画面には最後に使った日が直近1年半以内の摘要だけを出す`() {
+        val c = SpendingRules.candidates(rows)
+        // 2026-09-27の1年半前は2025-03-27。家具店B(2026-05-10)は残り、それより前の摘要は出さない
+        val old = SpendingRules.Candidate("古い店", 1, 1_000, LocalDate.parse("2025-03-26"), fromCard = true, excludedNow = false)
+        val edge = old.copy(description = "ちょうど1年半前", lastDate = LocalDate.parse("2025-03-27"))
+        val shown = SpendingRules.recent(c + old + edge, LocalDate.parse("2026-09-27"))
+        assertEquals(setOf("スーパーA", "家具店B", "カード引落", "給与", "ちょうど1年半前"), shown.map { it.description }.toSet())
+    }
+
+    @Test
     fun `カテゴリなしの出金だけに絞る。入金だけの摘要とカードの引き落としは出さない`() {
         val c = SpendingRules.candidates(rows) +
             SpendingRules.Candidate("カード会社", 1, 9_000, LocalDate.parse("2026-09-27"), fromCard = false, excludedNow = true, cardPaymentOnly = true)
