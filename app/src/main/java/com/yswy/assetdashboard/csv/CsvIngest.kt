@@ -33,7 +33,7 @@ object CsvIngest {
         val header = rows.first()
         val dataRows = rows.drop(1)
 
-        val adapter = CsvAdapters.findFor(header)
+        val adapter = CsvAdapters.findForRows(rows)
 
         if (adapter == null) {
             // 1行目が列名とは限らない(カードのCSVは氏名やカード番号が入る)ので、
@@ -59,7 +59,7 @@ object CsvIngest {
             return Outcome.Parsed(file, decoded.charsetName, fallback, viaFallback = true)
         }
 
-        val result = adapter.parse(header, dataRows)
+        val result = adapter.parseRows(rows, parseModifiedDate(file.modifiedTime))
 
         val summary = when (val data = result.data) {
             is ParsedData.Transactions -> "取引${data.rows.size}行"

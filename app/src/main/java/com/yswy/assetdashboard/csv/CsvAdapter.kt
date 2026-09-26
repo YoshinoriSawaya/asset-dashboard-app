@@ -103,6 +103,19 @@ interface CsvAdapter {
 
     /** ヘッダー行を除いたデータ行をパースする。 */
     fun parse(header: List<String>, rows: List<List<String>>): ParseResult
+
+    /**
+     * ファイル全体を見て、自分が扱える形式か答える。見出しが1行目に無い形式(E01-15)は
+     * これを上書きする。ふつうは1行目だけを見る。
+     */
+    fun matchesRows(rows: List<List<String>>): Boolean = rows.isNotEmpty() && matches(rows.first())
+
+    /**
+     * ファイル全体をパースする。見出しが1行目に無い、日付の列が無い形式(E01-15)は
+     * これを上書きする。ふつうは1行目を見出しとして [parse] に渡す。
+     * @param fileDate ファイルの日付(Driveの更新日)。中に日付が無いときに使う
+     */
+    fun parseRows(rows: List<List<String>>, fileDate: LocalDate): ParseResult = parse(rows.first(), rows.drop(1))
 }
 
 object CsvAdapters {
@@ -114,10 +127,15 @@ object CsvAdapters {
         // 列名の行が無いので、1行目の形で見分ける。列名で判定するものより後に置く
         CardStatementAdapter,
         CardPendingAdapter,
+        // 見出しが途中にあるので、ファイル全体を見る
+        HoldingsAdapter,
     )
 
     /** ヘッダーに一致するアダプターを返す。無ければnull(E01-05のフォールバックに回す)。 */
     fun findFor(header: List<String>): CsvAdapter? = all.firstOrNull { it.matches(header) }
+
+    /** ファイル全体を見てアダプターを返す。取り込みはこちらを使う。 */
+    fun findForRows(rows: List<List<String>>): CsvAdapter? = all.firstOrNull { it.matchesRows(rows) }
 }
 
 /** 金額・日付のパースはフォーマットを問わず共通なのでここにまとめる。 */
@@ -131,6 +149,9 @@ internal object FieldParsers {
      * これを超えることは無いので、通すより弾いたほうが安全。
      */
     private const val MAX_ABS_AMOUNT = 10_000_000_000_000L
+
+    /** 小数点のある数。`1234567.89` */
+    private val DECIMAL = Regex("""\d+\.\d+""")
 
     /** ありえない年。これを外れる日付は誤読とみなす。 */
     private val PLAUSIBLE_YEARS = 1900..2100
@@ -186,6 +207,18 @@ internal object FieldParsers {
         if (text.isEmpty() || text == "-" || text == "―" || text == "－") return null
 
         val negative = text.startsWith("-") || text.startsWith("△") || text.startsWith("▲")
+
+        // 小数のある額(証券の評価額など。E01-15)は円に丸める。数字だけを拾うと
+        // 小数点が消えて「1234567.00」が100倍になる(実物で踏んだ)
+        val plain = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC)
+            .removePrefix("-").removePrefix("△").removePrefix("▲")
+            .replace(",", "").removeSuffix("円").trim()
+        DECIMAL.matchEntire(plain)?.let {
+            val magnitude = java.math.BigDecimal(plain).setScale(0, java.math.RoundingMode.HALF_UP).toLong()
+            if (magnitude > MAX_ABS_AMOUNT) return null
+            return if (negative) -magnitude else magnitude
+        }
+
         val digits = text.filter { it.isDigit() }
         if (digits.isEmpty()) return null
 

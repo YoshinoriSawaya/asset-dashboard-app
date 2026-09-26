@@ -25,6 +25,9 @@ object CsvShape {
         "利用金額", "ご利用金額", "支払区分", "支払方法", "今回回数", "支払回数", "支払金額", "お支払い金額",
         "今回支払金額", "支払総額", "支払手数料", "備考", "合計", "摘要", "内容", "金額", "残高",
         "現地通貨額", "通貨略称", "換算レート", "取引日", "お取引日", "お引出し", "お預入れ", "入金", "出金",
+        // 証券口座(E01-15)
+        "ファンド名", "銘柄", "銘柄名", "銘柄（コード）", "買付日", "数量", "保有数量", "取得単価", "現在値",
+        "前日比", "前日比（％）", "損益", "損益（％）", "評価額", "評価損益", "評価損益率",
     )
 
     private val NUMBER = Regex("""[-+]?¥?[\d,]+(\.\d+)?円?""")
@@ -49,8 +52,13 @@ object CsvShape {
      * 先頭と末尾の数行の形。途中は同じ形の行が続くことが多いので、
      * 形ごとの行数だけ数えて出す。
      */
-    fun describe(rows: List<List<String>>, head: Int = 6, tail: Int = 4): String = buildString {
+    fun describe(rows: List<List<String>>, head: Int = 6, tail: Int = 4, smallFile: Int = 40): String = buildString {
         appendLine("${rows.size}行")
+        // 小さなファイルは全部の行を出す。区分ごとの表が並ぶ形(E01-15)は、並び順が分からないと読めない
+        if (rows.size <= smallFile) {
+            rows.forEachIndexed { i, row -> appendLine("L${i + 1} ${line(row)}") }
+            return@buildString
+        }
         rows.take(head).forEachIndexed { i, row -> appendLine("L${i + 1} ${line(row)}") }
         if (rows.size > head + tail) {
             val middle = rows.subList(head, rows.size - tail).groupingBy { line(it) }.eachCount()
