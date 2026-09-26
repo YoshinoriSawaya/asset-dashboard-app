@@ -164,14 +164,20 @@ object CacheSync {
         // 取引は先勝ち、Metricは後勝ち(E01-11)。
         val transactions = LinkedHashMap<String, BankTransactionEntity>()
         val points = LinkedHashMap<String, MetricPointEntity>()
+        // カードの請求の合計(E01-14)。銀行の引き落としと突き合わせる
+        val statements = mutableListOf<CardPayments.Statement>()
 
         for (backup in backups) {
             when (val data = backup.data) {
-                is ParsedData.Transactions -> data.rows.forEach { row ->
-                    val entity = BankTransactionEntity.from(row, backup.sourceFileId).copy(
-                        excludedFromSpending = SpendingRules.matches(row.description, exclusions),
-                    )
-                    if (transactions.putIfAbsent(entity.dedupKey, entity) != null) dropped++
+                is ParsedData.Transactions -> {
+                    data.rows.forEach { row ->
+                        val entity = BankTransactionEntity.from(row, backup.sourceFileId).copy(
+                            excludedFromSpending = SpendingRules.matches(row.description, exclusions),
+                        )
+                        if (transactions.putIfAbsent(entity.dedupKey, entity) != null) dropped++
+                    }
+                    val last = data.rows.maxOfOrNull { it.date }
+                    if (data.statementTotal != null && last != null) statements += CardPayments.Statement(data.statementTotal, last)
                 }
                 is ParsedData.Metrics -> data.points.forEach { point ->
                     if (points.put(Deduplication.keyOf(point), MetricPointEntity.from(point)) != null) dropped++
@@ -191,6 +197,10 @@ object CacheSync {
                 },
             )
         }
+
+        // カードの明細があれば、銀行の引き落としの行は生活費から除く(内訳はカードの明細が正)
+        val cardPayments = CardPayments.matchedKeys(transactions.values, statements)
+        for (key in cardPayments) transactions[key] = transactions.getValue(key).copy(excludedFromSpending = true)
 
         return Snapshot(
             items = withAutoMetrics(settings, points.values.map { it.metricKey }),

@@ -82,6 +82,16 @@ class BackupWriterTest {
     }
 
     @Test
+    fun `カードの請求の合計を書いて読み戻せ、無ければキーごと出さない`() {
+        val rows = listOf(com.yswy.assetdashboard.csv.CardStatementAdapter.cardTransaction(java.time.LocalDate.of(2026, 9, 1), "店", 100))
+        val withTotal = BackupWriter.render("c.csv", "id", "t", ParsedData.Transactions(rows, statementTotal = 100))
+        assertEquals(100L, (BackupReader.parse(withTotal)!!.data as ParsedData.Transactions).statementTotal)
+        val without = BackupWriter.render("b.csv", "id", "t", ParsedData.Transactions(rows))
+        assertEquals(false, JSONObject(without).has("statementTotal"))
+        assertEquals(null, (BackupReader.parse(without)!!.data as ParsedData.Transactions).statementTotal)
+    }
+
+    @Test
     fun `空でも壊れたJSONにはならない`() {
         val json = JSONObject(
             BackupWriter.render("empty.csv", "id", "t", ParsedData.Metrics(emptyList())),

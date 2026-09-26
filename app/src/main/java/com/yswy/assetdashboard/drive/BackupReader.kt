@@ -35,6 +35,7 @@ object BackupReader {
         val data = when (root.optString("kind")) {
             "transactions" -> ParsedData.Transactions(
                 root.objects("transactions").mapNotNull { it.toTransaction() },
+                statementTotal = root.longOrNull("statementTotal"),
             )
             "metrics" -> ParsedData.Metrics(
                 root.objects("metrics").mapNotNull { it.toMetricPoint() },

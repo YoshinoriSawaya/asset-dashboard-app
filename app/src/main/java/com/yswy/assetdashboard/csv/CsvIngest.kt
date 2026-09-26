@@ -36,8 +36,10 @@ object CsvIngest {
         val adapter = CsvAdapters.findFor(header)
 
         if (adapter == null) {
-            // ヘッダーは列名だけなので個人情報は入らない。判定の手がかりとして出す。
-            Log.i(TAG, "未知のヘッダー: ${file.name} header=${header.joinToString(",")}")
+            // 1行目が列名とは限らない(カードのCSVは氏名やカード番号が入る)ので、
+            // 文字は出さずに形だけ出す(E01-14)。行全体の形はデバッグビルドでだけ
+            Log.i(TAG, "未知の形: ${file.name} 1行目=${CsvShape.line(header)}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "形:\n" + CsvShape.describe(rows))
 
             // 日付が読めない場合に備えて、ファイルの更新時刻を日付の代わりに渡す。
             val fallbackDate = parseModifiedDate(file.modifiedTime)

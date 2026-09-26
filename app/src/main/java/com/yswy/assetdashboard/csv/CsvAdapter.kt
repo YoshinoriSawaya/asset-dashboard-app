@@ -46,8 +46,12 @@ data class SkippedRow(val lineNumber: Int, val reason: String, val raw: String)
  */
 sealed interface ParsedData {
 
-    /** 銀行の入出金明細。 */
-    data class Transactions(val rows: List<BankTransaction>) : ParsedData {
+    /**
+     * 銀行の入出金明細。カードの利用明細(E01-14)もこの形で持つ。
+     * @param statementTotal カードの明細なら、今回の請求の合計(銀行から引き落とされる額)。
+     *   銀行の引き落としの行と突き合わせて、支出を二重に数えないために使う
+     */
+    data class Transactions(val rows: List<BankTransaction>, val statementTotal: Long? = null) : ParsedData {
         val latestBalance: Long? get() = rows.lastOrNull { it.balance != null }?.balance
         val dateRange: ClosedRange<LocalDate>? get() = rows.map { it.date }.toRange()
     }
@@ -107,6 +111,9 @@ object CsvAdapters {
         WithdrawalDepositAdapter,
         AnserAdapter,
         AssetTrendAdapter,
+        // 列名の行が無いので、1行目の形で見分ける。列名で判定するものより後に置く
+        CardStatementAdapter,
+        CardPendingAdapter,
     )
 
     /** ヘッダーに一致するアダプターを返す。無ければnull(E01-05のフォールバックに回す)。 */

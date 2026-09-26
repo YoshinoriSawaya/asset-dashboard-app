@@ -80,6 +80,7 @@ object BackupWriter {
         when (data) {
             is ParsedData.Transactions -> {
                 root.put("kind", "transactions")
+                data.statementTotal?.let { root.put("statementTotal", it) }
                 root.put("transactions", JSONArray().apply {
                     data.rows.forEach { put(it.toJson()) }
                 })

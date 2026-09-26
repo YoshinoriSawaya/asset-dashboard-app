@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.data
 
+import com.yswy.assetdashboard.csv.CardStatementAdapter
 import java.time.LocalDate
 import java.time.Year
 import java.time.YearMonth
@@ -64,14 +65,23 @@ object Summary {
         )
     }
 
+    /**
+     * 入金・出金は銀行の口座の出入り。カードの利用明細(E01-14)は口座を出入りしないので入れない
+     * (カードの分は、銀行のカード引き落としとして出金に入っている)。
+     * 生活費は、カードの明細を使った日に数え、代わりに銀行の引き落としの行を除く。
+     */
     fun cashflow(transactions: List<BankTransactionEntity>, period: ClosedRange<LocalDate>): Cashflow {
         val inPeriod = transactions.filter { it.date in period }
+        val bank = inPeriod.filterNot { it.label == CardStatementAdapter.LABEL }
         return Cashflow(
             period = period,
-            incomeYen = inPeriod.sumOf { it.deposit ?: 0L },
-            spendingYen = inPeriod.sumOf { it.withdrawal ?: 0L },
+            incomeYen = bank.sumOf { it.deposit ?: 0L },
+            spendingYen = bank.sumOf { it.withdrawal ?: 0L },
             count = inPeriod.size,
-            livingSpendingYen = inPeriod.filterNot { it.excludedFromSpending }.sumOf { it.withdrawal ?: 0L },
+            // カードの返品(入金として持つ)は生活費から引く
+            livingSpendingYen = inPeriod.filterNot { it.excludedFromSpending }.sumOf {
+                if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
+            },
         )
     }
 
