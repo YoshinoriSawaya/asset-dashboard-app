@@ -8,7 +8,7 @@ Claude Codeでコードを書いても実行・確認ができない。
 - [x] [E00-01: プロジェクトフォルダの作成・git init](../tasks/E00-01-project-folder-setup.md)
 - [x] [E00-02: Android Studioインストール](../tasks/E00-02-android-studio-install.md)
 - [x] [E00-03: プロジェクト作成(Kotlin + Jetpack Compose)](../tasks/E00-03-project-creation.md)
-- [ ] [E00-04: 実機デバッグ環境のセットアップ(USBデバッグ有効化)](../tasks/E00-04-device-debug-setup.md)
+- [x] [E00-04: 実機デバッグ環境のセットアップ(USBデバッグ有効化)](../tasks/E00-04-device-debug-setup.md)
 - [x] [E00-05: エミュレータのセットアップ(実機が使えない場面用)](../tasks/E00-05-emulator-setup.md)
 - [x] [E00-06: 署名用キーストア作成・安全な保管](../tasks/E00-06-keystore-creation.md)
 - [x] [E00-07: Claude Codeとの連携確認(プロジェクトを開いて簡単な変更→ビルドできるか)](../tasks/E00-07-claude-code-integration.md)
@@ -23,7 +23,7 @@ CLIで完結できるものは全て完了。エミュレータ `AssetDash_API37
 
 残りは**本人の手を動かす必要があるもの**だけ:
 
-- **E00-04**: スマホ側で開発者オプション→USBデバッグを有効にする
+- ~~**E00-04**: スマホ側で開発者オプション→USBデバッグを有効にする~~ 2026-09-26に完了
 - ~~**E00-06**: keystoreのパスワードを決めてパスワードマネージャーに保管する~~ 2026-09-26に完了
 
 どちらもE01以降の実装をブロックしない(E00-04は実機確認したくなった時、
