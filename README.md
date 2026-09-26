@@ -76,8 +76,11 @@ Google Driveの `inbox` に放り込むだけで取り込み、資産の推移�
 |------|------|
 | `app/src/main/java/.../drive/` | Drive API、認可、同期の流れ |
 | `app/src/main/java/.../csv/` | CSVのパース、バリデーション、重複検出 |
-| `app/src/main/java/.../data/` | Room(ローカルキャッシュ) |
-| `app/src/main/java/.../ui/` | Compose(いまはテーマだけ) |
+| `app/src/main/java/.../data/` | Room(ローカルキャッシュ)と、表示用の計算(集計・目標・予測・純資産) |
+| `app/src/main/java/.../ui/` | Composeの画面と、グラフ(`ui/chart/`) |
+| `app/src/main/java/.../notify/` | 端末の中で出す通知(1日1回の確認) |
+| `app/src/main/java/.../widget/` | ホーム画面のウィジェット(Glance) |
+| `app/src/main/java/.../lock/` | アプリのロック(生体認証・画面ロック) |
 | `issues/` | エピックとタスク。設計の経緯もここ |
 | `docs/` | 全体の仕組みと開発手順 |
 
