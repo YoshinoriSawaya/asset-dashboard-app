@@ -38,6 +38,13 @@ data class BankTransactionEntity(
      */
     @ColumnInfo(defaultValue = "0")
     val excludedFromSpending: Boolean = false,
+    /** カテゴリの名前(E07-21)。摘要の言葉から、キャッシュを作り直すたびに決める。無ければnull */
+    val category: String? = null,
+    /** カテゴリの種類(E07-21)。null はカテゴリ無し(生活費として数える) */
+    val categoryKind: CategoryKind? = null,
+    /** カードの明細と突き合わせた銀行の引き落とし(E01-14)。内訳はカードの明細の側で数える */
+    @ColumnInfo(defaultValue = "0")
+    val cardPayment: Boolean = false,
 ) {
     companion object {
         fun from(transaction: BankTransaction, sourceFileId: String) = BankTransactionEntity(

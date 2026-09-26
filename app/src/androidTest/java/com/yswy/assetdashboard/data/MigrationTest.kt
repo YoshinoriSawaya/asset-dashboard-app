@@ -181,6 +181,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v10からv11で明細が残りカテゴリが空になる() {
+        helper.createDatabase(DB11, 10).use { v10 ->
+            v10.execSQL(
+                "INSERT INTO bank_transaction (dedupKey, date, description, withdrawal, deposit, balance, memo, label, sourceFileId, excludedFromSpending) " +
+                    "VALUES ('k1', '2026-09-01', '電気代', 1000, NULL, NULL, NULL, NULL, 'f', 0)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB11, 11, true).use { v11 ->
+            v11.query("SELECT description, category, categoryKind, cardPayment FROM bank_transaction").use { c ->
+                c.moveToFirst(); assertEquals("電気代", c.getString(0)); assertTrue(c.isNull(1)); assertTrue(c.isNull(2)); assertEquals(0, c.getInt(3))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -223,5 +238,6 @@ class MigrationTest {
         const val DB8 = "migration-test-8.db"
         const val DB9 = "migration-test-9.db"
         const val DB10 = "migration-test-10.db"
+        const val DB11 = "migration-test-11.db"
     }
 }

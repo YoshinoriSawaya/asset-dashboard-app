@@ -36,13 +36,17 @@ object SpendingRules {
         val fromCard: Boolean,
         /** 今のキャッシュで全部が生活費から外れている(保存済みの言葉、カードの引き落としの突き合わせ)。 */
         val excludedNow: Boolean,
+        /** 入金の合計(E07-21)。振替・給与など、入金の摘要にもカテゴリを付けるため */
+        val depositYen: Long = 0,
+        /** 全部がカードの引き落とし(E01-14)で、内訳はカードの明細の側にある */
+        val cardPaymentOnly: Boolean = false,
     )
 
     enum class Order(val label: String) { COUNT("件数順"), AMOUNT("金額順"), RECENT("最近順") }
 
-    /** 出金を摘要ごとにまとめる。入金だけの摘要は出さない。 */
+    /** 明細を摘要ごとにまとめる。出金も入金も(振替は両方に出る。E07-21)。 */
     fun candidates(transactions: List<BankTransactionEntity>): List<Candidate> =
-        transactions.filter { (it.withdrawal ?: 0) > 0 }
+        transactions.filter { (it.withdrawal ?: 0) > 0 || (it.deposit ?: 0) > 0 }
             .groupBy { it.description }
             .map { (description, rows) ->
                 Candidate(
@@ -52,12 +56,14 @@ object SpendingRules {
                     lastDate = rows.maxOf { it.date },
                     fromCard = rows.any { it.label == CardStatementAdapter.LABEL },
                     excludedNow = rows.all { it.excludedFromSpending },
+                    depositYen = rows.sumOf { it.deposit ?: 0 },
+                    cardPaymentOnly = rows.all { it.cardPayment },
                 )
             }
 
     fun sorted(candidates: List<Candidate>, order: Order): List<Candidate> = when (order) {
         Order.COUNT -> candidates.sortedWith(compareByDescending<Candidate> { it.count }.thenByDescending { it.totalYen })
-        Order.AMOUNT -> candidates.sortedByDescending { it.totalYen }
+        Order.AMOUNT -> candidates.sortedByDescending { maxOf(it.totalYen, it.depositYen) }
         Order.RECENT -> candidates.sortedWith(compareByDescending<Candidate> { it.lastDate }.thenByDescending { it.count })
     }
 

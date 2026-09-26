@@ -50,6 +50,7 @@ object Routes {
     const val SURPLUS = "surplus"
     const val PLAN_IMPORT = "plan_import"
     const val REMINDERS = "reminders"
+    const val INVEST = "invest"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -241,6 +242,12 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
+        route == Routes.INVEST -> InvestPlanScreen(
+            load = viewModel::investPlan,
+            onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.REMINDERS -> ReminderListScreen(
             reminders = state.overviews.filterIsInstance<ItemOverview.Reminder>(),
             onOpenItem = { stack.add(Routes.item(it)) },
@@ -266,11 +273,12 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
-        route == Routes.SPENDING_RULES -> SpendingRulesScreen(
-            load = viewModel::loadSpendingRules,
-            withdrawals = viewModel::withdrawalDescriptions,
+        // 明細のカテゴリ(E07-21)。前の「生活費から除く出金」の入口からも開く
+        route == Routes.SPENDING_RULES -> CategoriesScreen(
+            load = viewModel::loadCategories,
+            candidatesOf = viewModel::withdrawalDescriptions,
             saving = state.syncing,
-            onSave = viewModel::saveSpendingRules,
+            onSave = viewModel::saveCategories,
             onBack = { close(route) },
             modifier = modifier,
         )
@@ -316,6 +324,8 @@ private fun Screens(
             onOpenSurplus = { stack.add(Routes.SURPLUS) },
             onOpenPlanImport = { stack.add(Routes.PLAN_IMPORT) },
             onOpenReminders = { stack.add(Routes.REMINDERS) },
+            onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
+            onOpenInvest = { stack.add(Routes.INVEST) },
             modifier = modifier,
         )
     }

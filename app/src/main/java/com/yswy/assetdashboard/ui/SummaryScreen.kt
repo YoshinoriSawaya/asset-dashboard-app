@@ -50,7 +50,7 @@ fun SummaryScreen(
                 FilterChip(unit == PeriodUnit.MONTH, onClick = { onUnitChange(PeriodUnit.MONTH) }, label = { Text("月次") })
                 FilterChip(unit == PeriodUnit.YEAR, onClick = { onUnitChange(PeriodUnit.YEAR) }, label = { Text("年次") })
             }
-            TextButton(onClick = onOpenSpendingRules) { Text("生活費から除く出金を設定") }
+            TextButton(onClick = onOpenSpendingRules) { Text("明細のカテゴリ(生活費から除くもの)を設定") }
         }
 
         when {

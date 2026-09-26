@@ -71,6 +71,8 @@ fun TopScreen(
     onOpenSurplus: () -> Unit = {},
     onOpenPlanImport: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
+    onOpenCategories: () -> Unit = {},
+    onOpenInvest: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -176,7 +178,9 @@ fun TopScreen(
             }
             TextButton(onClick = onAddReminder) { Text("+ リマインダーを追加(点検・保険の更新など)") }
             TextButton(onClick = onOpenCalendar) { Text("大型出費の予定(向こう3年)") }
+            TextButton(onClick = onOpenInvest) { Text("積立投資の目安") }
             TextButton(onClick = onOpenSurplus) { Text("余剰資金の配分案(ボーナスなど)") }
+            TextButton(onClick = onOpenCategories) { Text("明細のカテゴリ(生活費・遊び代・振替など)") }
             TextButton(onClick = onOpenPlanImport) { Text("大型出費の予定をまとめて取り込む") }
             TextButton(onClick = onAddManual) {
                 Text("+ 手入力の系列を追加(現金など)")

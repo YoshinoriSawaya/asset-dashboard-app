@@ -103,7 +103,8 @@ class AutoTargetsTest {
         )
         val snapshot = CacheSync.build(
             listOf(BackupReader.Backup("f", "f.csv", ParsedData.Transactions(rows))),
-            corrections = emptyList(), settings = emptyList(), exclusions = listOf("カード"),
+            // 前の除く言葉(E07-06)は、カテゴリ(E07-21)の「生活費以外」として引き継がれる
+            corrections = emptyList(), settings = emptyList(), categories = CategorySettings.fromLegacy(listOf("カード")),
         )
         assertEquals(listOf(true, false), snapshot.transactions.map { it.excludedFromSpending })
 

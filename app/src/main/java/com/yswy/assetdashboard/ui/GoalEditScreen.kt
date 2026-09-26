@@ -158,7 +158,7 @@ fun GoalEditScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onOpenSpendingRules) { Text("生活費から除く出金を設定") }
+            TextButton(onClick = onOpenSpendingRules) { Text("明細のカテゴリ(生活費から除くもの)を設定") }
         }
         OutlinedTextField(
             value = due, onValueChange = { due = it },

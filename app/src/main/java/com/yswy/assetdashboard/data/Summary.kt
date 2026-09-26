@@ -31,6 +31,10 @@ data class Cashflow(
     val count: Int,
     /** 支出のうち、振替などを除いた生活費(E07-06)。除く決まりが無ければ支出と同じ。 */
     val livingSpendingYen: Long = spendingYen,
+    /** 消費(E07-21)。生活費と遊び代。大型出費・振替・積立投資は入れない */
+    val consumptionYen: Long = livingSpendingYen,
+    /** 積立投資に回した額(E07-21)。カテゴリの種類が積立投資の出金 */
+    val investmentYen: Long = 0,
 ) {
     val netYen: Long get() = incomeYen - spendingYen
 }
@@ -68,20 +72,24 @@ object Summary {
     /**
      * 入金・出金は銀行の口座の出入り。カードの利用明細(E01-14)は口座を出入りしないので入れない
      * (カードの分は、銀行のカード引き落としとして出金に入っている)。
-     * 生活費は、カードの明細を使った日に数え、代わりに銀行の引き落としの行を除く。
+     * 自分の口座どうしの振替(E07-21)は、入金にも出金にも入れない。
+     * 生活費・消費・積立投資は、カードの明細を使った日に数え、代わりに銀行の引き落としの行を除く。
      */
     fun cashflow(transactions: List<BankTransactionEntity>, period: ClosedRange<LocalDate>): Cashflow {
         val inPeriod = transactions.filter { it.date in period }
-        val bank = inPeriod.filterNot { it.label == CardStatementAdapter.LABEL }
+        val bank = inPeriod.filterNot { it.label == CardStatementAdapter.LABEL || it.categoryKind == CategoryKind.TRANSFER }
+        // 使った額。カードの返品(入金として持つ)は引く。カードの引き落としの行は内訳がカードの明細にあるので数えない
+        fun used(rows: List<BankTransactionEntity>) = rows.filterNot { it.cardPayment }.sumOf {
+            if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
+        }
         return Cashflow(
             period = period,
             incomeYen = bank.sumOf { it.deposit ?: 0L },
             spendingYen = bank.sumOf { it.withdrawal ?: 0L },
             count = inPeriod.size,
-            // カードの返品(入金として持つ)は生活費から引く
-            livingSpendingYen = inPeriod.filterNot { it.excludedFromSpending }.sumOf {
-                if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
-            },
+            livingSpendingYen = used(inPeriod.filterNot { it.excludedFromSpending }),
+            consumptionYen = used(inPeriod.filter { it.categoryKind?.isConsumption ?: true }),
+            investmentYen = used(inPeriod.filter { it.categoryKind == CategoryKind.INVESTMENT }),
         )
     }
 

@@ -7,6 +7,7 @@ import java.security.MessageDigest
 import androidx.room.withTransaction
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.BankTransactionEntity
+import com.yswy.assetdashboard.data.CategorySettings
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemEntity
 import com.yswy.assetdashboard.data.ItemType
@@ -184,10 +185,10 @@ object CacheSync {
             ?: return Outcome.Kept("correctionsを読めない")
         val settings = Settings.load(api, folders)
             ?: return Outcome.Kept("settingsを読めない")
-        val exclusions = SpendingRules.load(api, folders)
-            ?: return Outcome.Kept("生活費から除く決まりを読めない")
+        val categories = CategoryStore.load(api, folders)
+            ?: return Outcome.Kept("明細のカテゴリを読めない")
 
-        val snapshot = build(latest, corrections, settings, exclusions)
+        val snapshot = build(latest, corrections, settings, categories)
 
         db.withTransaction {
             db.itemDao().deleteAll()
@@ -228,8 +229,8 @@ object CacheSync {
         backups: List<BackupReader.Backup>,
         corrections: List<Corrections.Entry>,
         settings: List<ItemEntity>,
-        /** 摘要にこの言葉を含む出金を生活費から除く(E07-06)。 */
-        exclusions: List<String> = emptyList(),
+        /** 明細のカテゴリ(E07-21)。生活費以外の種類は生活費から除く(前のE07-06の除く言葉を引き継いだもの) */
+        categories: CategorySettings = CategorySettings.EMPTY,
     ): Snapshot {
         var dropped = 0
 
@@ -243,8 +244,11 @@ object CacheSync {
             when (val data = backup.data) {
                 is ParsedData.Transactions -> {
                     data.rows.forEach { row ->
+                        val category = categories.categoryOf(row.description)
                         val entity = BankTransactionEntity.from(row, backup.sourceFileId).copy(
-                            excludedFromSpending = SpendingRules.matches(row.description, exclusions),
+                            category = category?.name,
+                            categoryKind = category?.kind,
+                            excludedFromSpending = category != null && !category.kind.isLiving,
                         )
                         if (transactions.putIfAbsent(entity.dedupKey, entity) != null) dropped++
                     }
@@ -277,7 +281,9 @@ object CacheSync {
 
         // カードの明細があれば、銀行の引き落としの行は生活費から除く(内訳はカードの明細が正)
         val cardPayments = CardPayments.matchedKeys(transactions.values, statements)
-        for (key in cardPayments) transactions[key] = transactions.getValue(key).copy(excludedFromSpending = true)
+        for (key in cardPayments) {
+            transactions[key] = transactions.getValue(key).copy(excludedFromSpending = true, cardPayment = true)
+        }
 
         return Snapshot(
             items = withAutoMetrics(settings, points.values.map { it.metricKey }),

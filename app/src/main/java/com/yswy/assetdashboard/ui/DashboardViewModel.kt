@@ -10,7 +10,10 @@ import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemEntity
+import com.yswy.assetdashboard.data.CategorySettings
+import com.yswy.assetdashboard.data.InvestPlan
 import com.yswy.assetdashboard.data.ItemOverview
+import com.yswy.assetdashboard.data.Summary
 import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
@@ -21,6 +24,7 @@ import com.yswy.assetdashboard.data.toEntity
 import com.yswy.assetdashboard.data.toItem
 import com.yswy.assetdashboard.drive.AppFolders
 import com.yswy.assetdashboard.drive.CacheSync
+import com.yswy.assetdashboard.drive.CategoryStore
 import com.yswy.assetdashboard.drive.Corrections
 import com.yswy.assetdashboard.drive.DriveApi
 import com.yswy.assetdashboard.drive.DriveFolderSetup
@@ -209,10 +213,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 生活費から除く言葉(E07-06)をDriveから読む。 */
-    suspend fun loadSpendingRules(): Result<List<String>> {
+    /** 明細のカテゴリ(E07-21)をDriveから読む。まだ無ければ前の除く言葉(E07-06)から作る。 */
+    suspend fun loadCategories(): Result<CategorySettings> {
         val outcome = DriveSession.withDrive(getApplication()) { api ->
-            SpendingRules.load(api, DriveFolderSetup.ensure(api).folders)
+            CategoryStore.load(api, DriveFolderSetup.ensure(api).folders)
         }
         return when (outcome) {
             is DriveSession.Outcome.Success ->
@@ -260,18 +264,24 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 生活費から除く言葉を保存し、キャッシュを作り直して明細の印を付け直す。 */
-    fun saveSpendingRules(keywords: List<String>, onResult: (String?) -> Unit) {
+    /** 明細のカテゴリを保存し、キャッシュを作り直してカテゴリを付け直す(E07-21)。 */
+    fun saveCategories(categories: CategorySettings, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             onResult(
                 editOnDrive { api, folders ->
-                    if (SpendingRules.save(api, folders, keywords)) null else "Driveに書けないので保存しない"
+                    if (CategoryStore.save(api, folders, categories)) null else "Driveに書けないので保存しない"
                 },
             )
         }
     }
 
-    /** 手元の出金を摘要ごとにまとめたもの(E07-20)。除く言葉を考える手がかりに、画面にだけ出す。 */
+    /** 積立投資の目安(E10-04)。手元のキャッシュから計算する。 */
+    suspend fun investPlan(): InvestPlan? {
+        val monthly = Summary.monthlyCashflow(db.bankTransactionDao().all())
+        return InvestPlan.of(monthly, _state.value.overviews.filterIsInstance<ItemOverview.Goal>(), LocalDate.now())
+    }
+
+    /** 手元の明細を摘要ごとにまとめたもの(E07-20・E07-21)。カテゴリを決める手がかりに、画面にだけ出す。 */
     suspend fun withdrawalDescriptions(): List<SpendingRules.Candidate> =
         SpendingRules.candidates(db.bankTransactionDao().all())
 

@@ -13,7 +13,7 @@
 - [x] [E07-05: iDeCo Metricの追加](../tasks/E07-05-idoco-metric.md)
 - [x] [E07-06: 生活防衛資金Goalの目標額自動計算](../tasks/E07-06-emergency-fund-auto-target.md)
 - [x] [E07-07: 生活防衛資金の回復プラン提示](../tasks/E07-07-emergency-fund-recovery-plan.md)
-- [ ] [E07-08: NISA積立の一時減額提案(生活防衛資金連動)](../tasks/E07-08-nisa-temporary-reduction.md)
+- [x] ~~[E07-08: NISA積立の一時減額提案(生活防衛資金連動)](../tasks/E07-08-nisa-temporary-reduction.md)~~ → E10-04に統合
 - [x] [E07-09: ふるさと納税枠の管理](../tasks/E07-09-furusato-nozei.md)
 - [x] [E07-10: 単一口座内での仮想配分管理(封筒予算方式)](../tasks/E07-10-envelope-allocation.md)
 - [x] [E07-11: Goalの目標期日とランプアップ(積み増し開始)通知](../tasks/E07-11-goal-due-date-rampup.md)
@@ -26,6 +26,7 @@
 - [x] [E07-18: 系列のまとめ先(内訳)](../tasks/E07-18-metric-groups.md)
 - [x] [E07-19: 足りないとき何か月で埋めるか(判定と月々の額を1つに)](../tasks/E07-19-refill-months.md)
 - [x] [E07-20: 生活費から除く出金の登録を楽にする](../tasks/E07-20-spending-rules-ux.md)
+- [x] [E07-21: 明細のカテゴリ(生活費・遊び代・大型出費・振替・積立投資)](../tasks/E07-21-transaction-categories.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

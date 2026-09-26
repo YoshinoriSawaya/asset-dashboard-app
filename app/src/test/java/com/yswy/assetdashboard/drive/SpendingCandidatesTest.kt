@@ -27,9 +27,11 @@ class SpendingCandidatesTest {
     )
 
     @Test
-    fun `摘要ごとに件数・合計・最後の日・カードか・外れているかをまとめ、入金だけの摘要は出さない`() {
+    fun `摘要ごとに件数・合計・最後の日・カードか・外れているかをまとめ、入金の摘要も出す`() {
         val c = SpendingRules.candidates(rows).associateBy { it.description }
-        assertEquals(setOf("スーパーA", "家具店B", "カード引落"), c.keys)
+        // 入金の摘要もカテゴリを付けるので出す(E07-21。振替・給与)
+        assertEquals(setOf("スーパーA", "家具店B", "カード引落", "給与"), c.keys)
+        assertEquals(100L, c["給与"]!!.depositYen)
         assertEquals(SpendingRules.Candidate("スーパーA", 2, 8_000, LocalDate.parse("2026-09-20"), fromCard = true, excludedNow = false), c["スーパーA"])
         assertEquals(true, c["カード引落"]!!.excludedNow)
         assertEquals(false, c["カード引落"]!!.fromCard)
@@ -38,9 +40,9 @@ class SpendingCandidatesTest {
     @Test
     fun `件数・金額・最近の順に並べる`() {
         val c = SpendingRules.candidates(rows)
-        assertEquals(listOf("スーパーA", "家具店B", "カード引落"), SpendingRules.sorted(c, SpendingRules.Order.COUNT).map { it.description })
-        assertEquals(listOf("家具店B", "カード引落", "スーパーA"), SpendingRules.sorted(c, SpendingRules.Order.AMOUNT).map { it.description })
-        assertEquals(listOf("カード引落", "スーパーA", "家具店B"), SpendingRules.sorted(c, SpendingRules.Order.RECENT).map { it.description })
+        assertEquals(listOf("スーパーA", "家具店B", "カード引落", "給与"), SpendingRules.sorted(c, SpendingRules.Order.COUNT).map { it.description })
+        assertEquals(listOf("家具店B", "カード引落", "スーパーA", "給与"), SpendingRules.sorted(c, SpendingRules.Order.AMOUNT).map { it.description })
+        assertEquals(listOf("カード引落", "給与", "スーパーA", "家具店B"), SpendingRules.sorted(c, SpendingRules.Order.RECENT).map { it.description })
     }
 
     @Test
