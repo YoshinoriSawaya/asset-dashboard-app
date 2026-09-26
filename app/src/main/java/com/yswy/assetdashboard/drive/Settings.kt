@@ -84,7 +84,8 @@ object Settings {
                     .also { json -> if (item.resetsYearly) json.put("resetsYearly", true) }
                     .also { json -> if (item.inNetWorth) json.put("inNetWorth", true) }
                     .also { json -> item.repeatYears?.let { json.put("repeatYears", it) } }
-                    .also { json -> item.fundId?.let { json.put("fundId", it) } }
+                    // Metricでは積立額にするカテゴリの名前(E09-05)。意味が違うので別の名前で書く
+                    .also { json -> item.fundId?.let { json.put(if (item.type == ItemType.METRIC) "investCategory" else "fundId", it) } }
                     .also { json -> item.groupKey?.let { json.put("groupKey", it) } }
                     .also { json -> item.refillMonths?.let { json.put("refillMonths", it) } }
                     .also { json ->
@@ -152,7 +153,8 @@ object Settings {
                 resetsYearly = obj.optBoolean("resetsYearly"),
                 inNetWorth = obj.optBoolean("inNetWorth"),
                 repeatYears = if (obj.has("repeatYears")) obj.optInt("repeatYears").takeIf { it > 1 } else null,
-                fundId = obj.optString("fundId").takeIf { it.isNotBlank() },
+                fundId = obj.optString("fundId").takeIf { it.isNotBlank() }
+                    ?: obj.optString("investCategory").takeIf { it.isNotBlank() },
                 groupKey = obj.optString("groupKey").takeIf { it.isNotBlank() },
                 refillMonths = if (obj.has("refillMonths")) obj.optInt("refillMonths").takeIf { it > 0 } else null,
                 sinkingYears = obj.optJSONObject("sinkingFund")?.optInt("horizonYears")?.takeIf { it > 0 },

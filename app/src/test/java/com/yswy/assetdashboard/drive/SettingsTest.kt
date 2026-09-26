@@ -68,6 +68,16 @@ class SettingsTest {
     }
 
     @Test
+    fun `Metricの積立額のカテゴリはinvestCategoryで書き、リマインダーの積立先はfundIdのまま`() {
+        val metric = Item.Metric(Item.metricId("投資信託"), "NISA", "投資信託", expectedReturnBp = 300, investCategory = "NISA積立").toEntity()
+        val reminder = Item.Reminder("r", "車検", LocalDate.of(2027, 3, 1), Repeat.YEARLY, fundId = "g").toEntity()
+        val json = Settings.render(listOf(metric, reminder))
+        assertEquals(true, json.contains("\"investCategory\": \"NISA積立\""))
+        assertEquals(true, json.contains("\"fundId\": \"g\""))
+        assertEquals(listOf(metric, reminder), Settings.parse(json))
+    }
+
+    @Test
     fun `純資産に数える印を読み戻せ、書いていない古い設定では数えない`() {
         val metric = Item.Metric(Item.metricId("合計"), "合計", "合計", inNetWorth = true).toEntity()
         assertEquals(listOf(metric), Settings.parse(Settings.render(listOf(metric))))

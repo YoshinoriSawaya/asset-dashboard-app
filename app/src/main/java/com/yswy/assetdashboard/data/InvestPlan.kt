@@ -73,11 +73,19 @@ data class InvestPlan(
         /**
          * 今の積立投資の月平均(E07-21)。将来の評価額(E09-03)にも使う。
          * 使える月が無いか、積立投資の明細が1件も無ければnull(まだ分からない)。
+         *
+         * [amount]で月ごとの額の取り方を変えられる。系列ごとに積立投資のカテゴリを1つ選んだとき(E09-05)、
+         * そのカテゴリの額だけで平均する。月の選び方は変えない(そのカテゴリの明細が無い月も0として数える)
          */
-        fun currentMonthlyYen(monthly: List<Cashflow>, today: LocalDate, months: Int = DEFAULT_MONTHS): Long? {
+        fun currentMonthlyYen(
+            monthly: List<Cashflow>,
+            today: LocalDate,
+            months: Int = DEFAULT_MONTHS,
+            amount: (Cashflow) -> Long = { it.investmentYen },
+        ): Long? {
             val usable = usableMonths(monthly, today, months)
             if (usable.isEmpty()) return null
-            return (usable.sumOf { it.investmentYen } / usable.size).takeIf { it > 0 }
+            return (usable.sumOf(amount) / usable.size).takeIf { it > 0 }
         }
 
         /** 平均に使う月。今月と、明細の無い月は使わない(生活防衛資金(E07-06)とそろえる)。古い順。 */

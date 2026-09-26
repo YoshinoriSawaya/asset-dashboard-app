@@ -51,7 +51,10 @@ data class ItemEntity(
     val inNetWorth: Boolean = false,
     /** 毎年のリマインダーを何年ごとにするか(E07-15)。nullは1年ごと。 */
     val repeatYears: Int? = null,
-    /** リマインダーの見込み額を積み立てる目標のid(E07-15)。 */
+    /**
+     * Reminderでは見込み額を積み立てる目標のid(E07-15)。Metricでは将来の評価額の積立額にする
+     * 積立投資のカテゴリの名前(E09-05)。列を増やさない(汎用スキーマ)。
+     */
     val fundId: String? = null,
     /** 大型出費の積立の目標(E07-15)。何年分の予定をならして月々の額を出すか。 */
     val sinkingYears: Int? = null,
@@ -120,6 +123,12 @@ sealed interface Item {
          * 将来の評価額の目安を出す。行の `growthRateBp` 列に入れる。
          */
         val expectedReturnBp: Int? = null,
+        /**
+         * 将来の評価額の積立額にする、積立投資のカテゴリの名前(E09-05)。NISAのクレカ積立と年金の掛金のように
+         * 積立投資が系列ごとに分かれるとき、この系列に入る分だけを数える。nullなら積立投資の全部。
+         * 行の `fundId` 列に入れる。
+         */
+        val investCategory: String? = null,
     ) : Item
 
     /**
@@ -196,7 +205,7 @@ sealed interface Item {
  */
 fun ItemEntity.toItem(): Item? = when (type) {
     ItemType.METRIC -> metricKey?.let {
-        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth, groupKey, growthRateBp)
+        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth, groupKey, growthRateBp, fundId)
     }
     ItemType.GOAL -> {
         val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
@@ -225,6 +234,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         inNetWorth = inNetWorth,
         groupKey = groupKey,
         growthRateBp = expectedReturnBp,
+        fundId = investCategory,
     )
     is Item.Goal -> ItemEntity(
         id = id, type = ItemType.GOAL, name = name,

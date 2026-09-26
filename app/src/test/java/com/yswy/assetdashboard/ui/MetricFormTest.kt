@@ -63,6 +63,16 @@ class MetricFormTest {
     }
 
     @Test
+    fun `積立額のカテゴリは利回りと一緒に持ち、利回りをやめれば持たない`() {
+        val saved = MetricForm.parse(auto, "投資信託", hidden = false, returnRate = "3", investCategory = "NISA積立") as MetricForm.Result.Save
+        assertEquals("NISA積立", saved.metric.investCategory)
+        // 指定しなければ今のまま
+        assertEquals("NISA積立", (MetricForm.parse(saved.metric, "NISA", hidden = false) as MetricForm.Result.Save).metric.investCategory)
+        assertEquals(MetricForm.Result.Reset(auto.id), MetricForm.parse(saved.metric, "投資信託", hidden = false, returnRate = ""))
+        assertFalse(MetricForm.isDefault(auto.copy(investCategory = "NISA積立")))
+    }
+
+    @Test
     fun `想定利回りが数でない・0〜20%の外なら通さない`() {
         listOf("abc", "-1", "25").forEach {
             assertTrue(it, MetricForm.parse(auto, "投資信託", hidden = false, returnRate = it) is MetricForm.Result.Invalid)

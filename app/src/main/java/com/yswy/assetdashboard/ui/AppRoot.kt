@@ -177,6 +177,7 @@ private fun Screens(
             // まとめ先の候補(E07-18)。隠している系列も含む
             others = (state.overviews.map { it.item }.filterIsInstance<Item.Metric>() + state.hiddenMetrics)
                 .filter { it.metricKey != metricKey },
+            investmentCategories = viewModel::investmentCategories,
         )
         goalId != null -> GoalEditScreen(
             existing = state.overviews.map { it.item }.filterIsInstance<Item.Goal>().firstOrNull { it.id == goalId },

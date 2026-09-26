@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
@@ -300,6 +301,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 積立投資の目安(E10-04)。手元のキャッシュから計算する。 */
+    /** 明細に付いている、種類が積立投資のカテゴリの名前(E09-05)。将来の評価額の積立額に選べる。 */
+    suspend fun investmentCategories(): List<String> =
+        db.bankTransactionDao().all()
+            .filter { it.categoryKind == CategoryKind.INVESTMENT }
+            .mapNotNull { it.category }
+            .distinct()
+            .sorted()
+
     suspend fun investPlan(): InvestPlan? {
         val monthly = Summary.monthlyCashflow(db.bankTransactionDao().all())
         return InvestPlan.of(monthly, _state.value.overviews.filterIsInstance<ItemOverview.Goal>(), LocalDate.now())

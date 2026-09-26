@@ -32,6 +32,8 @@ object MetricForm {
         groupKey: String? = current.groupKey,
         /** 想定利回り(年%)。空なら決めない(将来の評価額を出さない)。 */
         returnRate: String = rateText(current.expectedReturnBp),
+        /** 積立額にする積立投資のカテゴリ(E09-05)。nullなら積立投資の全部 */
+        investCategory: String? = current.investCategory,
     ): Result {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -45,14 +47,17 @@ object MetricForm {
                 ?: return Result.Invalid("想定利回りは0〜${MAX_RETURN_PERCENT}(%)で入れてください(例: 3)。出さないなら空に")
         }
 
-        val edited = current.copy(name = trimmed, hidden = hidden, inNetWorth = inNetWorth, groupKey = groupKey, expectedReturnBp = bp)
+        val edited = current.copy(name = trimmed, hidden = hidden, inNetWorth = inNetWorth, groupKey = groupKey, expectedReturnBp = bp,
+            // 利回りをやめたら、積立額のカテゴリも使わないので持たない
+            investCategory = investCategory?.takeIf { bp != null },
+        )
         return if (isDefault(edited)) Result.Reset(current.id) else Result.Save(edited)
     }
 
     /** CSVの列から自動で生えたときと同じか。 */
     fun isDefault(metric: Item.Metric): Boolean =
         metric.name == metric.metricKey && !metric.hidden && metric.sortOrder == 0 && !metric.inNetWorth && metric.groupKey == null &&
-            metric.expectedReturnBp == null
+            metric.expectedReturnBp == null && metric.investCategory == null
 
     /** 入力欄に出す想定利回り(年%)。3% → "3"、3.5% → "3.5"。 */
     fun rateText(bp: Int?): String = bp?.let { (it / 100.0).toString().removeSuffix(".0") }.orEmpty()

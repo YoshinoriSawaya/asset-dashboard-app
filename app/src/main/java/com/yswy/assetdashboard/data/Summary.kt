@@ -80,10 +80,6 @@ object Summary {
     fun cashflow(transactions: List<BankTransactionEntity>, period: ClosedRange<LocalDate>): Cashflow {
         val inPeriod = transactions.filter { it.date in period }
         val bank = inPeriod.filterNot { it.label == CardStatementAdapter.LABEL || it.categoryKind == CategoryKind.TRANSFER }
-        // 使った額。カードの返品(入金として持つ)は引く。カードの引き落としの行は内訳がカードの明細にあるので数えない
-        fun used(rows: List<BankTransactionEntity>) = rows.filterNot { it.cardPayment }.sumOf {
-            if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
-        }
         return Cashflow(
             period = period,
             incomeYen = bank.sumOf { it.deposit ?: 0L },
@@ -94,6 +90,15 @@ object Summary {
             investmentYen = used(inPeriod.filter { it.categoryKind == CategoryKind.INVESTMENT }),
             uncategorizedYen = used(inPeriod.filter { it.categoryKind == null }),
         )
+    }
+
+    /** ある期間に、あるカテゴリで使った額(E09-05)。数え方は[cashflow]の積立投資・消費と同じ。 */
+    fun categorySpending(transactions: List<BankTransactionEntity>, period: ClosedRange<LocalDate>, category: String): Long =
+        used(transactions.filter { it.date in period && it.category == category })
+
+    /** 使った額。カードの返品(入金として持つ)は引く。カードの引き落としの行は内訳がカードの明細にあるので数えない */
+    private fun used(rows: List<BankTransactionEntity>): Long = rows.filterNot { it.cardPayment }.sumOf {
+        if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
     }
 
     /** データのある最初の月から最後の月まで、抜けた月も含めて並べる。 */

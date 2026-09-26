@@ -180,9 +180,11 @@ private fun LazyListScope.futureContent(detail: ItemDetail.Metric) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            // 積立投資のカテゴリを選んでいれば、その名前を出す(E09-05)
+            val source = detail.overview.item.investCategory?.let { "カテゴリ「$it」" } ?: "積立投資(全部)"
             Label(
-                future.monthlyYen?.let { "積立は明細の「積立投資」の月平均 ${money.amount(it)}" }
-                    ?: "積立額がまだ分からないので、今の評価額だけを運用した場合です(明細に「積立投資」のカテゴリを付けると入ります)",
+                future.monthlyYen?.let { "積立は明細の${source}の月平均 ${money.amount(it)}" }
+                    ?: "積立額がまだ分からないので、今の評価額だけを運用した場合です(明細の${source}が直近の月にありません)",
             )
             Label("想定利回りで計算した目安で、値動きは読めません。投資の判断を保証するものではありません")
         }

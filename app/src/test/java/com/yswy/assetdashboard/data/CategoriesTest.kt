@@ -126,5 +126,11 @@ class CategoriesTest {
         // 将来の評価額(E09-03)に使う積立投資の月平均も、同じ月から出す
         assertEquals(30_000L, InvestPlan.currentMonthlyYen(monthly, LocalDate.of(2026, 9, 26)))
         assertNull(InvestPlan.currentMonthlyYen(monthly, LocalDate.of(2026, 8, 30)))
+        // 積立投資のカテゴリを1つ選べば、そのカテゴリの分だけ(E09-05)。無いカテゴリなら分からない(null)
+        fun byCategory(name: String) = InvestPlan.currentMonthlyYen(monthly, LocalDate.of(2026, 9, 26)) {
+            Summary.categorySpending(snapshot.transactions, it.period, name)
+        }
+        assertEquals(30_000L, byCategory("積立投資"))
+        assertNull(byCategory("年金の掛金"))
     }
 }

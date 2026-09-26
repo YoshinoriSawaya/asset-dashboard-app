@@ -110,8 +110,14 @@ sealed interface ItemDetail {
             val series = key?.let { db.metricPointDao().series(it) }.orEmpty()
             // 想定利回りを決めた系列だけ、明細から積立投資の月平均を出す(E09-03)
             val today = LocalDate.now()
-            val invest = (overview.item as? Item.Metric)?.expectedReturnBp?.let {
-                InvestPlan.currentMonthlyYen(Summary.monthlyCashflow(db.bankTransactionDao().all()), today)
+            val invest = (overview.item as? Item.Metric)?.takeIf { it.expectedReturnBp != null }?.let { metric ->
+                val transactions = db.bankTransactionDao().all()
+                val monthly = Summary.monthlyCashflow(transactions)
+                // 積立投資のカテゴリを選んでいれば、そのカテゴリの分だけ(E09-05)
+                when (val category = metric.investCategory) {
+                    null -> InvestPlan.currentMonthlyYen(monthly, today)
+                    else -> InvestPlan.currentMonthlyYen(monthly, today) { Summary.categorySpending(transactions, it.period, category) }
+                }
             }
             return of(overview, series, all, today, invest)
         }

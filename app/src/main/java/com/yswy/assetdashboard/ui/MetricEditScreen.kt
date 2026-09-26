@@ -21,6 +21,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,7 +44,10 @@ fun MetricEditScreen(
     modifier: Modifier = Modifier,
     /** まとめ先に選べるほかの系列(E07-18) */
     others: List<Item.Metric> = emptyList(),
+    /** 積立額に選べる、種類が積立投資のカテゴリ(E09-05) */
+    investmentCategories: suspend () -> List<String> = { emptyList() },
 ) {
+    val categories by produceState(emptyList<String>()) { value = investmentCategories() }
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -59,6 +63,7 @@ fun MetricEditScreen(
         var inNetWorth by rememberSaveable { mutableStateOf(metric.inNetWorth) }
         var groupKey by rememberSaveable { mutableStateOf(metric.groupKey) }
         var returnRate by rememberSaveable { mutableStateOf(MetricForm.rateText(metric.expectedReturnBp)) }
+        var investCategory by rememberSaveable { mutableStateOf(metric.investCategory) }
         var message by rememberSaveable { mutableStateOf<String?>(null) }
 
         Text("名前・表示を変更", style = MaterialTheme.typography.headlineSmall)
@@ -128,12 +133,28 @@ fun MetricEditScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // 積立額にするカテゴリ(E09-05)。積立投資が系列ごとに分かれるとき(NISAと年金の掛金など)に選ぶ
+        if (returnRate.isNotBlank() && (categories.isNotEmpty() || investCategory != null)) {
+            Text("積立額にするカテゴリ", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "この系列に入る積立だけを選びます。「全部」は種類が積立投資の明細を全部足します。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(investCategory == null, onClick = { investCategory = null }, label = { Text("全部") })
+                // 今選んでいるカテゴリが明細から消えていても、選んだままだと分かるように出す
+                (categories + listOfNotNull(investCategory)).distinct().forEach { c ->
+                    FilterChip(investCategory == c, onClick = { investCategory = c }, label = { Text(c) })
+                }
+            }
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 enabled = !saving,
                 onClick = {
-                    val result = MetricForm.parse(metric, name, hidden, inNetWorth, groupKey, returnRate)
+                    val result = MetricForm.parse(metric, name, hidden, inNetWorth, groupKey, returnRate, investCategory)
                     if (result is MetricForm.Result.Invalid) {
                         message = result.message
                     } else {
