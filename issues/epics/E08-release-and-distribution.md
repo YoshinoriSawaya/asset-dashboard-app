@@ -6,7 +6,7 @@
 
 ## 子イシュー
 - [x] [E08-01: 署名付きAPKビルド手順の確立(E00-06のkeystoreを使用)](../tasks/E08-01-signed-apk-build.md)
-- [ ] [E08-02: スマホへのインストール・更新運用フロー](../tasks/E08-02-install-update-flow.md)
+- [x] [E08-02: スマホへのインストール・更新運用フロー](../tasks/E08-02-install-update-flow.md)
 - [x] [E08-03: バージョン管理・変更履歴の記録方法](../tasks/E08-03-version-history.md)
 
 ## 完了条件
