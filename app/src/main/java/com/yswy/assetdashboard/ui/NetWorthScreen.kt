@@ -1,16 +1,24 @@
 package com.yswy.assetdashboard.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.Item
@@ -19,6 +27,9 @@ import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.NetWorth
+import com.yswy.assetdashboard.ui.chart.ColorDot
+import com.yswy.assetdashboard.ui.chart.DonutChart
+import com.yswy.assetdashboard.ui.chart.GoalColors
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import java.time.LocalDate
 
@@ -46,7 +57,7 @@ fun NetWorthScreen(
 
         item {
             val money = LocalMoney.current
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Spacer8()
                 val latest = netWorth.latest
                 if (latest == null) {
@@ -64,16 +75,73 @@ fun NetWorthScreen(
                     )
                 }
                 Spacer8()
-                Text("数えている系列", style = MaterialTheme.typography.titleMedium)
+                Text("配分", style = MaterialTheme.typography.titleMedium)
+                // 配分(E10-03)。数えている系列の最新値の比率
+                val pie = netWorth.pieParts
+                if (pie.isNotEmpty()) {
+                    val colors = pie.indices.map { GoalColors.of(it) }
+                    DonutChart(
+                        pie.mapIndexed { i, (_, ratio) -> ratio to colors[i] },
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp),
+                    )
+                }
+                Label("系列をタップすると、名前の変更や純資産から外すことができます")
             }
         }
         items(netWorth.metrics, key = { "nw-" + it.id }) { metric ->
-            TextButton(onClick = { onEditMetric(metric.metricKey) }) {
-                Text(if (metric.hidden) "${metric.name}(一覧では隠している)" else metric.name)
+            val pie = netWorth.pieParts
+            val index = pie.indexOfFirst { it.first.metric.id == metric.id }
+            val part = netWorth.breakdown.firstOrNull { it.metric.id == metric.id }
+            LegendRow(
+                metric = metric,
+                color = index.takeIf { it >= 0 }?.let { GoalColors.of(it) },
+                ratio = pie.getOrNull(index)?.second,
+                part = part,
+                latestDate = netWorth.latest?.date,
+                onClick = { onEditMetric(metric.metricKey) },
+            )
+        }
+        if (netWorth.excludedParts.isNotEmpty()) {
+            item {
+                Label("マイナスや0の系列は円グラフに入れていません(純資産の額には含めています)")
             }
         }
 
         metricContent(asMetricDetail(netWorth))
+    }
+}
+
+/** 凡例の1行。色の丸・系列名・割合・額。円グラフに入らない系列は丸を出さない。 */
+@Composable
+private fun LegendRow(
+    metric: Item.Metric,
+    color: Color?,
+    ratio: Double?,
+    part: NetWorth.Part?,
+    latestDate: LocalDate?,
+    onClick: () -> Unit,
+) {
+    val money = LocalMoney.current
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (color != null) ColorDot(color) else Spacer(Modifier.size(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(metric.name, style = MaterialTheme.typography.bodyMedium)
+            val notes = buildList {
+                if (metric.hidden) add("一覧では隠している")
+                // 更新の止まった系列は、古い値のまま比率に入っている
+                if (part != null && latestDate != null && part.date < latestDate) add("${part.date}時点の値")
+                if (part == null) add("データなし")
+            }
+            if (notes.isNotEmpty()) Label(notes.joinToString(" / "))
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            ratio?.let { Text(money.share(it), style = MaterialTheme.typography.bodyMedium) }
+            part?.let { Text(money.amount(it.valueYen), style = MaterialTheme.typography.bodySmall) }
+        }
     }
 }
 

@@ -65,4 +65,14 @@ class MoneyFormatTest {
         assertNull(percent.shareAxis(500_000, 0))
         assertNull(mask.shareAxis(500_000, 1_000_000))
     }
+
+    @Test
+    fun `配分の割合は小数1桁に四捨五入し、マスクでは隠す`() {
+        // 進捗の percent は切り捨て(99%)。配分では合計が100%に近く見えるよう四捨五入
+        assertEquals("99%", real.percent(0.9996))
+        assertEquals("100.0%", real.share(0.9996))
+        assertEquals("33.3%", percent.share(1.0 / 3))
+        assertEquals("66.7%", real.share(2.0 / 3))
+        assertEquals(MoneyFormat.HIDDEN, mask.share(0.5))
+    }
 }

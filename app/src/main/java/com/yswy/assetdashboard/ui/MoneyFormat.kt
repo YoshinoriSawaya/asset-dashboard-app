@@ -48,6 +48,12 @@ class MoneyFormat(val mode: PrivacyMode) {
         else -> Formatters.percent(ratio)
     }
 
+    /** 内訳の割合(E10-03)。%のときもそのまま出す。 */
+    fun share(ratio: Double): String = when (mode) {
+        PrivacyMode.MASK -> HIDDEN
+        else -> Formatters.sharePercent(ratio)
+    }
+
     /**
      * 推移の折れ線の目盛り。%のときは最初の点に対する増減率にする
      * (「NISA評価額のような絶対額の推移グラフは増減率に変換」)。マスクなら出さない。

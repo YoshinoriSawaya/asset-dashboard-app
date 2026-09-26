@@ -28,8 +28,26 @@ data class NetWorth(
     val lateStarts: List<Pair<Item.Metric, LocalDate>>,
     /** 今月の増減。比べる相手が無ければnull。 */
     val monthChangeYen: Long?,
+    /** 系列ごとの最新値(E10-03)。[metrics]の順。点がまだ無い系列は入れない。 */
+    val breakdown: List<Part> = emptyList(),
 ) {
     val latest: MetricPointEntity? get() = series.lastOrNull()
+
+    /** 内訳の1つ。[date]は系列の最新の点の日付(純資産の日付より古いことがある)。 */
+    data class Part(val metric: Item.Metric, val valueYen: Long, val date: LocalDate)
+
+    /**
+     * 円グラフに入れる内訳と、その割合(E10-03)。割合は円グラフに入れる分の合計に対するもの。
+     * マイナスや0の系列(ローンなど)は円にできないので入れない([excludedParts])。
+     */
+    val pieParts: List<Pair<Part, Double>>
+        get() {
+            val positive = breakdown.filter { it.valueYen > 0 }
+            val total = positive.sumOf { it.valueYen }.takeIf { it > 0 } ?: return emptyList()
+            return positive.map { it to it.valueYen.toDouble() / total }
+        }
+
+    val excludedParts: List<Part> get() = breakdown.filter { it.valueYen <= 0 }
 
     /** 月ごとの推移。新しい月が先頭(詳細画面の表と同じ向き)。 */
     val monthly: List<MetricChange> get() = Summary.monthlyMetric(KEY, series).reversed()
@@ -75,6 +93,11 @@ data class NetWorth(
                 series = series,
                 lateStarts = lateStarts,
                 monthChangeYen = Summary.metricChange(KEY, series, Summary.month(YearMonth.from(today))).changeYen,
+                // 合算の最新値と同じく「各系列の最新の点」なので、内訳の合計は純資産の最新値に一致する
+                breakdown = counted.mapNotNull { metric ->
+                    pointsByKey[metric.metricKey].orEmpty().maxByOrNull { it.date }
+                        ?.let { Part(metric, it.valueYen, it.date) }
+                },
             )
         }
 

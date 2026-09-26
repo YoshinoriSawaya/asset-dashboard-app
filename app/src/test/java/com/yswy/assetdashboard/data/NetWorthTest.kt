@@ -71,6 +71,40 @@ class NetWorthTest {
     }
 
     @Test
+    fun `内訳は各系列の最新値で、合計は純資産の最新値に一致する`() {
+        val points = mapOf(
+            "預金・現金" to listOf(p("預金・現金", "2026-08-01", 100), p("預金・現金", "2026-09-01", 300)),
+            "年金" to listOf(p("年金", "2026-08-01", 100)),
+        )
+        val nw = NetWorth.of(listOf(metric("預金・現金"), metric("年金"), metric("手入力")), points, today)!!
+        assertEquals(
+            listOf(Triple("預金・現金", 300L, LocalDate.of(2026, 9, 1)), Triple("年金", 100L, LocalDate.of(2026, 8, 1))),
+            nw.breakdown.map { Triple(it.metric.metricKey, it.valueYen, it.date) },
+        )
+        assertEquals(nw.latest?.valueYen, nw.breakdown.sumOf { it.valueYen })
+        assertEquals(listOf(0.75, 0.25), nw.pieParts.map { it.second })
+    }
+
+    @Test
+    fun `マイナスや0の系列は円グラフに入れず、割合は残りで出す`() {
+        val points = mapOf(
+            "預金・現金" to listOf(p("預金・現金", "2026-09-01", 300)),
+            "ローン" to listOf(p("ローン", "2026-09-01", -200)),
+            "空" to listOf(p("空", "2026-09-01", 0)),
+        )
+        val nw = NetWorth.of(listOf(metric("預金・現金"), metric("ローン"), metric("空")), points, today)!!
+        assertEquals(listOf("預金・現金" to 1.0), nw.pieParts.map { it.first.metric.metricKey to it.second })
+        assertEquals(listOf("ローン", "空"), nw.excludedParts.map { it.metric.metricKey })
+        assertEquals(100L, nw.latest?.valueYen)
+    }
+
+    @Test
+    fun `全部マイナスなら円グラフは空`() {
+        val points = mapOf("ローン" to listOf(p("ローン", "2026-09-01", -200)))
+        assertEquals(emptyList<Pair<NetWorth.Part, Double>>(), NetWorth.of(listOf(metric("ローン")), points, today)!!.pieParts)
+    }
+
+    @Test
     fun `点がまだ無い系列だけなら、データなし`() {
         val nw = NetWorth.of(listOf(metric("手入力")), emptyMap(), today)!!
         assertNull(nw.latest)

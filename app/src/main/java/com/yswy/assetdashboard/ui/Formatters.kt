@@ -41,6 +41,12 @@ object Formatters {
     /** `42%`。達成超えもそのまま出す(`120%`)。 */
     fun percent(ratio: Double): String = "${(ratio * 100).toInt()}%"
 
+    /**
+     * 配分の割合(E10-03)。小数1桁に四捨五入する。[percent]は進捗向けに切り捨てで、
+     * 内訳に使うと合計が100%から数%欠けて見える。
+     */
+    fun sharePercent(ratio: Double): String = String.format(java.util.Locale.ROOT, "%.1f%%", ratio * 100)
+
     /** `あと3日` / `今日` / `5日過ぎ` */
     fun daysLeft(days: Long): String = when {
         days > 0 -> "あと${days}日"
