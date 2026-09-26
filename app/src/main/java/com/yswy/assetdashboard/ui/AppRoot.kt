@@ -45,6 +45,7 @@ object Routes {
     const val SPENDING_RULES = "spending_rules"
     const val CALENDAR = "calendar"
     const val NET_WORTH = "net_worth"
+    const val SURPLUS = "surplus"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -227,6 +228,11 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
+        route == Routes.SURPLUS -> SurplusScreen(
+            goals = state.overviews.filterIsInstance<ItemOverview.Goal>(),
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.CALENDAR -> ExpenseCalendarScreen(
             entries = ExpenseCalendar.build(state.overviews.map { it.item }, LocalDate.now()),
             onOpenItem = { entry -> stack.add(Routes.item(entry.itemId)) },
@@ -280,6 +286,7 @@ private fun Screens(
             onRunDailyCheck = viewModel::runDailyCheckNow,
             onEditMetric = { stack.add(Routes.metric(it)) },
             onOpenNetWorth = { stack.add(Routes.NET_WORTH) },
+            onOpenSurplus = { stack.add(Routes.SURPLUS) },
             modifier = modifier,
         )
     }
