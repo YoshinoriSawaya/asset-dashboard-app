@@ -11,6 +11,7 @@ import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemEntity
 import com.yswy.assetdashboard.data.ItemOverview
+import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
 import com.yswy.assetdashboard.data.SummaryBoard
@@ -56,6 +57,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val message: String = "",
         /** 一覧から隠しているMetric項目(E07-14)。トップから戻せるように持っておく。 */
         val hiddenMetrics: List<Item.Metric> = emptyList(),
+        /** 純資産の推移(E10-01)。数える系列を選んでいなければnull。 */
+        val netWorth: NetWorth? = null,
         /** 前回の同期の結果(E03-05)。まだ一度も同期していなければnull。 */
         val lastSync: LastSync? = null,
         /** 同意画面を出してほしい。出したら[consentLaunched]を呼ぶ。 */
@@ -354,7 +357,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val overviews = ItemOverview.load(db)
         val status = SyncStatus.load(db)
         val hidden = db.itemDao().getAll().mapNotNull { it.toItem() as? Item.Metric }.filter { it.hidden }
-        _state.update { it.copy(overviews = overviews, syncStatus = status, hiddenMetrics = hidden) }
+        val netWorth = NetWorth.load(db)
+        _state.update { it.copy(overviews = overviews, syncStatus = status, hiddenMetrics = hidden, netWorth = netWorth) }
         // ウィジェットの色も同じ判定なので、キャッシュが変わるたびに描き直す(E04)
         SyncStatusWidget.refresh(getApplication())
     }

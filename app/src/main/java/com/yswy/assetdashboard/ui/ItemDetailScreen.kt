@@ -159,7 +159,7 @@ private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
     }
 }
 
-private fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
+internal fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
     item {
         val money = LocalMoney.current
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -462,12 +462,12 @@ private fun ReminderContent(detail: ItemDetail.Reminder) {
 }
 
 @Composable
-private fun Label(text: String) {
+internal fun Label(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
-private fun Spacer8() {
+internal fun Spacer8() {
     Spacer(modifier = Modifier.height(8.dp))
 }
 

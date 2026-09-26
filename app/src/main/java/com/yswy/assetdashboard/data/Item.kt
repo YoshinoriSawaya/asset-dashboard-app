@@ -46,6 +46,9 @@ data class ItemEntity(
     val rampUpMonths: Int? = null,
     /** 自動の目標の下限。生活費の何か月分か(E07-12)。 */
     val autoFloorMonths: Int? = null,
+    /** 純資産に数える系列か(E10-01)。Metricだけが使う。 */
+    @ColumnInfo(defaultValue = "0")
+    val inNetWorth: Boolean = false,
 )
 
 /**
@@ -76,6 +79,11 @@ sealed interface Item {
         val metricKey: String,
         override val sortOrder: Int = 0,
         override val hidden: Boolean = false,
+        /**
+         * 純資産に数えるか(E10-01)。資産推移の「合計」とその内訳のように重なる系列があるので、
+         * 全部を足さず、人が選んだ系列だけを足す。一覧から隠していても数える。
+         */
+        val inNetWorth: Boolean = false,
     ) : Item
 
     /**
@@ -141,7 +149,7 @@ sealed interface Item {
  */
 fun ItemEntity.toItem(): Item? = when (type) {
     ItemType.METRIC -> metricKey?.let {
-        Item.Metric(id, name, it, sortOrder, hidden)
+        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth)
     }
     ItemType.GOAL -> {
         val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
@@ -163,6 +171,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         id = id, type = ItemType.METRIC, name = name,
         metricKey = metricKey,
         sortOrder = sortOrder, hidden = hidden,
+        inNetWorth = inNetWorth,
     )
     is Item.Goal -> ItemEntity(
         id = id, type = ItemType.GOAL, name = name,

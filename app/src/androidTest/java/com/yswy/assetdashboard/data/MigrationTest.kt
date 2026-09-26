@@ -120,6 +120,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v6からv7で系列が残り純資産に数えない() {
+        helper.createDatabase(DB7, 6).use { v6 ->
+            v6.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden, autoAverageMonths, autoCoverMonths, resetsYearly, rampUpMonths, autoFloorMonths) " +
+                    "VALUES ('metric:合計', 'METRIC', '合計', '合計', NULL, NULL, NULL, 0, 1, NULL, NULL, 0, NULL, NULL)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB7, 7, true).use { v7 ->
+            v7.query("SELECT name, hidden, inNetWorth FROM item").use { c ->
+                c.moveToFirst(); assertEquals("合計", c.getString(0)); assertEquals(1, c.getInt(1)); assertEquals(0, c.getInt(2))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -158,5 +173,6 @@ class MigrationTest {
         const val DB4 = "migration-test-4.db"
         const val DB5 = "migration-test-5.db"
         const val DB6 = "migration-test-6.db"
+        const val DB7 = "migration-test-7.db"
     }
 }

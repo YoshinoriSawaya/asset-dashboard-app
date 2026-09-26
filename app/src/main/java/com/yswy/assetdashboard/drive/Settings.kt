@@ -82,6 +82,7 @@ object Settings {
                     .put("sortOrder", item.sortOrder)
                     .put("hidden", item.hidden)
                     .also { json -> if (item.resetsYearly) json.put("resetsYearly", true) }
+                    .also { json -> if (item.inNetWorth) json.put("inNetWorth", true) }
                     .also { json -> item.rampUpMonths?.let { json.put("rampUpMonths", it) } }
                     .also { json ->
                         item.metricKey?.let { json.put("metricKey", it) }
@@ -133,6 +134,7 @@ object Settings {
                 autoCoverMonths = obj.optJSONObject("autoTarget")?.optInt("coverMonths")?.takeIf { it > 0 },
                 autoFloorMonths = obj.optJSONObject("autoTarget")?.optInt("floorMonths")?.takeIf { it > 0 },
                 resetsYearly = obj.optBoolean("resetsYearly"),
+                inNetWorth = obj.optBoolean("inNetWorth"),
                 rampUpMonths = if (obj.has("rampUpMonths")) obj.optInt("rampUpMonths").takeIf { it > 0 } else null,
             )
             if (item.toItem() == null) {

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.Item
 
 /**
- * Metric項目の表示名・非表示(E07-14)。CSVの列名(metricKey)は変えない。
+ * Metric項目の表示名・非表示(E07-14)・純資産に数えるか(E10-01)。CSVの列名(metricKey)は変えない。
  * 保存先はDriveの settings/items.json。
  */
 @Composable
@@ -48,6 +48,7 @@ fun MetricEditScreen(
 
         var name by rememberSaveable { mutableStateOf(metric.name) }
         var hidden by rememberSaveable { mutableStateOf(metric.hidden) }
+        var inNetWorth by rememberSaveable { mutableStateOf(metric.inNetWorth) }
         var message by rememberSaveable { mutableStateOf<String?>(null) }
 
         Text("名前・表示を変更", style = MaterialTheme.typography.headlineSmall)
@@ -73,12 +74,24 @@ fun MetricEditScreen(
                 )
             }
         }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Switch(checked = inNetWorth, onCheckedChange = { inNetWorth = it })
+            Column {
+                Text("純資産に数える")
+                Text(
+                    "トップの純資産に足します。「合計」とその内訳のように重なる系列は、どちらか一方だけにしてください。" +
+                        "隠していても数えます。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 enabled = !saving,
                 onClick = {
-                    val result = MetricForm.parse(metric, name, hidden)
+                    val result = MetricForm.parse(metric, name, hidden, inNetWorth)
                     if (result is MetricForm.Result.Invalid) {
                         message = result.message
                     } else {
@@ -87,7 +100,7 @@ fun MetricEditScreen(
                     }
                 },
             ) { Text("保存") }
-            // 列名に戻して、隠すのもやめる(settingsから消す)
+            // 列名に戻して、隠すのも純資産に数えるのもやめる(settingsから消す)
             TextButton(
                 enabled = !saving && !MetricForm.isDefault(metric),
                 onClick = {

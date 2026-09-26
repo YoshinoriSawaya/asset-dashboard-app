@@ -41,5 +41,20 @@ class MetricFormTest {
         assertFalse(MetricForm.isDefault(auto.copy(name = "NISA")))
         assertFalse(MetricForm.isDefault(auto.copy(hidden = true)))
         assertFalse(MetricForm.isDefault(auto.copy(sortOrder = 2)))
+        assertFalse(MetricForm.isDefault(auto.copy(inNetWorth = true)))
+    }
+
+    @Test
+    fun `純資産に数えるだけでもsettingsに書き、やめれば消す`() {
+        val result = MetricForm.parse(auto, "投資信託", hidden = false, inNetWorth = true) as MetricForm.Result.Save
+        assertTrue(result.metric.inNetWorth)
+        assertEquals(MetricForm.Result.Reset(auto.id), MetricForm.parse(result.metric, "投資信託", hidden = false, inNetWorth = false))
+    }
+
+    @Test
+    fun `数える印を指定しなければ今のまま`() {
+        val counted = auto.copy(name = "NISA", inNetWorth = true)
+        val result = MetricForm.parse(counted, "NISA", hidden = true) as MetricForm.Result.Save
+        assertTrue(result.metric.inNetWorth)
     }
 }

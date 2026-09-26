@@ -37,6 +37,7 @@ import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
+import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.Repeat
 import com.yswy.assetdashboard.data.SyncStatus
 import com.yswy.assetdashboard.lock.AppLock
@@ -63,6 +64,7 @@ fun TopScreen(
     onRunDailyCheck: ((Int) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
     onPrivacyChange: (PrivacyMode) -> Unit = {},
+    onOpenNetWorth: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -99,6 +101,25 @@ fun TopScreen(
         item {
             SyncHeader(state, onSync, onOpenSummary, onOpenSyncLog)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        }
+
+        // 純資産(E10-01)。いちばん見たい数字なので、項目の一覧より上に置く
+        val netWorth = state.netWorth
+        if (netWorth != null) {
+            item(key = "net-worth") {
+                NetWorthRow(netWorth, onClick = onOpenNetWorth)
+                HorizontalDivider()
+            }
+        } else if (state.overviews.any { it is ItemOverview.Metric } || state.hiddenMetrics.isNotEmpty()) {
+            item(key = "net-worth-hint") {
+                Text(
+                    "純資産: 数える系列を選ぶと、ここに合算が出ます(系列の詳細 →「名前・表示を変更」)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                HorizontalDivider()
+            }
         }
 
         if (state.overviews.isEmpty()) {
@@ -218,6 +239,35 @@ private fun SyncHeader(
                 color = if (last.hasProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clickable(onClick = onOpenSyncLog).padding(vertical = 4.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun NetWorthRow(netWorth: NetWorth, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("純資産", style = MaterialTheme.typography.titleLarge)
+            Text("${netWorth.metrics.size}系列の合計", style = MaterialTheme.typography.labelSmall)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            val money = LocalMoney.current
+            val latest = netWorth.latest
+            if (latest == null) {
+                Text("データなし", style = MaterialTheme.typography.titleLarge)
+            } else {
+                Text(money.amount(latest.valueYen), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    netWorth.monthChangeYen?.let { "今月 ${money.change(it, latest.valueYen - it)}" } ?: "${latest.date}時点",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }

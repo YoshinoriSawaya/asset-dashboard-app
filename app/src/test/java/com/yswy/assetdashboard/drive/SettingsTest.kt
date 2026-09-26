@@ -56,4 +56,12 @@ class SettingsTest {
         val old = fund.copy(autoFloorMonths = null)
         assertEquals(null, Settings.parse(Settings.render(listOf(old))).single().autoFloorMonths)
     }
+
+    @Test
+    fun `純資産に数える印を読み戻せ、書いていない古い設定では数えない`() {
+        val metric = Item.Metric(Item.metricId("合計"), "合計", "合計", inNetWorth = true).toEntity()
+        assertEquals(listOf(metric), Settings.parse(Settings.render(listOf(metric))))
+        val old = """{"formatVersion":1,"items":[{"id":"metric:合計","type":"METRIC","name":"合計","metricKey":"合計"}]}"""
+        assertEquals(false, Settings.parse(old).single().inNetWorth)
+    }
 }
