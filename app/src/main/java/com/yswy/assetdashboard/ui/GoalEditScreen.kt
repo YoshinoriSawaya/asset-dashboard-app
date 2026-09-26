@@ -51,7 +51,7 @@ fun GoalEditScreen(
     var name by rememberSaveable { mutableStateOf(existing?.name.orEmpty()) }
     var target by rememberSaveable { mutableStateOf(existing?.targetYen?.toString().orEmpty()) }
     var metricKey by rememberSaveable { mutableStateOf(existing?.metricKey) }
-    var due by rememberSaveable { mutableStateOf(existing?.dueDate?.toString().orEmpty()) }
+    var due by rememberSaveable { mutableStateOf(existing?.dueDate?.let(DateInput::format).orEmpty()) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     // 目標額の決め方(E07-06)。生活防衛資金のように、生活費の何か月分かで決めたいとき
@@ -61,6 +61,12 @@ fun GoalEditScreen(
     var rampUp by rememberSaveable { mutableStateOf(existing?.rampUpMonths?.toString().orEmpty()) }
     var floorMonths by rememberSaveable { mutableStateOf(existing?.autoTarget?.floorMonths?.toString().orEmpty()) }
     var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
+    // 大型出費の予定から出す(E07-15)。家電・車の買い替えなど、何年かごとに来る出費の積立
+    var useSinking by rememberSaveable { mutableStateOf(existing?.sinking != null) }
+    var sinkingYears by rememberSaveable { mutableStateOf((existing?.sinking?.horizonYears ?: 5).toString()) }
+    var growthPercent by rememberSaveable {
+        mutableStateOf(existing?.sinking?.growthRateBp?.takeIf { it > 0 }?.let { (it / 100.0).toString().removeSuffix(".0") }.orEmpty())
+    }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -79,11 +85,39 @@ fun GoalEditScreen(
             label = { Text("名前(例: 車の購入)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         Text("目標額の決め方", style = MaterialTheme.typography.titleSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(!useAuto, onClick = { useAuto = false }, label = { Text("金額を入れる") })
-            FilterChip(useAuto, onClick = { useAuto = true }, label = { Text("生活費から出す") })
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(!useAuto && !useSinking, onClick = { useAuto = false; useSinking = false }, label = { Text("金額を入れる") })
+            FilterChip(useAuto, onClick = { useAuto = true; useSinking = false }, label = { Text("生活費から出す") })
+            FilterChip(useSinking, onClick = { useSinking = true; useAuto = false }, label = { Text("大型出費の予定から出す") })
         }
-        if (!useAuto) {
+        if (useSinking) {
+            Text(
+                "家電や車のように、何年かごとに来る出費に向けて貯める目標です。リマインダーで見込み額と" +
+                    "「何年ごと」を入れ、積立先にこの目標を選ぶと、向こう1年の見込み額の合計が目標額になります。" +
+                    "向こう何年かの予定をならした、月々の積立額も出します。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = sinkingYears, onValueChange = { sinkingYears = it },
+                    label = { Text("何年分をならすか") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = growthPercent, onValueChange = { growthPercent = it },
+                    label = { Text("物価上昇率(年%)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                "見込み額は今の値段で入れてください。先の回ほど、この率で増やして数えます(空なら0%)。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else if (!useAuto) {
             OutlinedTextField(
                 value = target, onValueChange = { target = it },
                 label = { Text("目標額(円)") }, singleLine = true,
@@ -127,9 +161,11 @@ fun GoalEditScreen(
         }
         OutlinedTextField(
             value = due, onValueChange = { due = it },
-            label = { Text("期日(任意。2030-04-01)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            label = { Text("期日(任意。例: 20300401)") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
         )
-        if (!useAuto && !resetsYearly) {
+        if (!useAuto && !resetsYearly && !useSinking) {
             OutlinedTextField(
                 value = rampUp, onValueChange = { rampUp = it },
                 label = { Text("期日の何か月前から積み増すか(任意)") }, singleLine = true,
@@ -175,9 +211,10 @@ fun GoalEditScreen(
                 enabled = !saving,
                 onClick = {
                     val auto = if (useAuto) averageMonths to coverMonths else null
-                    // 積み増しの欄が隠れている(生活費から出す・毎年の枠)ときは、残っていた値を使わない
-                    val rampUpInput = if (useAuto || resetsYearly) "" else rampUp
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput, floor = floorMonths)) {
+                    val sinking = if (useSinking) sinkingYears to growthPercent else null
+                    // 積み増しの欄が隠れている(生活費から出す・毎年の枠・大型出費の積立)ときは、残っていた値を使わない
+                    val rampUpInput = if (useAuto || resetsYearly || useSinking) "" else rampUp
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput, floor = floorMonths, sinking = sinking)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."

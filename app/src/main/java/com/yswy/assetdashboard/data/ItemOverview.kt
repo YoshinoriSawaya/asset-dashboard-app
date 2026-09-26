@@ -33,6 +33,8 @@ sealed interface ItemOverview {
         val monthlyPaceYen: Long? = null,
         /** 同じ系列を分け合っているときの内訳(E07-10)。分け合っていなければnull。 */
         val share: Allocation.Share? = null,
+        /** 大型出費の積立の計算(E07-15)。積立の目標でなければnull。 */
+        val sinking: SinkingPlan.Result? = null,
     ) : ItemOverview {
         /**
          * この目標から下が使える額。分け合っていなければ[currentYen]と同じ。
@@ -44,7 +46,11 @@ sealed interface ItemOverview {
 
         /** 実際に使う目標額。自動の目標で、計算に使える月が無ければnull。 */
         val targetYen: Long?
-            get() = if (item.autoTarget != null) auto?.targetYen else item.targetYen
+            get() = when {
+                item.sinking != null -> sinking?.nextYearYen
+                item.autoTarget != null -> auto?.targetYen
+                else -> item.targetYen
+            }
 
         /** 下限の額(E07-12)。下限を決めていない、生活費が分からなければnull。 */
         val floorYen: Long?
@@ -78,6 +84,8 @@ sealed interface ItemOverview {
             today: LocalDate,
             /** 月ごとの入出金。支出から目標額を出すGoal(E07-06)で使う。 */
             monthlyCashflow: List<Cashflow> = emptyList(),
+            /** リマインダー全部。大型出費の積立(E07-15)の目標額を出すのに使う。 */
+            reminders: List<Item.Reminder> = emptyList(),
         ): ItemOverview =
             when (item) {
                 is Item.Metric -> {
@@ -104,6 +112,7 @@ sealed interface ItemOverview {
                     auto = item.autoTarget?.let { AutoTargets.compute(it, monthlyCashflow, today) },
                     monthlyPaceYen = item.metricKey?.takeIf { !item.resetsYearly }
                         ?.let { pointsByKey[it] }?.let { Pace.of(it) }?.monthlyYen,
+                    sinking = SinkingPlan.of(item, reminders, today),
                 )
                 is Item.Reminder -> Reminder(item, ChronoUnit.DAYS.between(today, item.dueDate))
             }
@@ -125,8 +134,10 @@ sealed interface ItemOverview {
             } else {
                 emptyList()
             }
+            // 積立先の目標を隠していても、リマインダーは数える(隠したリマインダーも予定のうち)
+            val reminders = db.itemDao().getAll().mapNotNull { it.toItem() as? Item.Reminder }
             // 同じ系列を測る目標どうしで、一覧の上から残高を分ける(E07-10)
-            return Allocation.apply(items.map { of(it, pointsByKey, today, monthly) })
+            return Allocation.apply(items.map { of(it, pointsByKey, today, monthly, reminders) })
         }
     }
 }

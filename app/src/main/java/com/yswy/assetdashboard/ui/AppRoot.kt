@@ -46,6 +46,7 @@ object Routes {
     const val CALENDAR = "calendar"
     const val NET_WORTH = "net_worth"
     const val SURPLUS = "surplus"
+    const val PLAN_IMPORT = "plan_import"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -134,6 +135,7 @@ private fun Screens(
     when {
         reminderId != null -> ReminderEditScreen(
             existing = state.overviews.map { it.item }.filterIsInstance<Item.Reminder>().firstOrNull { it.id == reminderId },
+            funds = state.overviews.map { it.item }.filterIsInstance<Item.Goal>().filter { it.sinking != null },
             saving = state.syncing,
             onSave = viewModel::saveReminder,
             onDelete = { id, onResult ->
@@ -192,7 +194,7 @@ private fun Screens(
                 ?.latest
             CorrectionScreen(
                 fixedKey = correctKey.ifEmpty { null },
-                initialDate = CorrectionForm.defaultDate(latest, LocalDate.now()).toString(),
+                initialDate = DateInput.format(CorrectionForm.defaultDate(latest, LocalDate.now())),
                 initialValue = latest?.valueYen?.toString().orEmpty(),
                 saving = state.syncing,
                 onSave = viewModel::saveCorrection,
@@ -225,6 +227,13 @@ private fun Screens(
         route == Routes.NET_WORTH -> NetWorthScreen(
             netWorth = state.netWorth,
             onEditMetric = { stack.add(Routes.metric(it)) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
+        route == Routes.PLAN_IMPORT -> PlanImportScreen(
+            load = viewModel::loadPlan,
+            saving = state.syncing,
+            onImport = viewModel::importPlan,
             onBack = { close(route) },
             modifier = modifier,
         )
@@ -287,6 +296,7 @@ private fun Screens(
             onEditMetric = { stack.add(Routes.metric(it)) },
             onOpenNetWorth = { stack.add(Routes.NET_WORTH) },
             onOpenSurplus = { stack.add(Routes.SURPLUS) },
+            onOpenPlanImport = { stack.add(Routes.PLAN_IMPORT) },
             modifier = modifier,
         )
     }

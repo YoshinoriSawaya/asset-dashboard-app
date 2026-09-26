@@ -2,6 +2,8 @@ package com.yswy.assetdashboard.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,7 +32,10 @@ import com.yswy.assetdashboard.data.Repeat
 /**
  * リマインダーの追加・編集・削除(E05-05/06)。保存先はDriveの settings/items.json。
  * 期日の7日前と当日に、端末が通知する(E05)。
+ *
+ * @param funds 大型出費の積立の目標(E07-15)。見込み額の積立先に選べる
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReminderEditScreen(
     existing: Item.Reminder?,
@@ -39,11 +44,14 @@ fun ReminderEditScreen(
     onDelete: (String, (String?) -> Unit) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    funds: List<Item.Goal> = emptyList(),
 ) {
     var name by rememberSaveable { mutableStateOf(existing?.name.orEmpty()) }
-    var due by rememberSaveable { mutableStateOf(existing?.dueDate?.toString().orEmpty()) }
+    var due by rememberSaveable { mutableStateOf(existing?.dueDate?.let(DateInput::format).orEmpty()) }
     var amount by rememberSaveable { mutableStateOf(existing?.amountYen?.toString().orEmpty()) }
     var repeat by rememberSaveable { mutableStateOf(existing?.repeat ?: Repeat.YEARLY) }
+    var everyYears by rememberSaveable { mutableStateOf(existing?.repeatYears?.takeIf { it > 1 }?.toString().orEmpty()) }
+    var fundId by rememberSaveable { mutableStateOf(existing?.fundId) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
@@ -64,7 +72,9 @@ fun ReminderEditScreen(
         )
         OutlinedTextField(
             value = due, onValueChange = { due = it },
-            label = { Text("期日(2027-03-01)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            label = { Text("期日(例: ${DateInput.EXAMPLE})") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = amount, onValueChange = { amount = it },
@@ -78,10 +88,38 @@ fun ReminderEditScreen(
                 FilterChip(repeat == value, onClick = { repeat = value }, label = { Text(label) })
             }
         }
+        if (repeat == Repeat.YEARLY) {
+            OutlinedTextField(
+                value = everyYears, onValueChange = { everyYears = it },
+                label = { Text("何年ごと(空なら毎年。車検は2、洗濯機は10など)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        // 積立先(E07-15)。積立の目標があるときだけ出す
+        if (funds.isNotEmpty() || fundId != null) {
+            Text("積立先", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "見込み額を、大型出費の積立の目標で準備します。その目標の目標額と月々の積立額に入ります。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(fundId == null, onClick = { fundId = null }, label = { Text("なし") })
+                funds.forEach { goal ->
+                    FilterChip(fundId == goal.id, onClick = { fundId = goal.id }, label = { Text(goal.name) })
+                }
+                // 積立先の目標が消えていても、選んだままなのが分かるように出す
+                if (fundId != null && funds.none { it.id == fundId }) {
+                    FilterChip(true, onClick = { fundId = null }, label = { Text("(見つからない目標)") })
+                }
+            }
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
             Button(enabled = !saving, onClick = {
-                when (val input = ReminderForm.parse(existing, name, due, repeat, amount = amount)) {
+                when (val input = ReminderForm.parse(existing, name, due, repeat, amount = amount, everyYears = everyYears, fundId = fundId)) {
                     is ReminderForm.Result.Invalid -> message = input.message
                     is ReminderForm.Result.Ok -> {
                         message = "保存中..."

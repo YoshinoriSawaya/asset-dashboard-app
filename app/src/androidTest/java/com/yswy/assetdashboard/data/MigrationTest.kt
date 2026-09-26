@@ -135,6 +135,22 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v7からv8でリマインダーが残り何年ごとと積立先が空になる() {
+        helper.createDatabase(DB8, 7).use { v7 ->
+            v7.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden, autoAverageMonths, autoCoverMonths, resetsYearly, rampUpMonths, autoFloorMonths, inNetWorth) " +
+                    "VALUES ('r1', 'REMINDER', '車検', NULL, 1000, '2027-03-01', 'YEARLY', -1, 0, NULL, NULL, 0, NULL, NULL, 0)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB8, 8, true).use { v8 ->
+            v8.query("SELECT name, targetYen, repeatYears, fundId, sinkingYears, growthRateBp FROM item").use { c ->
+                c.moveToFirst(); assertEquals("車検", c.getString(0)); assertEquals(1000, c.getInt(1))
+                assertTrue(c.isNull(2)); assertTrue(c.isNull(3)); assertTrue(c.isNull(4)); assertTrue(c.isNull(5))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -174,5 +190,6 @@ class MigrationTest {
         const val DB5 = "migration-test-5.db"
         const val DB6 = "migration-test-6.db"
         const val DB7 = "migration-test-7.db"
+        const val DB8 = "migration-test-8.db"
     }
 }

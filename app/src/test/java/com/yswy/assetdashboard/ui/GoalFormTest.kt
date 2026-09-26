@@ -39,7 +39,7 @@ class GoalFormTest {
             Triple("車", "0", ""),
             Triple("車", "-5000", ""),
             Triple("車", "1O00", ""),
-            Triple("車", "1000", "2030/04/01"),
+            Triple("車", "1000", "2030/04/31"), // 存在しない日(E07-17で区切りのある形は通す)
         )) {
             assertTrue("$name $target $due", GoalForm.parse(null, name, target, null, due) is GoalForm.Result.Invalid)
         }

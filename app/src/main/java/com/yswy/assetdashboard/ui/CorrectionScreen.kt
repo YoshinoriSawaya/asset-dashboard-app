@@ -68,7 +68,8 @@ fun CorrectionScreen(
         OutlinedTextField(
             value = date,
             onValueChange = { date = it },
-            label = { Text("日付(2026-09-25)") },
+            label = { Text("日付(例: ${DateInput.EXAMPLE})") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )

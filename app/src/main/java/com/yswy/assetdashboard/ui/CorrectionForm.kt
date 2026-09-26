@@ -4,7 +4,6 @@ import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.drive.Corrections
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 
 /**
  * 補正画面(E03-04)の入力を、保存できる形にする。画面から切り離した純粋関数。
@@ -26,11 +25,8 @@ object CorrectionForm {
         val key = metricKey.trim()
         if (key.isEmpty()) return Result.Invalid("系列の名前を入れてください")
 
-        val day = try {
-            LocalDate.parse(date.trim())
-        } catch (e: DateTimeParseException) {
-            return Result.Invalid("日付は 2026-09-25 の形で入れてください")
-        }
+        val day = DateInput.parse(date)
+            ?: return Result.Invalid("日付は ${DateInput.EXAMPLE} の形で入れてください")
 
         val yen = parseYen(value) ?: return Result.Invalid("金額は数字で入れてください(例: 1,234,567)")
 

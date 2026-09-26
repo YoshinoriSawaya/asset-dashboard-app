@@ -28,7 +28,7 @@ import androidx.room.TypeConverters
         MetricPointEntity::class,
         BankTransactionEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         // E02-02: item / metric_point / bank_transaction を追加
@@ -43,6 +43,8 @@ import androidx.room.TypeConverters
         AutoMigration(from = 5, to = 6),
         // E10-01: 純資産に数える系列の印を追加
         AutoMigration(from = 6, to = 7),
+        // E07-15: 何年ごとの繰り返し・積立先・大型出費の積立の設定を追加
+        AutoMigration(from = 7, to = 8),
     ],
 )
 @TypeConverters(Converters::class)

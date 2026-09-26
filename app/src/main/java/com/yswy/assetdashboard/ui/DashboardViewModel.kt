@@ -223,6 +223,40 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 予定の取り込み(E07-16)で読んだもの。ファイルが無ければ[plan]がnull。 */
+    data class PlanPreview(val parsed: PlanImport.Parsed?, val plan: PlanImport.Plan?)
+
+    /**
+     * Driveの `settings/plan.csv` を読み、今の項目と突き合わせる。まだ何も登録しない。
+     * 突き合わせる相手は、Driveのsettingsそのもの(キャッシュではなく)。
+     */
+    suspend fun loadPlan(): Result<PlanPreview> {
+        val outcome = DriveSession.withDrive(getApplication()) { api ->
+            val folders = DriveFolderSetup.ensure(api).folders
+            val fileId = api.findFile(PlanImport.FILE_NAME, folders.settings)
+                ?: return@withDrive PlanPreview(null, null)
+            val settings = Settings.load(api, folders) ?: error("Driveの設定を読めない")
+            val parsed = PlanImport.parse(api.download(fileId))
+            PlanPreview(parsed, PlanImport.plan(parsed.rows, settings.mapNotNull { it.toItem() }))
+        }
+        return when (outcome) {
+            is DriveSession.Outcome.Success -> Result.success(outcome.value)
+            is DriveSession.Outcome.Offline -> Result.failure(Exception("オフライン"))
+            is DriveSession.Outcome.Failed -> Result.failure(Exception(outcome.message))
+            is DriveSession.Outcome.ConsentRequired -> {
+                _state.update { it.copy(consentRequest = outcome.pendingIntent) }
+                Result.failure(Exception("Googleの同意が必要"))
+            }
+        }
+    }
+
+    /** 取り込みの中身をsettingsに足す(同じidは置き換える)。 */
+    fun importPlan(plan: PlanImport.Plan, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            onResult(editSettings { items -> plan.items.fold(items) { acc, item -> Settings.upsert(acc, item.toEntity()) } })
+        }
+    }
+
     /** 生活費から除く言葉を保存し、キャッシュを作り直して明細の印を付け直す。 */
     fun saveSpendingRules(keywords: List<String>, onResult: (String?) -> Unit) {
         viewModelScope.launch {

@@ -49,6 +49,14 @@ data class ItemEntity(
     /** 純資産に数える系列か(E10-01)。Metricだけが使う。 */
     @ColumnInfo(defaultValue = "0")
     val inNetWorth: Boolean = false,
+    /** 毎年のリマインダーを何年ごとにするか(E07-15)。nullは1年ごと。 */
+    val repeatYears: Int? = null,
+    /** リマインダーの見込み額を積み立てる目標のid(E07-15)。 */
+    val fundId: String? = null,
+    /** 大型出費の積立の目標(E07-15)。何年分の予定をならして月々の額を出すか。 */
+    val sinkingYears: Int? = null,
+    /** 大型出費の積立で使う物価上昇率(E07-15)。年率の1万分率(2% = 200)。 */
+    val growthRateBp: Int? = null,
 )
 
 /**
@@ -63,6 +71,17 @@ data class AutoTarget(
      * 下限を割ったら強く知らせる。決めていなければnull(目標額を割ったら知らせる)。
      */
     val floorMonths: Int? = null,
+)
+
+/**
+ * 大型出費の積立(E07-15)。家電・車のように、何年かごとに来る出費に向けて貯める。
+ * 目標額は、この目標を積立先にしたリマインダーの、向こう1年の見込み額の合計。
+ */
+data class SinkingFund(
+    /** 何年分の予定をならして、月々の積立額を出すか。 */
+    val horizonYears: Int = 5,
+    /** 物価上昇率。年率の1万分率(2% = 200)。先の回ほど見込み額を増やす。 */
+    val growthRateBp: Int = 0,
 )
 
 /** 型の付いた項目。[ItemEntity]との行き来は[toItem] / [toEntity]。 */
@@ -114,6 +133,8 @@ sealed interface Item {
          * それまでは何もしなくてよく、この時期に入ったら期日までの月々の額を出して知らせる。
          */
         val rampUpMonths: Int? = null,
+        /** 目標額を大型出費の予定から出す(E07-15)。決まった額・生活費から出す目標ならnull。 */
+        val sinking: SinkingFund? = null,
     ) : Item
 
     data class Reminder(
@@ -129,6 +150,10 @@ sealed interface Item {
          * 行の `targetYen` 列に入れる(列を増やさない。汎用スキーマ)。
          */
         val amountYen: Long? = null,
+        /** [Repeat.YEARLY]のとき何年ごとか(E07-15)。車検は2、洗濯機は10など。 */
+        val repeatYears: Int = 1,
+        /** 見込み額を積み立てる目標([Item.Goal.sinking]のある目標)のid(E07-15)。 */
+        val fundId: String? = null,
     ) : Item
 
     companion object {
@@ -157,12 +182,16 @@ fun ItemEntity.toItem(): Item? = when (type) {
         } else {
             null
         }
-        // 目標額の決め方がどちらも無いGoalは読めない
-        if (targetYen == null && auto == null) null
-        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly, rampUpMonths)
+        val sinking = sinkingYears?.let { SinkingFund(it, growthRateBp ?: 0) }
+        // 目標額の決め方がどれも無いGoalは読めない
+        if (targetYen == null && auto == null && sinking == null) null
+        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly, rampUpMonths, sinking)
     }
     ItemType.REMINDER -> dueDate?.let {
-        Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden, amountYen = targetYen)
+        Item.Reminder(
+            id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden,
+            amountYen = targetYen, repeatYears = repeatYears ?: 1, fundId = fundId,
+        )
     }
 }
 
@@ -181,12 +210,16 @@ fun Item.toEntity(): ItemEntity = when (this) {
         autoFloorMonths = autoTarget?.floorMonths,
         resetsYearly = resetsYearly,
         rampUpMonths = rampUpMonths,
+        sinkingYears = sinking?.horizonYears,
+        growthRateBp = sinking?.growthRateBp,
     )
     is Item.Reminder -> ItemEntity(
         id = id, type = ItemType.REMINDER, name = name,
         dueDate = dueDate, repeat = repeat,
         sortOrder = sortOrder, hidden = hidden,
         targetYen = amountYen,
+        repeatYears = repeatYears.takeIf { it > 1 },
+        fundId = fundId,
     )
 }
 

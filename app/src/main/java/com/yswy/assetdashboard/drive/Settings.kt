@@ -83,6 +83,16 @@ object Settings {
                     .put("hidden", item.hidden)
                     .also { json -> if (item.resetsYearly) json.put("resetsYearly", true) }
                     .also { json -> if (item.inNetWorth) json.put("inNetWorth", true) }
+                    .also { json -> item.repeatYears?.let { json.put("repeatYears", it) } }
+                    .also { json -> item.fundId?.let { json.put("fundId", it) } }
+                    .also { json ->
+                        item.sinkingYears?.let { years ->
+                            json.put(
+                                "sinkingFund",
+                                JSONObject().put("horizonYears", years).put("growthRateBp", item.growthRateBp ?: 0),
+                            )
+                        }
+                    }
                     .also { json -> item.rampUpMonths?.let { json.put("rampUpMonths", it) } }
                     .also { json ->
                         item.metricKey?.let { json.put("metricKey", it) }
@@ -135,6 +145,10 @@ object Settings {
                 autoFloorMonths = obj.optJSONObject("autoTarget")?.optInt("floorMonths")?.takeIf { it > 0 },
                 resetsYearly = obj.optBoolean("resetsYearly"),
                 inNetWorth = obj.optBoolean("inNetWorth"),
+                repeatYears = if (obj.has("repeatYears")) obj.optInt("repeatYears").takeIf { it > 1 } else null,
+                fundId = obj.optString("fundId").takeIf { it.isNotBlank() },
+                sinkingYears = obj.optJSONObject("sinkingFund")?.optInt("horizonYears")?.takeIf { it > 0 },
+                growthRateBp = obj.optJSONObject("sinkingFund")?.optInt("growthRateBp"),
                 rampUpMonths = if (obj.has("rampUpMonths")) obj.optInt("rampUpMonths").takeIf { it > 0 } else null,
             )
             if (item.toItem() == null) {

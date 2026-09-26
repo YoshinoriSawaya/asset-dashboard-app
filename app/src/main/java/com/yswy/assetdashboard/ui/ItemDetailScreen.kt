@@ -261,6 +261,7 @@ private fun GoalContent(detail: ItemDetail.Goal) {
             )
         }
         FloorLabels(detail.overview)
+        SinkingLabels(detail.overview)
         detail.remainingYen?.let {
             Label(
                 when {
@@ -296,6 +297,35 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 大型出費の積立(E07-15)。目標額の中身と、ならした月々の積立額。 */
+@Composable
+private fun SinkingLabels(overview: ItemOverview.Goal) {
+    val fund = overview.item.sinking ?: return
+    val plan = overview.sinking ?: return
+    val money = LocalMoney.current
+    val today = LocalDate.now()
+    Label(
+        "目標額は、向こう1年の大型出費の見込み" +
+            if (fund.growthRateBp > 0) "(物価上昇 年${fund.growthRateBp / 100.0}%を掛けた額)" else "",
+    )
+    Text(
+        "向こう${plan.horizonYears}年をならすと 月々 ${money.amount(plan.monthlyYen)}",
+        style = MaterialTheme.typography.titleSmall,
+    )
+    val nextYear = plan.nextYear(today)
+    if (plan.occurrences.isEmpty()) {
+        Label("積立先にこの目標を選んだ、見込み額つきのリマインダーがまだありません")
+    } else if (nextYear.isEmpty()) {
+        Label("向こう1年の予定はありません")
+    } else {
+        Text("向こう1年の予定", style = MaterialTheme.typography.titleSmall)
+        nextYear.forEach { o ->
+            val overdue = o.date.isBefore(today)
+            Label("${o.date}  ${o.reminder.name}  ${money.amount(o.amountYen)}" + if (overdue) "(期日を過ぎている)" else "")
+        }
     }
 }
 
@@ -455,9 +485,10 @@ private fun ReminderContent(detail: ItemDetail.Reminder) {
             when (reminder.repeat) {
                 Repeat.NONE -> "繰り返さない"
                 Repeat.MONTHLY -> "毎月"
-                Repeat.YEARLY -> "毎年"
+                Repeat.YEARLY -> if (reminder.repeatYears > 1) "${reminder.repeatYears}年ごと" else "毎年"
             },
         )
+        if (reminder.fundId != null) Label("大型出費の積立で準備する")
     }
 }
 

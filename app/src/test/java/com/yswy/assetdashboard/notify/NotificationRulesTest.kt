@@ -97,7 +97,8 @@ class NotificationRulesTest {
         val ok = ReminderForm.parse(null, " 保険の更新 ", "2027-03-01", Repeat.YEARLY, newId = { "id" }) as ReminderForm.Result.Ok
         assertEquals(Item.Reminder("id", "保険の更新", LocalDate.of(2027, 3, 1), Repeat.YEARLY, sortOrder = -1), ok.reminder)
         assertTrue(ReminderForm.parse(null, "", "2027-03-01", Repeat.YEARLY) is ReminderForm.Result.Invalid)
-        assertTrue(ReminderForm.parse(null, "x", "2027/03/01", Repeat.YEARLY) is ReminderForm.Result.Invalid)
+        // 区切りのある形・yyyymmddは通す(E07-17)。読めない日付は通さない
+        assertTrue(ReminderForm.parse(null, "x", "2027/13/01", Repeat.YEARLY) is ReminderForm.Result.Invalid)
     }
 
     @Test

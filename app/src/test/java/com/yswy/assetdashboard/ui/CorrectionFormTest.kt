@@ -33,7 +33,7 @@ class CorrectionFormTest {
     fun `打ち間違いは通さない`() {
         for ((key, date, value) in listOf(
             Triple("", "2026-09-25", "1000"),
-            Triple("現金", "2026/09/25", "1000"),
+            Triple("現金", "2026925", "1000"), // 7桁(E07-17で yyyymmdd と区切りのある形は通す)
             Triple("現金", "2026-02-30", "1000"),
             Triple("現金", "2026-09-25", ""),
             Triple("現金", "2026-09-25", "1O00"),

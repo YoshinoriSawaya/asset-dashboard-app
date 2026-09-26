@@ -2,8 +2,8 @@ package com.yswy.assetdashboard.ui
 
 import com.yswy.assetdashboard.data.AutoTarget
 import com.yswy.assetdashboard.data.Item
+import com.yswy.assetdashboard.data.SinkingFund
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /**
@@ -24,6 +24,8 @@ object GoalForm {
      *   そのときは[target]を見ない
      * @param rampUp 期日の何か月前から積み増すか(E07-11)。空なら決めない。期日が要る
      * @param floor 生活費から出す目標の下限、生活費の何か月分か(E07-12)。空なら決めない
+     * @param sinking 目標額を大型出費の予定から出す(E07-15)なら、ならす年数と物価上昇率(年%)。
+     *   そのときは[target]を見ない
      */
     fun parse(
         existing: Item.Goal?,
@@ -36,6 +38,7 @@ object GoalForm {
         resetsYearly: Boolean = false,
         rampUp: String = "",
         floor: String = "",
+        sinking: Pair<String, String>? = null,
     ): Result {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -52,7 +55,19 @@ object GoalForm {
             AutoTarget(a, c, f)
         }
 
-        val yen = if (autoTarget != null) {
+        val sinkingFund = sinking?.let { (years, rate) ->
+            if (autoTarget != null) return Result.Invalid("目標額の決め方は1つだけ選んでください")
+            if (resetsYearly) return Result.Invalid("大型出費の積立は、毎年の枠にはできません")
+            val y = years.trim().toIntOrNull()?.takeIf { it in 1..MAX_SINKING_YEARS }
+                ?: return Result.Invalid("ならす年数は1〜${MAX_SINKING_YEARS}年で入れてください")
+            val bp = rate.trim().ifEmpty { "0" }.toBigDecimalOrNull()
+                ?.takeIf { it.signum() >= 0 && it <= MAX_GROWTH_PERCENT.toBigDecimal() }
+                ?.movePointRight(2)?.toInt()
+                ?: return Result.Invalid("物価上昇率は0〜${MAX_GROWTH_PERCENT}(%)で入れてください(例: 2)")
+            SinkingFund(y, bp)
+        }
+
+        val yen = if (autoTarget != null || sinkingFund != null) {
             null
         } else {
             val parsed = CorrectionForm.parseYen(target)
@@ -62,19 +77,16 @@ object GoalForm {
         }
 
         val due = dueDate.trim().takeIf { it.isNotEmpty() }?.let {
-            try {
-                LocalDate.parse(it)
-            } catch (e: DateTimeParseException) {
-                return Result.Invalid("期日は 2030-04-01 の形で入れてください(無ければ空のまま)")
-            }
+            DateInput.parse(it)
+                ?: return Result.Invalid("期日は ${DateInput.EXAMPLE} の形で入れてください(無ければ空のまま)")
         }
 
         val rampUpMonths = rampUp.trim().takeIf { it.isNotEmpty() }?.let {
             val months = it.toIntOrNull()?.takeIf { m -> m in 1..MAX_RAMP_UP_MONTHS }
                 ?: return Result.Invalid("積み増しを始める時期は1〜${MAX_RAMP_UP_MONTHS}か月前で入れてください")
             if (due == null) return Result.Invalid("積み増しを始める時期を決めるには、期日を入れてください")
-            if (autoTarget != null || resetsYearly) {
-                return Result.Invalid("積み増しは、金額を入れる目標で使えます(生活費から出す目標・毎年の枠では使えません)")
+            if (autoTarget != null || resetsYearly || sinkingFund != null) {
+                return Result.Invalid("積み増しは、金額を入れる目標で使えます(生活費から出す目標・毎年の枠・大型出費の積立では使えません)")
             }
             months
         }
@@ -94,10 +106,13 @@ object GoalForm {
                 autoTarget = autoTarget,
                 resetsYearly = resetsYearly,
                 rampUpMonths = rampUpMonths,
+                sinking = sinkingFund,
             ),
         )
     }
 
     private const val MAX_MONTHS = 24
     private const val MAX_RAMP_UP_MONTHS = 120
+    private const val MAX_SINKING_YEARS = 30
+    private const val MAX_GROWTH_PERCENT = 20
 }
