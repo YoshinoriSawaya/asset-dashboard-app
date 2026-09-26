@@ -136,4 +136,31 @@ class NotificationRulesTest {
         // 届いたら出さない
         assertEquals(emptyList<String>(), keys(items = at(1_000_000)))
     }
+
+    @Test
+    fun `下限までの取り崩しは咎めず30日ごと、下限を割ったら週に1度`() {
+        val fundItem = Item.Goal("f", "生活防衛資金", null, "預金・現金", autoTarget = AutoTarget(6, 6, 3))
+        fun fund(current: Long) = listOf(ItemOverview.Goal(fundItem, current, AutoTargets.Result(1_800_000, 6, 300_000)))
+
+        val drawn = NotificationRules.evaluate(today, fresh, fund(1_000_000), emptyMap()).single()
+        assertEquals("shortfall:f", drawn.key)
+        assertTrue(drawn.title.contains("取り崩しています"))
+
+        val below = NotificationRules.evaluate(today, fresh, fund(800_000), emptyMap()).single()
+        assertEquals("belowfloor:f", below.key)
+        assertTrue(below.title.contains("下限を割って"))
+        assertEquals(emptyList<String>(), keys(items = fund(800_000), last = mapOf("belowfloor:f" to today.minusDays(6))))
+        assertEquals(listOf("belowfloor:f"), keys(items = fund(800_000), last = mapOf("belowfloor:f" to today.minusDays(7))))
+
+        for (notice in listOf(drawn, below)) assertFalse((notice.title + notice.text).contains("000"))
+    }
+
+    @Test
+    fun `期日の目標が届かずに期日を過ぎたら、期日ごとに1度`() {
+        val dueDate = LocalDate.of(2026, 9, 1)
+        val car = listOf(ItemOverview.Goal(Item.Goal("c", "車", 1_000_000, "車の資金", dueDate = dueDate, rampUpMonths = 12), 600_000))
+        val key = "rampup:c:$dueDate:overdue"
+        assertEquals(listOf(key), keys(items = car))
+        assertEquals(emptyList<String>(), keys(items = car, last = mapOf(key to today.minusDays(100))))
+    }
 }

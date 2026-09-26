@@ -105,6 +105,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v5からv6で目標が残り下限が空になる() {
+        helper.createDatabase(DB6, 5).use { v5 ->
+            v5.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden, autoAverageMonths, autoCoverMonths, resetsYearly, rampUpMonths) " +
+                    "VALUES ('f1', 'GOAL', '生活防衛資金', NULL, NULL, NULL, NULL, 0, 0, 6, 6, 0, NULL)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB6, 6, true).use { v6 ->
+            v6.query("SELECT name, autoCoverMonths, autoFloorMonths FROM item").use { c ->
+                c.moveToFirst(); assertEquals("生活防衛資金", c.getString(0)); assertEquals(6, c.getInt(1)); assertTrue(c.isNull(2))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -142,5 +157,6 @@ class MigrationTest {
         const val DB3 = "migration-test-3.db"
         const val DB4 = "migration-test-4.db"
         const val DB5 = "migration-test-5.db"
+        const val DB6 = "migration-test-6.db"
     }
 }

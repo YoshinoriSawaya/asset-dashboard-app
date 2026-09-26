@@ -70,4 +70,16 @@ class GoalFormTest {
         assertTrue(parse("2030-04-01", "12", auto = "6" to "6") is GoalForm.Result.Invalid)
         assertTrue(parse("2030-04-01", "12", yearly = true) is GoalForm.Result.Invalid)
     }
+
+    @Test
+    fun `下限は生活費から出す目標で、何か月分より少なく`() {
+        fun parse(floor: String, cover: String = "6") =
+            GoalForm.parse(null, "生活防衛資金", "", null, "", newId = { "new-id" }, auto = "6" to cover, floor = floor)
+
+        assertEquals(3, ((parse("3")) as GoalForm.Result.Ok).goal.autoTarget?.floorMonths)
+        assertNull(((parse(" ")) as GoalForm.Result.Ok).goal.autoTarget?.floorMonths)
+        assertTrue(parse("6") is GoalForm.Result.Invalid)
+        assertTrue(parse("0") is GoalForm.Result.Invalid)
+        assertTrue(parse("1", cover = "1") is GoalForm.Result.Invalid)
+    }
 }

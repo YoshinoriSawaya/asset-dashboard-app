@@ -44,13 +44,23 @@ data class ItemEntity(
     val resetsYearly: Boolean = false,
     /** 期日の何か月前から積み増すか(E07-11)。 */
     val rampUpMonths: Int? = null,
+    /** 自動の目標の下限。生活費の何か月分か(E07-12)。 */
+    val autoFloorMonths: Int? = null,
 )
 
 /**
  * 目標額を支出の実績から出す決まり(E07-06)。
  * 「直近[averageMonths]か月の生活費の平均 × [coverMonths]か月」。
  */
-data class AutoTarget(val averageMonths: Int = 6, val coverMonths: Int = 6)
+data class AutoTarget(
+    val averageMonths: Int = 6,
+    val coverMonths: Int = 6,
+    /**
+     * 下限。生活費の何か月分か(E07-12)。目標額から下限までは取り崩してよく、
+     * 下限を割ったら強く知らせる。決めていなければnull(目標額を割ったら知らせる)。
+     */
+    val floorMonths: Int? = null,
+)
 
 /** 型の付いた項目。[ItemEntity]との行き来は[toItem] / [toEntity]。 */
 sealed interface Item {
@@ -135,7 +145,7 @@ fun ItemEntity.toItem(): Item? = when (type) {
     }
     ItemType.GOAL -> {
         val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
-            AutoTarget(autoAverageMonths, autoCoverMonths)
+            AutoTarget(autoAverageMonths, autoCoverMonths, autoFloorMonths)
         } else {
             null
         }
@@ -159,6 +169,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         metricKey = metricKey, targetYen = targetYen, dueDate = dueDate,
         sortOrder = sortOrder, hidden = hidden,
         autoAverageMonths = autoTarget?.averageMonths, autoCoverMonths = autoTarget?.coverMonths,
+        autoFloorMonths = autoTarget?.floorMonths,
         resetsYearly = resetsYearly,
         rampUpMonths = rampUpMonths,
     )

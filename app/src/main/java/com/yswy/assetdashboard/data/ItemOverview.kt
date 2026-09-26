@@ -33,6 +33,13 @@ sealed interface ItemOverview {
         val targetYen: Long?
             get() = if (item.autoTarget != null) auto?.targetYen else item.targetYen
 
+        /** 下限の額(E07-12)。下限を決めていない、生活費が分からなければnull。 */
+        val floorYen: Long?
+            get() {
+                val months = item.autoTarget?.floorMonths ?: return null
+                return auto?.monthlyAverageYen?.let { it * months }
+            }
+
         /** 進捗(1.0で達成)。目標額を超えても頭打ちにしない。 */
         val progress: Double?
             get() {

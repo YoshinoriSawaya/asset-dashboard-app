@@ -3,6 +3,7 @@ package com.yswy.assetdashboard.ui
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
+import com.yswy.assetdashboard.data.RampUp
 import com.yswy.assetdashboard.data.RecoveryPlan
 import java.time.LocalDate
 
@@ -79,11 +80,20 @@ object AiExport {
                     target?.let { append(" / 残り ${yen((it - current).coerceAtLeast(0))}") }
                 }
                 item.dueDate?.let { append(" / 期日 $it") }
+                // 生活防衛資金の下限(E07-12)。ここまでは取り崩してよい
+                item.autoTarget?.floorMonths?.let { months ->
+                    append(" / 下限 ${goal.floorYen?.let(::yen) ?: "不明"}(生活費の${months}か月分。ここまでは取り崩してよい)")
+                }
+                // 期日に向けた積み増し(E07-11)
+                item.rampUpMonths?.let { append(" / 期日の${it}か月前から積み増す") }
+                (RampUp.of(item, target, goal.currentYen, today) as? RampUp.Active)?.let {
+                    append("(期間中。期日まで月々${yen(it.monthlyYen)})")
+                }
                 FundOutlook.of(goal)?.let { outlook ->
                     outlook.monthsCovered?.let { append(" / 生活費の約${"%.1f".format(it)}か月分") }
                     outlook.monthsUntilBelowTarget?.let { append(" / このペースだと約${it}か月後に目標を割る") }
                 }
-                RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort && !item.resetsYearly }?.let { plan ->
+                RecoveryPlan.of(target, goal.currentYen)?.takeIf { it.isShort && !item.resetsYearly && item.rampUpMonths == null }?.let { plan ->
                     append(" / 不足分を埋めるには ")
                     append(plan.options.joinToString("、") { "${it.months}か月なら月々${yen(it.monthlyYen)}" })
                 }

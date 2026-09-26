@@ -48,4 +48,12 @@ class SettingsTest {
         val old = Item.Goal("g", "車", 1_000_000).toEntity()
         assertEquals(null, Settings.parse(Settings.render(listOf(old))).single().rampUpMonths)
     }
+
+    @Test
+    fun `下限を読み戻せ、書いていない古い設定では無し`() {
+        val fund = Item.Goal("f", "生活防衛資金", null, autoTarget = com.yswy.assetdashboard.data.AutoTarget(6, 6, 3)).toEntity()
+        assertEquals(listOf(fund), Settings.parse(Settings.render(listOf(fund))))
+        val old = fund.copy(autoFloorMonths = null)
+        assertEquals(null, Settings.parse(Settings.render(listOf(old))).single().autoFloorMonths)
+    }
 }

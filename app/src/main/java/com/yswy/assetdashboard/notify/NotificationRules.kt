@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.notify
 
+import com.yswy.assetdashboard.data.Drawdown
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.RampUp
@@ -42,6 +43,9 @@ object NotificationRules {
 
     /** 積み増しの期間中の通知の間隔(E07-11)。最初の1回が「始める時期です」。 */
     const val RAMP_UP_REPEAT_DAYS = 30L
+
+    /** 生活防衛資金が下限を割ったときの間隔(E07-12)。目標額を割っただけより詰める。 */
+    const val BELOW_FLOOR_REPEAT_DAYS = 7L
 
     fun evaluate(
         today: LocalDate,
@@ -96,10 +100,34 @@ object NotificationRules {
                             notices += Notice(key, "${goal.name}の枠が残っています", "${today.year}年の枠は年末までです。アプリで残りを確認してください。")
                         }
                     } else if (goal.autoTarget != null && current < target) {
-                        // E07-07: 生活費から出す目標(生活防衛資金)を下回ったら、30日に1度
-                        val key = "shortfall:${goal.id}"
-                        if (intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
-                            notices += Notice(key, "${goal.name}が目標を下回っています", "アプリで回復の目安を確認してください。")
+                        when (Drawdown.stateOf(overview)) {
+                            // E07-12: 下限を割ったら、週に1度
+                            Drawdown.FundState.BELOW_FLOOR -> {
+                                val key = "belowfloor:${goal.id}"
+                                if (intervalPassed(key, BELOW_FLOOR_REPEAT_DAYS)) {
+                                    notices += Notice(key, "${goal.name}が下限を割っています", "アプリで、まず下限まで戻す目安を確認してください。")
+                                }
+                            }
+                            // E07-12: 下限までは取り崩してよい範囲。咎めずに回復の目安へ誘う
+                            Drawdown.FundState.DRAWN -> {
+                                val key = "shortfall:${goal.id}"
+                                if (intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
+                                    notices += Notice(key, "${goal.name}を取り崩しています", "下限まではまだ余裕があります。アプリで回復の目安を確認してください。")
+                                }
+                            }
+                            // E07-07: 下限を決めていなければ、目標を割ったら30日に1度
+                            else -> {
+                                val key = "shortfall:${goal.id}"
+                                if (intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
+                                    notices += Notice(key, "${goal.name}が目標を下回っています", "アプリで回復の目安を確認してください。")
+                                }
+                            }
+                        }
+                    } else if (RampUp.of(goal, target, current, today) == RampUp.Overdue) {
+                        // E07-12: 期日に届かなかった。生活防衛資金で補えるかへ誘う。期日ごとに1度
+                        val key = "rampup:${goal.id}:${goal.dueDate}:overdue"
+                        if (key !in lastNotified) {
+                            notices += Notice(key, "${goal.name}の期日が過ぎました", "足りない分を生活防衛資金で補えるか、アプリで確認してください。")
                         }
                     } else if (RampUp.of(goal, target, current, today) is RampUp.Active) {
                         // E07-11: 期日に向けて積み増す時期に入ったら知らせ、届くまで月に1度。

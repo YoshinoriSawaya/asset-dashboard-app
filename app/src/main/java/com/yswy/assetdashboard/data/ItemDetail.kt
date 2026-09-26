@@ -24,6 +24,8 @@ sealed interface ItemDetail {
         override val overview: ItemOverview.Goal,
         /** 今のペースならいつ届くか(E09-01)。予測しない目標ならnull。 */
         val forecast: GoalForecast? = null,
+        /** 期日に向けた目標の足りない分を、生活防衛資金で補えるか(E07-12)。 */
+        val cover: Drawdown.Cover? = null,
     ) : ItemDetail {
         /** 目標まであといくら。達成済みなら0。進捗不明ならnull。 */
         val remainingYen: Long?
@@ -44,7 +46,12 @@ sealed interface ItemDetail {
 
     companion object {
         /** [series]はMetricならその系列の点。Goal・Reminderでは使わない。 */
-        fun of(overview: ItemOverview, series: List<MetricPointEntity>): ItemDetail = when (overview) {
+        fun of(
+            overview: ItemOverview,
+            series: List<MetricPointEntity>,
+            all: List<ItemOverview> = emptyList(),
+            today: LocalDate = LocalDate.now(),
+        ): ItemDetail = when (overview) {
             is ItemOverview.Metric -> Metric(
                 overview = overview,
                 monthly = Summary.monthlyMetric(overview.item.metricKey, series).reversed(),
@@ -52,11 +59,16 @@ sealed interface ItemDetail {
                 pointCount = series.size,
                 correctedCount = series.count { it.origin != MetricOrigin.CSV },
             )
-            is ItemOverview.Goal -> Goal(overview, GoalForecast.of(overview.item, overview.targetYen, series))
+            is ItemOverview.Goal -> Goal(
+                overview,
+                GoalForecast.of(overview.item, overview.targetYen, series),
+                Drawdown.cover(overview, all.filterIsInstance<ItemOverview.Goal>(), today),
+            )
             is ItemOverview.Reminder -> Reminder(overview)
         }
 
-        suspend fun load(db: AppDatabase, overview: ItemOverview): ItemDetail {
+        /** @param all 一覧の全項目。生活防衛資金を探すのに使う(E07-12) */
+        suspend fun load(db: AppDatabase, overview: ItemOverview, all: List<ItemOverview> = emptyList()): ItemDetail {
             // Metricは推移の表とグラフに、Goalは達成の予測(E09-01)に、系列の点を使う
             val key = when (val item = overview.item) {
                 is Item.Metric -> item.metricKey
@@ -64,7 +76,7 @@ sealed interface ItemDetail {
                 is Item.Reminder -> null
             }
             val series = key?.let { db.metricPointDao().series(it) }.orEmpty()
-            return of(overview, series)
+            return of(overview, series, all)
         }
     }
 }

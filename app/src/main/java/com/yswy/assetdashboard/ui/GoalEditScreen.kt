@@ -59,6 +59,7 @@ fun GoalEditScreen(
     var averageMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.averageMonths ?: 6).toString()) }
     var resetsYearly by rememberSaveable { mutableStateOf(existing?.resetsYearly ?: false) }
     var rampUp by rememberSaveable { mutableStateOf(existing?.rampUpMonths?.toString().orEmpty()) }
+    var floorMonths by rememberSaveable { mutableStateOf(existing?.autoTarget?.floorMonths?.toString().orEmpty()) }
     var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
 
     Column(
@@ -110,6 +111,18 @@ fun GoalEditScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            OutlinedTextField(
+                value = floorMonths, onValueChange = { floorMonths = it },
+                label = { Text("下限(生活費の何か月分・任意)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "目標額から下限までは、車の頭金のような期日のある目標が足りないときに取り崩してよい範囲として扱います。" +
+                    "下限を割ったら強めに知らせます。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             TextButton(onClick = onOpenSpendingRules) { Text("生活費から除く出金を設定") }
         }
         OutlinedTextField(
@@ -164,7 +177,7 @@ fun GoalEditScreen(
                     val auto = if (useAuto) averageMonths to coverMonths else null
                     // 積み増しの欄が隠れている(生活費から出す・毎年の枠)ときは、残っていた値を使わない
                     val rampUpInput = if (useAuto || resetsYearly) "" else rampUp
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput)) {
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput, floor = floorMonths)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."

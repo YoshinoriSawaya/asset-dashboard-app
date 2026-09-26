@@ -109,7 +109,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 詳細画面(E03-02)の中身。一覧の行に、系列の点などを足して組み立てる。 */
-    suspend fun detail(overview: ItemOverview): ItemDetail = ItemDetail.load(db, overview)
+    suspend fun detail(overview: ItemOverview): ItemDetail = ItemDetail.load(db, overview, _state.value.overviews)
 
     /**
      * 補正を保存する(E03-04)。

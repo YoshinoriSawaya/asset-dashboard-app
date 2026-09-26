@@ -93,7 +93,8 @@ object Settings {
                                 "autoTarget",
                                 JSONObject()
                                     .put("averageMonths", item.autoAverageMonths)
-                                    .put("coverMonths", item.autoCoverMonths),
+                                    .put("coverMonths", item.autoCoverMonths)
+                                    .also { auto -> item.autoFloorMonths?.let { auto.put("floorMonths", it) } },
                             )
                         }
                     },
@@ -130,6 +131,7 @@ object Settings {
                 hidden = obj.optBoolean("hidden"),
                 autoAverageMonths = obj.optJSONObject("autoTarget")?.optInt("averageMonths")?.takeIf { it > 0 },
                 autoCoverMonths = obj.optJSONObject("autoTarget")?.optInt("coverMonths")?.takeIf { it > 0 },
+                autoFloorMonths = obj.optJSONObject("autoTarget")?.optInt("floorMonths")?.takeIf { it > 0 },
                 resetsYearly = obj.optBoolean("resetsYearly"),
                 rampUpMonths = if (obj.has("rampUpMonths")) obj.optInt("rampUpMonths").takeIf { it > 0 } else null,
             )

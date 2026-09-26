@@ -23,6 +23,7 @@ object GoalForm {
      * @param auto 目標額を生活費から出す(E07-06)なら、平均を取る月数と何か月分か。
      *   そのときは[target]を見ない
      * @param rampUp 期日の何か月前から積み増すか(E07-11)。空なら決めない。期日が要る
+     * @param floor 生活費から出す目標の下限、生活費の何か月分か(E07-12)。空なら決めない
      */
     fun parse(
         existing: Item.Goal?,
@@ -34,6 +35,7 @@ object GoalForm {
         auto: Pair<String, String>? = null,
         resetsYearly: Boolean = false,
         rampUp: String = "",
+        floor: String = "",
     ): Result {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -43,7 +45,11 @@ object GoalForm {
                 ?: return Result.Invalid("平均を取る月数は1〜${MAX_MONTHS}で入れてください")
             val c = cover.trim().toIntOrNull()?.takeIf { it in 1..MAX_MONTHS }
                 ?: return Result.Invalid("何か月分かは1〜${MAX_MONTHS}で入れてください")
-            AutoTarget(a, c)
+            val f = floor.trim().takeIf { it.isNotEmpty() }?.let {
+                it.toIntOrNull()?.takeIf { m -> m in 1 until c }
+                    ?: return Result.Invalid("下限は1〜${c - 1}か月分で入れてください(目標の${c}か月分より少なく)")
+            }
+            AutoTarget(a, c, f)
         }
 
         val yen = if (autoTarget != null) {

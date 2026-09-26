@@ -30,8 +30,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.FundOutlook
+import com.yswy.assetdashboard.data.Drawdown
 import com.yswy.assetdashboard.data.GoalForecast
 import com.yswy.assetdashboard.data.RampUp
+import com.yswy.assetdashboard.data.RecoveryPlan
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
@@ -241,6 +243,7 @@ private fun GoalContent(detail: ItemDetail.Goal) {
                 },
             )
         }
+        FloorLabels(detail.overview)
         detail.remainingYen?.let {
             Label(
                 when {
@@ -253,9 +256,19 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         }
         val rampUp = detail.rampUp(LocalDate.now())
         RampUpLabels(goal, rampUp)
+        detail.cover?.let { CoverLabels(it) }
         // 届いていなければ、月々いくらで何か月で届くか(E07-07)
         // 毎年の枠では「残り」は埋めるものではないので出さない。
         // 期日に向けて積み増す目標(E07-11)は、期日から出した月額があるので出さない
+        // 下限を割っていれば、まず下限まで戻す案を先に出す(E07-12)
+        if (Drawdown.stateOf(detail.overview) == Drawdown.FundState.BELOW_FLOOR) {
+            RecoveryPlan.of(detail.overview.floorYen, detail.overview.currentYen)?.let { plan ->
+                Text("まず下限まで戻すには", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error)
+                plan.options.forEach { option ->
+                    Label("${option.months}か月で: 月々 ${money.amount(option.monthlyYen)}")
+                }
+            }
+        }
         detail.recovery?.takeIf { it.isShort && !yearly && rampUp == null }?.let { plan ->
             Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
             plan.options.forEach { option ->
@@ -266,6 +279,38 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 生活防衛資金の下限と、今どこにいるか(E07-12)。 */
+@Composable
+private fun FloorLabels(overview: ItemOverview.Goal) {
+    val months = overview.item.autoTarget?.floorMonths ?: return
+    val money = LocalMoney.current
+    Label("下限 " + (overview.floorYen?.let(money::amount) ?: "不明") + "(生活費の${months}か月分)")
+    when (Drawdown.stateOf(overview)) {
+        Drawdown.FundState.DRAWN -> Label("取り崩し中。下限まではまだ余裕があります")
+        Drawdown.FundState.BELOW_FLOOR -> Text("下限を割っています", color = MaterialTheme.colorScheme.error)
+        else -> Unit
+    }
+}
+
+/** 期日に向けた目標の足りない分を、生活防衛資金で補えるか(E07-12)。 */
+@Composable
+private fun CoverLabels(cover: Drawdown.Cover) {
+    val money = LocalMoney.current
+    Text("足りなければ", style = MaterialTheme.typography.titleSmall)
+    when (cover.fits) {
+        true -> Label(
+            "足りない ${money.amount(cover.shortfallYen)} は、${cover.fundName}から補えます" +
+                "(下限まで ${money.amount(cover.availableYen ?: 0)} 取り崩せる)",
+        )
+        false -> Text(
+            "足りない ${money.amount(cover.shortfallYen)} を${cover.fundName}から補うと、下限を割ります" +
+                "(下限まで ${money.amount(cover.availableYen ?: 0)})",
+            color = MaterialTheme.colorScheme.error,
+        )
+        null -> Label("${cover.fundName}に下限を決めると、どこまで取り崩して補えるかを出せます")
     }
 }
 
