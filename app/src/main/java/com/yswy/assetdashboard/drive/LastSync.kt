@@ -59,6 +59,8 @@ data class LastSync(
             val moveFailed = inbox.count(InboxSync.Status.MOVE_FAILED)
             val skippedRows = inbox.skipped.values.sumOf { it.size }
             val cacheKept = result.cache is CacheSync.Outcome.Kept
+            // backupの抜け(E01-16)。取り込み直さないと、DBを失ったときに戻せない
+            val missingBackups = (result.cache as? CacheSync.Outcome.Rebuilt)?.missingBackups?.size ?: 0
 
             val summary = buildList {
                 add("取り込み${ok}件")
@@ -66,9 +68,10 @@ data class LastSync(
                 if (moveFailed > 0) add("移動できず${moveFailed}件")
                 if (skippedRows > 0) add("読めない行${skippedRows}件")
                 if (cacheKept) add("キャッシュ未更新")
+                if (missingBackups > 0) add("backup無し${missingBackups}件")
             }.joinToString("・")
 
-            val hasProblem = failed > 0 || moveFailed > 0 || skippedRows > 0 || cacheKept
+            val hasProblem = failed > 0 || moveFailed > 0 || skippedRows > 0 || cacheKept || missingBackups > 0
             val detail = buildString {
                 append(result.describe())
                 if (inbox.hasProblem || skippedRows > 0) {

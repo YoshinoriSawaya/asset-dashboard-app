@@ -20,12 +20,19 @@ import org.json.JSONObject
  *
  * ## ファイルの分け方
  * 取り込んだ元ファイルごとに1つのJSONを作る
- * (`<元のファイル名>.json`)。全部を1ファイルにまとめると、
+ * (`<元のファイル名>.<元ファイルのDriveのID>.json`)。全部を1ファイルにまとめると、
  * 1回の書き込み失敗で全履歴を失う。元ファイル単位なら、
  * 壊れても壊れたぶんだけで済む。
  *
- * 同名があれば中身を差し替える。同じCSVを取り込み直したときに
- * ファイルが増えていかないようにするため。
+ * 同じ元ファイル(同じID)なら中身を差し替える。processedからinboxへ戻して
+ * 取り込み直しても、DriveのIDは変わらないので、ファイルは増えない。
+ *
+ * ## 名前にIDを入れる(E01-16)
+ * 以前は `<元のファイル名>.json` だった。銀行やカードから落としたCSVは
+ * `明細 (1).csv` のように**別のファイルでも同じ名前**になりやすく、後から取り込んだ
+ * ほうが前のbackupを上書きして、前のファイルの中身がbackupから消えていた。
+ * 古い名前のbackupは、同じ元ファイルのものなら新しい名前で書いたあとゴミ箱に移す。
+ * 別の元ファイルのものなら残す(それしか残っていない中身かもしれない)。
  */
 object BackupWriter {
 
@@ -50,9 +57,9 @@ object BackupWriter {
     ): Boolean {
         val json = render(sourceFileName, sourceFileId, adapterId, data)
 
-        return try {
+        val written = try {
             api.putTextFile(
-                name = "$sourceFileName.json",
+                name = nameFor(sourceFileName, sourceFileId),
                 parentId = folders.backup,
                 content = json,
                 mimeType = "application/json",
@@ -61,6 +68,26 @@ object BackupWriter {
         } catch (e: Exception) {
             Log.w(TAG, "backupに書けなかった: $sourceFileName", e)
             false
+        }
+        if (written) trashLegacy(api, folders, sourceFileName, sourceFileId)
+        return written
+    }
+
+    /** backupのファイル名。同じ名前の別ファイルとぶつからないよう、元ファイルのIDを入れる。 */
+    fun nameFor(sourceFileName: String, sourceFileId: String): String = "$sourceFileName.$sourceFileId.json"
+
+    /**
+     * 古い名前(`<元のファイル名>.json`)のbackupが同じ元ファイルのものなら、ゴミ箱に移す。
+     * 残っていても読む側([CacheSync])が元ファイルごとに新しいほうだけを使うので、
+     * 失敗しても取り込みは止めない。
+     */
+    private suspend fun trashLegacy(api: DriveApi, folders: AppFolders, sourceFileName: String, sourceFileId: String) {
+        try {
+            val legacyId = api.findFile("$sourceFileName.json", folders.backup) ?: return
+            val legacy = BackupReader.parse(String(api.download(legacyId), Charsets.UTF_8))
+            if (legacy?.sourceFileId == sourceFileId) api.trashFile(legacyId)
+        } catch (e: Exception) {
+            Log.w(TAG, "古い名前のbackupを片付けられなかった: $sourceFileName", e)
         }
     }
 

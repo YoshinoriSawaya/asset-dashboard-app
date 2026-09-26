@@ -76,6 +76,12 @@ object CacheSync {
             val backupFiles: Int,
             /** 形が読めず飛ばしたbackupファイル名。 */
             val unreadable: List<String>,
+            /**
+             * processedにあるのに、どのbackupの元にもなっていないファイル名(E01-16)。
+             * backupが上書きされて消えた・書けなかったもの。inboxに戻せば取り込み直せる。
+             * processedの一覧を取れなければnull(確かめられなかった)。
+             */
+            val missingBackups: List<String>? = emptyList(),
         ) : Outcome
 
         /** 作り直さなかった。今のキャッシュはそのまま。 */
@@ -90,6 +96,10 @@ object CacheSync {
             if (snapshot.droppedDuplicates > 0) append(", 重複 ${snapshot.droppedDuplicates}行")
             if (unreadable.isNotEmpty()) append(", 読めず ${unreadable.size}件")
             append(")")
+            when {
+                missingBackups == null -> append(" / processedの一覧を取れずbackupの抜けは未確認")
+                missingBackups.isNotEmpty() -> append(" / backupの無い取り込み済み ${missingBackups.size}件: ${missingBackups.joinToString(", ")}")
+            }
             append(" 指紋 ${snapshot.fingerprint}")
         }
         is Outcome.Kept -> "キャッシュは更新せず: $reason"
@@ -124,6 +134,17 @@ object CacheSync {
             }
         }
 
+        // 同じ元ファイルのbackupが2つあれば(古い名前が片付かずに残った)、新しいほうだけ使う(E01-16)
+        val latest = latestPerSource(backups)
+
+        // backupの抜けを探す。取れなくても作り直しは止めない(見えるように書くだけ)
+        val missing = try {
+            missingBackups(api.listFiles(folders.processed), latest)
+        } catch (e: Exception) {
+            Log.w(TAG, "processedの一覧を取れない", e)
+            null
+        }
+
         val corrections = Corrections.load(api, folders)
             ?: return Outcome.Kept("correctionsを読めない")
         val settings = Settings.load(api, folders)
@@ -131,7 +152,7 @@ object CacheSync {
         val exclusions = SpendingRules.load(api, folders)
             ?: return Outcome.Kept("生活費から除く決まりを読めない")
 
-        val snapshot = build(backups, corrections, settings, exclusions)
+        val snapshot = build(latest, corrections, settings, exclusions)
 
         db.withTransaction {
             db.itemDao().deleteAll()
@@ -142,9 +163,25 @@ object CacheSync {
             db.bankTransactionDao().insertAll(snapshot.transactions)
         }
 
-        return Outcome.Rebuilt(snapshot, files.size, unreadable).also {
+        return Outcome.Rebuilt(snapshot, files.size, unreadable, missing).also {
             Log.i(TAG, it.summary())
         }
+    }
+
+    /**
+     * 元ファイルごとに、いちばん後のbackupだけを残す(E01-16)。順番は保つ。
+     * 古い名前と新しい名前のbackupが両方あると、明細は先勝ちなので古い読み方が勝ってしまう。
+     * @param backups 古い順
+     */
+    fun latestPerSource(backups: List<BackupReader.Backup>): List<BackupReader.Backup> {
+        val lastIndex = backups.withIndex().associate { (i, b) -> b.sourceFileId to i }
+        return backups.filterIndexed { i, b -> lastIndex[b.sourceFileId] == i }
+    }
+
+    /** processedにあるのに、どのbackupの元にもなっていないファイルの名前(E01-16)。 */
+    fun missingBackups(processed: List<DriveApi.DriveFile>, backups: List<BackupReader.Backup>): List<String> {
+        val backed = backups.map { it.sourceFileId }.toSet()
+        return processed.filterNot { it.id in backed }.map { it.name }.sorted()
     }
 
     /**

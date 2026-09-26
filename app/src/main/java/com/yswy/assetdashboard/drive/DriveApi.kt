@@ -306,6 +306,24 @@ class DriveApi(private val accessToken: String) {
     }
 
     /**
+     * ゴミ箱に移す(E01-16)。完全には消さないので、Driveのゴミ箱から戻せる。
+     * 置き換えた古いbackupを片付けるのに使う。
+     */
+    suspend fun trashFile(fileId: String) {
+        val url = "$BASE_URL/files/$fileId".toHttpUrl().newBuilder()
+            .addQueryParameter("fields", "id,trashed")
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .patch("""{"trashed":true}""".toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        execute(request)
+    }
+
+    /**
      * フォルダを探し、無ければ作る。
      * 返り値はIDと、新規作成したかどうか。
      */
