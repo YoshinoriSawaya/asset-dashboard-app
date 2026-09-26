@@ -1,5 +1,7 @@
 package com.yswy.assetdashboard.data
 
+import java.time.LocalDate
+
 /**
  * 詳細画面(E03-02)に出すもの。一覧の1行([ItemOverview])に、
  * 種類ごとの詳しい値を足したもの。
@@ -33,6 +35,9 @@ sealed interface ItemDetail {
         /** 届いていないとき、月々いくらで何か月で届くか(E07-07)。 */
         val recovery: RecoveryPlan?
             get() = RecoveryPlan.of(overview.targetYen, overview.currentYen)
+
+        /** 期日に向けた積み増し(E07-11)。決めていなければnull。 */
+        fun rampUp(today: LocalDate): RampUp? = RampUp.of(overview.item, overview.targetYen, overview.currentYen, today)
     }
 
     data class Reminder(override val overview: ItemOverview.Reminder) : ItemDetail

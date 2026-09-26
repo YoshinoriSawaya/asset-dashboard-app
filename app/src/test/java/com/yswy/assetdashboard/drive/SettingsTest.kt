@@ -40,4 +40,12 @@ class SettingsTest {
         val json = """{"formatVersion":1,"items":[{"id":"metric:合計","type":"METRIC","metricKey":"合計"}]}"""
         assertEquals("metric:合計", Settings.parse(json).single().name)
     }
+
+    @Test
+    fun `積み増しの時期を読み戻せ、書いていない古い設定では無し`() {
+        val goal = Item.Goal("g", "車", 1_000_000, dueDate = java.time.LocalDate.of(2030, 4, 1), rampUpMonths = 18).toEntity()
+        assertEquals(listOf(goal), Settings.parse(Settings.render(listOf(goal))))
+        val old = Item.Goal("g", "車", 1_000_000).toEntity()
+        assertEquals(null, Settings.parse(Settings.render(listOf(old))).single().rampUpMonths)
+    }
 }

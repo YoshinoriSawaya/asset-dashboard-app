@@ -114,4 +114,26 @@ class NotificationRulesTest {
         assertEquals(ZonedDateTime.of(2026, 9, 25, 9, 0, 0, 0, zone), DailyCheck.nextCheckAt(ZonedDateTime.of(2026, 9, 25, 8, 30, 0, 0, zone)))
         assertEquals(ZonedDateTime.of(2026, 9, 26, 9, 0, 0, 0, zone), DailyCheck.nextCheckAt(ZonedDateTime.of(2026, 9, 25, 9, 0, 0, 0, zone)))
     }
+
+    @Test
+    fun `積み増しの時期に入ったら知らせ、届くまで30日に1度。文面に金額を入れない`() {
+        val dueDate = LocalDate.of(2027, 3, 1)
+        val car = Item.Goal("c", "車", 1_000_000, "預金・現金", dueDate = dueDate, rampUpMonths = 6)
+        fun at(current: Long) = listOf(ItemOverview.Goal(car, current))
+        val key = "rampup:c:$dueDate"
+
+        // 2026-09 はまだ(始めるのは 2026-09 = 期日の6か月前 → 今日から)
+        assertEquals(listOf(key), keys(items = at(100_000)))
+        assertEquals(emptyList<String>(), keys(items = at(100_000), on = LocalDate.of(2026, 8, 31)))
+
+        val first = NotificationRules.evaluate(today, fresh, at(100_000), emptyMap()).single()
+        assertTrue(first.title.contains("始める時期"))
+        val again = NotificationRules.evaluate(today, fresh, at(100_000), mapOf(key to today.minusDays(30))).single()
+        assertFalse(again.title.contains("始める時期"))
+        for (notice in listOf(first, again)) assertFalse((notice.title + notice.text).contains("000"))
+
+        assertEquals(emptyList<String>(), keys(items = at(100_000), last = mapOf(key to today.minusDays(29))))
+        // 届いたら出さない
+        assertEquals(emptyList<String>(), keys(items = at(1_000_000)))
+    }
 }

@@ -1,0 +1,254 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "aed62b0ca35b8170867c2f9b766b1375",
+    "entities": [
+      {
+        "tableName": "ingested_file",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`driveFileId` TEXT NOT NULL, `name` TEXT NOT NULL, `modifiedTime` TEXT NOT NULL, `md5Checksum` TEXT, `ingestedAt` INTEGER NOT NULL, PRIMARY KEY(`driveFileId`))",
+        "fields": [
+          {
+            "fieldPath": "driveFileId",
+            "columnName": "driveFileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modifiedTime",
+            "columnName": "modifiedTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "md5Checksum",
+            "columnName": "md5Checksum",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ingestedAt",
+            "columnName": "ingestedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "driveFileId"
+          ]
+        }
+      },
+      {
+        "tableName": "item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `name` TEXT NOT NULL, `metricKey` TEXT, `targetYen` INTEGER, `dueDate` TEXT, `repeat` TEXT, `sortOrder` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, `autoAverageMonths` INTEGER, `autoCoverMonths` INTEGER, `resetsYearly` INTEGER NOT NULL DEFAULT 0, `rampUpMonths` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metricKey",
+            "columnName": "metricKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "targetYen",
+            "columnName": "targetYen",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dueDate",
+            "columnName": "dueDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repeat",
+            "columnName": "repeat",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hidden",
+            "columnName": "hidden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoAverageMonths",
+            "columnName": "autoAverageMonths",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "autoCoverMonths",
+            "columnName": "autoCoverMonths",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resetsYearly",
+            "columnName": "resetsYearly",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "rampUpMonths",
+            "columnName": "rampUpMonths",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "metric_point",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`metricKey` TEXT NOT NULL, `date` TEXT NOT NULL, `valueYen` INTEGER NOT NULL, `origin` TEXT NOT NULL, PRIMARY KEY(`metricKey`, `date`))",
+        "fields": [
+          {
+            "fieldPath": "metricKey",
+            "columnName": "metricKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueYen",
+            "columnName": "valueYen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "metricKey",
+            "date"
+          ]
+        }
+      },
+      {
+        "tableName": "bank_transaction",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`dedupKey` TEXT NOT NULL, `date` TEXT NOT NULL, `description` TEXT NOT NULL, `withdrawal` INTEGER, `deposit` INTEGER, `balance` INTEGER, `memo` TEXT, `label` TEXT, `sourceFileId` TEXT NOT NULL, `excludedFromSpending` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`dedupKey`))",
+        "fields": [
+          {
+            "fieldPath": "dedupKey",
+            "columnName": "dedupKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "withdrawal",
+            "columnName": "withdrawal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "deposit",
+            "columnName": "deposit",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "balance",
+            "columnName": "balance",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "memo",
+            "columnName": "memo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceFileId",
+            "columnName": "sourceFileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "excludedFromSpending",
+            "columnName": "excludedFromSpending",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "dedupKey"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_bank_transaction_date",
+            "unique": false,
+            "columnNames": [
+              "date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bank_transaction_date` ON `${TABLE_NAME}` (`date`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aed62b0ca35b8170867c2f9b766b1375')"
+    ]
+  }
+}

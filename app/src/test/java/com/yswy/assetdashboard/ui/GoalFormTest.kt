@@ -56,4 +56,18 @@ class GoalFormTest {
         assertEquals("A2", replaced.last().name)
         assertEquals(listOf("a"), Settings.remove(replaced, "b").map { it.id })
     }
+
+    @Test
+    fun `積み増しの時期は期日の何か月前かで、期日と金額の目標が要る`() {
+        fun parse(due: String, rampUp: String, auto: Pair<String, String>? = null, yearly: Boolean = false) =
+            GoalForm.parse(null, "車", "1,000,000", null, due, newId = { "new-id" }, auto = auto, resetsYearly = yearly, rampUp = rampUp)
+
+        assertEquals(12, ((parse("2030-04-01", " 12 ")) as GoalForm.Result.Ok).goal.rampUpMonths)
+        assertNull(((parse("2030-04-01", "")) as GoalForm.Result.Ok).goal.rampUpMonths)
+        assertTrue(parse("", "12") is GoalForm.Result.Invalid)
+        assertTrue(parse("2030-04-01", "0") is GoalForm.Result.Invalid)
+        assertTrue(parse("2030-04-01", "121") is GoalForm.Result.Invalid)
+        assertTrue(parse("2030-04-01", "12", auto = "6" to "6") is GoalForm.Result.Invalid)
+        assertTrue(parse("2030-04-01", "12", yearly = true) is GoalForm.Result.Invalid)
+    }
 }

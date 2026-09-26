@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.GoalForecast
+import com.yswy.assetdashboard.data.RampUp
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
@@ -250,9 +251,12 @@ private fun GoalContent(detail: ItemDetail.Goal) {
                 },
             )
         }
+        val rampUp = detail.rampUp(LocalDate.now())
+        RampUpLabels(goal, rampUp)
         // 届いていなければ、月々いくらで何か月で届くか(E07-07)
-        // 毎年の枠では「残り」は埋めるものではないので出さない
-        detail.recovery?.takeIf { it.isShort && !yearly }?.let { plan ->
+        // 毎年の枠では「残り」は埋めるものではないので出さない。
+        // 期日に向けて積み増す目標(E07-11)は、期日から出した月額があるので出さない
+        detail.recovery?.takeIf { it.isShort && !yearly && rampUp == null }?.let { plan ->
             Text("不足分を埋めるには", style = MaterialTheme.typography.titleSmall)
             plan.options.forEach { option ->
                 Label("${option.months}か月で: 月々 ${money.amount(option.monthlyYen)}")
@@ -262,6 +266,25 @@ private fun GoalContent(detail: ItemDetail.Goal) {
         OutlookLabels(detail)
         ForecastLabels(detail)
         Label(goal.metricKey?.let { "進捗を測る系列: $it" } ?: "進捗を測る系列が未設定")
+    }
+}
+
+/** 期日に向けた積み増し(E07-11)。 */
+@Composable
+private fun RampUpLabels(goal: Item.Goal, rampUp: RampUp?) {
+    val months = goal.rampUpMonths ?: return
+    val money = LocalMoney.current
+    Text("期日に向けた積み増し", style = MaterialTheme.typography.titleSmall)
+    Label("期日の${months}か月前から")
+    when (rampUp) {
+        is RampUp.Waiting -> Label("${rampUp.startMonth.year}年${rampUp.startMonth.monthValue}月から始める(それまでは何もしなくてよい)")
+        is RampUp.Active -> Text(
+            "積み増しの期間中: 期日まで月々 ${money.amount(rampUp.monthlyYen)}(残り${rampUp.monthsLeft}か月)",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        RampUp.Overdue -> Text("期日を過ぎましたが届いていません", color = MaterialTheme.colorScheme.error)
+        RampUp.Achieved -> Label("届いています")
+        null -> Label("目標額か現在の値が分からず、月額を出せません")
     }
 }
 
@@ -307,7 +330,8 @@ private fun ForecastLabels(detail: ItemDetail.Goal) {
     val target = detail.overview.targetYen
     val current = detail.overview.currentYen
     val late = forecast is GoalForecast.NotReaching || (forecast is GoalForecast.Reaching && forecast.onTime == false)
-    if (late && goal.dueDate != null && target != null && current != null) {
+    // 積み増しの時期を決めた目標(E07-11)は、その欄で月額を出している
+    if (late && goal.rampUpMonths == null && goal.dueDate != null && target != null && current != null) {
         GoalForecast.monthlyNeededForDue(target, current, goal.dueDate, LocalDate.now())?.let {
             Label("期日に間に合わせるには 月々 ${money.amount(it)}")
         }

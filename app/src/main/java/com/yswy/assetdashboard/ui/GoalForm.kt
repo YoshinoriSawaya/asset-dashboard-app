@@ -22,6 +22,7 @@ object GoalForm {
      * @param dueDate 空なら期日なし
      * @param auto 目標額を生活費から出す(E07-06)なら、平均を取る月数と何か月分か。
      *   そのときは[target]を見ない
+     * @param rampUp 期日の何か月前から積み増すか(E07-11)。空なら決めない。期日が要る
      */
     fun parse(
         existing: Item.Goal?,
@@ -32,6 +33,7 @@ object GoalForm {
         newId: () -> String = { UUID.randomUUID().toString() },
         auto: Pair<String, String>? = null,
         resetsYearly: Boolean = false,
+        rampUp: String = "",
     ): Result {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return Result.Invalid("名前を入れてください")
@@ -61,6 +63,16 @@ object GoalForm {
             }
         }
 
+        val rampUpMonths = rampUp.trim().takeIf { it.isNotEmpty() }?.let {
+            val months = it.toIntOrNull()?.takeIf { m -> m in 1..MAX_RAMP_UP_MONTHS }
+                ?: return Result.Invalid("積み増しを始める時期は1〜${MAX_RAMP_UP_MONTHS}か月前で入れてください")
+            if (due == null) return Result.Invalid("積み増しを始める時期を決めるには、期日を入れてください")
+            if (autoTarget != null || resetsYearly) {
+                return Result.Invalid("積み増しは、金額を入れる目標で使えます(生活費から出す目標・毎年の枠では使えません)")
+            }
+            months
+        }
+
         return Result.Ok(
             Item.Goal(
                 id = existing?.id ?: newId(),
@@ -75,9 +87,11 @@ object GoalForm {
                 hidden = existing?.hidden ?: false,
                 autoTarget = autoTarget,
                 resetsYearly = resetsYearly,
+                rampUpMonths = rampUpMonths,
             ),
         )
     }
 
     private const val MAX_MONTHS = 24
+    private const val MAX_RAMP_UP_MONTHS = 120
 }

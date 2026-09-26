@@ -2,6 +2,7 @@ package com.yswy.assetdashboard.notify
 
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
+import com.yswy.assetdashboard.data.RampUp
 import com.yswy.assetdashboard.data.SyncStatus
 import java.time.LocalDate
 import java.time.Month
@@ -38,6 +39,9 @@ object NotificationRules {
 
     /** 年末の枠の通知の間隔(E07-09)。12月の間だけ。 */
     const val ALLOWANCE_REPEAT_DAYS = 7L
+
+    /** 積み増しの期間中の通知の間隔(E07-11)。最初の1回が「始める時期です」。 */
+    const val RAMP_UP_REPEAT_DAYS = 30L
 
     fun evaluate(
         today: LocalDate,
@@ -96,6 +100,17 @@ object NotificationRules {
                         val key = "shortfall:${goal.id}"
                         if (intervalPassed(key, SHORTFALL_REPEAT_DAYS)) {
                             notices += Notice(key, "${goal.name}が目標を下回っています", "アプリで回復の目安を確認してください。")
+                        }
+                    } else if (RampUp.of(goal, target, current, today) is RampUp.Active) {
+                        // E07-11: 期日に向けて積み増す時期に入ったら知らせ、届くまで月に1度。
+                        // 期日を変えたら、始めの通知からやり直す
+                        val key = "rampup:${goal.id}:${goal.dueDate}"
+                        if (intervalPassed(key, RAMP_UP_REPEAT_DAYS)) {
+                            notices += if (key !in lastNotified) {
+                                Notice(key, "${goal.name}の積み増しを始める時期です", "期日 ${goal.dueDate} に向けて、アプリで月々の目安を確認してください。")
+                            } else {
+                                Notice(key, "${goal.name}の積み増し", "期日 ${goal.dueDate} まで。アプリで今月の目安を確認してください。")
+                            }
                         }
                     } else if (goal.autoTarget != null) {
                         // E09-02: まだ目標以上だが、このペースだと数か月で割るなら、下回る前に知らせる

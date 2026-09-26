@@ -90,6 +90,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v4からv5で目標が残り積み増しの時期が空になる() {
+        helper.createDatabase(DB5, 4).use { v4 ->
+            v4.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, targetYen, dueDate, repeat, sortOrder, hidden, autoAverageMonths, autoCoverMonths, resetsYearly) " +
+                    "VALUES ('g1', 'GOAL', '車', NULL, 1000, '2030-04-01', NULL, 0, 0, NULL, NULL, 0)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB5, 5, true).use { v5 ->
+            v5.query("SELECT name, rampUpMonths FROM item").use { c ->
+                c.moveToFirst(); assertEquals("車", c.getString(0)); assertTrue(c.isNull(1))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -126,5 +141,6 @@ class MigrationTest {
         const val DB = "migration-test.db"
         const val DB3 = "migration-test-3.db"
         const val DB4 = "migration-test-4.db"
+        const val DB5 = "migration-test-5.db"
     }
 }

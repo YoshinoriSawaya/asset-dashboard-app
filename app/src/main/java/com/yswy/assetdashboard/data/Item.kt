@@ -42,6 +42,8 @@ data class ItemEntity(
     /** 毎年1月にリセットする枠(ふるさと納税・NISAの年間枠など)。E07-09。 */
     @ColumnInfo(defaultValue = "0")
     val resetsYearly: Boolean = false,
+    /** 期日の何か月前から積み増すか(E07-11)。 */
+    val rampUpMonths: Int? = null,
 )
 
 /**
@@ -89,6 +91,11 @@ sealed interface Item {
          * 系列の値は今年の累計。去年の点は数えない。
          */
         val resetsYearly: Boolean = false,
+        /**
+         * 期日の何か月前から積み増すか(E07-11)。期日([dueDate])があるときだけ意味を持つ。
+         * それまでは何もしなくてよく、この時期に入ったら期日までの月々の額を出して知らせる。
+         */
+        val rampUpMonths: Int? = null,
     ) : Item
 
     data class Reminder(
@@ -134,7 +141,7 @@ fun ItemEntity.toItem(): Item? = when (type) {
         }
         // 目標額の決め方がどちらも無いGoalは読めない
         if (targetYen == null && auto == null) null
-        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly)
+        else Item.Goal(id, name, targetYen, metricKey, dueDate, sortOrder, hidden, auto, resetsYearly, rampUpMonths)
     }
     ItemType.REMINDER -> dueDate?.let {
         Item.Reminder(id, name, it, repeat ?: Repeat.NONE, sortOrder, hidden, amountYen = targetYen)
@@ -153,6 +160,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         sortOrder = sortOrder, hidden = hidden,
         autoAverageMonths = autoTarget?.averageMonths, autoCoverMonths = autoTarget?.coverMonths,
         resetsYearly = resetsYearly,
+        rampUpMonths = rampUpMonths,
     )
     is Item.Reminder -> ItemEntity(
         id = id, type = ItemType.REMINDER, name = name,

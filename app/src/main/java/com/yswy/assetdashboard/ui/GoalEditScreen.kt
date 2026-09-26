@@ -58,6 +58,7 @@ fun GoalEditScreen(
     var useAuto by rememberSaveable { mutableStateOf(existing?.autoTarget != null) }
     var averageMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.averageMonths ?: 6).toString()) }
     var resetsYearly by rememberSaveable { mutableStateOf(existing?.resetsYearly ?: false) }
+    var rampUp by rememberSaveable { mutableStateOf(existing?.rampUpMonths?.toString().orEmpty()) }
     var coverMonths by rememberSaveable { mutableStateOf((existing?.autoTarget?.coverMonths ?: 6).toString()) }
 
     Column(
@@ -115,6 +116,20 @@ fun GoalEditScreen(
             value = due, onValueChange = { due = it },
             label = { Text("期日(任意。2030-04-01)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
+        if (!useAuto && !resetsYearly) {
+            OutlinedTextField(
+                value = rampUp, onValueChange = { rampUp = it },
+                label = { Text("期日の何か月前から積み増すか(任意)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "車の買い替えのように、期日に向けて貯める目標で使います。その時期に入ったら通知し、" +
+                    "期日までに月々いくら要るかを詳細画面に出します。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Switch(checked = resetsYearly, onCheckedChange = { resetsYearly = it })
@@ -147,7 +162,9 @@ fun GoalEditScreen(
                 enabled = !saving,
                 onClick = {
                     val auto = if (useAuto) averageMonths to coverMonths else null
-                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly)) {
+                    // 積み増しの欄が隠れている(生活費から出す・毎年の枠)ときは、残っていた値を使わない
+                    val rampUpInput = if (useAuto || resetsYearly) "" else rampUp
+                    when (val input = GoalForm.parse(existing, name, target, metricKey, due, auto = auto, resetsYearly = resetsYearly, rampUp = rampUpInput)) {
                         is GoalForm.Result.Invalid -> message = input.message
                         is GoalForm.Result.Ok -> {
                             message = "保存中..."
