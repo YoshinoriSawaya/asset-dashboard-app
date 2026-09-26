@@ -31,6 +31,7 @@ import com.yswy.assetdashboard.drive.LastSyncStore
 import com.yswy.assetdashboard.drive.Settings
 import com.yswy.assetdashboard.drive.SpendingRules
 import com.yswy.assetdashboard.notify.DailyCheck
+import com.yswy.assetdashboard.ui.chart.SeriesColors
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.Instant
 import java.time.LocalDate
@@ -57,6 +58,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val message: String = "",
         /** 一覧から隠しているMetric項目(E07-14)。トップから戻せるように持っておく。 */
         val hiddenMetrics: List<Item.Metric> = emptyList(),
+        /** 系列の色の番号(E03-08)。metricKey → 番号。 */
+        val seriesColors: Map<String, Int> = emptyMap(),
         /** 純資産の推移(E10-01)。数える系列を選んでいなければnull。 */
         val netWorth: NetWorth? = null,
         /** 前回の同期の結果(E03-05)。まだ一度も同期していなければnull。 */
@@ -390,9 +393,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refresh() {
         val overviews = ItemOverview.load(db)
         val status = SyncStatus.load(db)
-        val hidden = db.itemDao().getAll().mapNotNull { it.toItem() as? Item.Metric }.filter { it.hidden }
+        val metrics = db.itemDao().getAll().mapNotNull { it.toItem() as? Item.Metric }
+        val hidden = metrics.filter { it.hidden }
         val netWorth = NetWorth.load(db)
-        _state.update { it.copy(overviews = overviews, syncStatus = status, hiddenMetrics = hidden, netWorth = netWorth) }
+        _state.update {
+            it.copy(
+                overviews = overviews, syncStatus = status, hiddenMetrics = hidden, netWorth = netWorth,
+                seriesColors = SeriesColors.indexOf(metrics),
+            )
+        }
         // ウィジェットの色も同じ判定なので、キャッシュが変わるたびに描き直す(E04)
         SyncStatusWidget.refresh(getApplication())
     }

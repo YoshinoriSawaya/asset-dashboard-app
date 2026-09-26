@@ -257,6 +257,11 @@ object CacheSync {
             }
         }
 
+        // 銀行明細の残高から、口座ごとの残高の系列を足す(E02-07)
+        AccountBalances.points(backups).forEach { point ->
+            points[Deduplication.keyOf(point)] = MetricPointEntity.from(point)
+        }
+
         // 補正を重ねる。由来を残すので Corrections.apply ではなくここで重ねる。
         for ((key, entry) in Corrections.effective(corrections)) {
             points[key] = MetricPointEntity(

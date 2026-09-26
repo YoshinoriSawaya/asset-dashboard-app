@@ -2,6 +2,8 @@ package com.yswy.assetdashboard.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -25,9 +28,10 @@ import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.Item
 
 /**
- * Metric項目の表示名・非表示(E07-14)・純資産に数えるか(E10-01)。CSVの列名(metricKey)は変えない。
+ * Metric項目の表示名・非表示(E07-14)・純資産に数えるか(E10-01)・まとめ先(E07-18)。CSVの列名(metricKey)は変えない。
  * 保存先はDriveの settings/items.json。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MetricEditScreen(
     metric: Item.Metric?,
@@ -35,6 +39,8 @@ fun MetricEditScreen(
     onSave: (MetricForm.Result, (String?) -> Unit) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** まとめ先に選べるほかの系列(E07-18) */
+    others: List<Item.Metric> = emptyList(),
 ) {
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -49,6 +55,7 @@ fun MetricEditScreen(
         var name by rememberSaveable { mutableStateOf(metric.name) }
         var hidden by rememberSaveable { mutableStateOf(metric.hidden) }
         var inNetWorth by rememberSaveable { mutableStateOf(metric.inNetWorth) }
+        var groupKey by rememberSaveable { mutableStateOf(metric.groupKey) }
         var message by rememberSaveable { mutableStateOf<String?>(null) }
 
         Text("名前・表示を変更", style = MaterialTheme.typography.headlineSmall)
@@ -87,11 +94,28 @@ fun MetricEditScreen(
             }
         }
 
+        // まとめ先(E07-18)。トップでは親の1行にまとめ、親の詳細に内訳として出す
+        if (others.isNotEmpty() || groupKey != null) {
+            Text("まとめ先", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "選ぶと、トップではまとめ先の系列の1行にまとめ、まとめ先の詳細に内訳として出します。" +
+                    "NISAの区分を「投資信託」に、銀行ごとの残高を「預金・現金」に、のように使います。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(groupKey == null, onClick = { groupKey = null }, label = { Text("なし") })
+                others.forEach { other ->
+                    FilterChip(groupKey == other.metricKey, onClick = { groupKey = other.metricKey }, label = { Text(other.name) })
+                }
+            }
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 enabled = !saving,
                 onClick = {
-                    val result = MetricForm.parse(metric, name, hidden, inNetWorth)
+                    val result = MetricForm.parse(metric, name, hidden, inNetWorth, groupKey)
                     if (result is MetricForm.Result.Invalid) {
                         message = result.message
                     } else {

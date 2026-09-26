@@ -151,6 +151,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun v8からv9で系列が残りまとめ先が空になる() {
+        helper.createDatabase(DB9, 8).use { v8 ->
+            v8.execSQL(
+                "INSERT INTO item (id, type, name, metricKey, sortOrder, hidden, resetsYearly, inNetWorth) " +
+                    "VALUES ('metric:NISA', 'METRIC', 'NISA', 'NISA', 0, 0, 0, 1)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB9, 9, true).use { v9 ->
+            v9.query("SELECT name, inNetWorth, groupKey FROM item").use { c ->
+                c.moveToFirst(); assertEquals("NISA", c.getString(0)); assertEquals(1, c.getInt(1)); assertTrue(c.isNull(2))
+            }
+        }
+    }
+
     /**
      * アプリと同じ設定([AppDatabase.build])で開いても消えないこと。
      *
@@ -191,5 +206,6 @@ class MigrationTest {
         const val DB6 = "migration-test-6.db"
         const val DB7 = "migration-test-7.db"
         const val DB8 = "migration-test-8.db"
+        const val DB9 = "migration-test-9.db"
     }
 }

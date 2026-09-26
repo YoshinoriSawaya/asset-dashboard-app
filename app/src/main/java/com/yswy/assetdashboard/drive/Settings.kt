@@ -85,6 +85,7 @@ object Settings {
                     .also { json -> if (item.inNetWorth) json.put("inNetWorth", true) }
                     .also { json -> item.repeatYears?.let { json.put("repeatYears", it) } }
                     .also { json -> item.fundId?.let { json.put("fundId", it) } }
+                    .also { json -> item.groupKey?.let { json.put("groupKey", it) } }
                     .also { json ->
                         item.sinkingYears?.let { years ->
                             json.put(
@@ -147,6 +148,7 @@ object Settings {
                 inNetWorth = obj.optBoolean("inNetWorth"),
                 repeatYears = if (obj.has("repeatYears")) obj.optInt("repeatYears").takeIf { it > 1 } else null,
                 fundId = obj.optString("fundId").takeIf { it.isNotBlank() },
+                groupKey = obj.optString("groupKey").takeIf { it.isNotBlank() },
                 sinkingYears = obj.optJSONObject("sinkingFund")?.optInt("horizonYears")?.takeIf { it > 0 },
                 growthRateBp = obj.optJSONObject("sinkingFund")?.optInt("growthRateBp"),
                 rampUpMonths = if (obj.has("rampUpMonths")) obj.optInt("rampUpMonths").takeIf { it > 0 } else null,

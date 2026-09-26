@@ -12,6 +12,7 @@
 - [ ] ~~[E05-04: 既存NISAトレーリング通知との統合(PC側スクレイピング→FCM経由でスマホに転送)](../tasks/E05-04-nisa-alert-integration.md)~~ 後回し(本人の判断)
 - [x] [E05-05: 車メンテ年1点検リマインダー通知](../tasks/E05-05-car-maintenance-reminder.md)
 - [x] [E05-06: 保険・税金の更新リマインダー](../tasks/E05-06-insurance-tax-reminder.md)
+- [x] [E05-07: リマインダーをトップから一覧画面へ](../tasks/E05-07-reminder-list.md)
 
 ## 通知の経路の決定(2026-09-26、本人が決めた)
 **通知はすべて端末の中で出す。** サーバーもFCMも使わない。

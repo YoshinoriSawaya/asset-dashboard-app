@@ -36,6 +36,7 @@ import com.yswy.assetdashboard.BuildConfig
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.MetricOrigin
+import com.yswy.assetdashboard.data.MetricGroups
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.Repeat
@@ -44,6 +45,8 @@ import com.yswy.assetdashboard.lock.AppLock
 import com.yswy.assetdashboard.lock.LockPrefs
 import com.yswy.assetdashboard.notify.DailyCheck
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
+import com.yswy.assetdashboard.ui.chart.ColorDot
+import com.yswy.assetdashboard.ui.chart.SeriesColors
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.LocalDate
 
@@ -67,6 +70,7 @@ fun TopScreen(
     onOpenNetWorth: () -> Unit = {},
     onOpenSurplus: () -> Unit = {},
     onOpenPlanImport: () -> Unit = {},
+    onOpenReminders: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -134,8 +138,20 @@ fun TopScreen(
             }
         }
 
-        items(state.overviews, key = { it.item.id }) { overview ->
-            ItemRow(overview, onClick = { onOpenItem(overview.item.id) })
+        // リマインダーはトップに並べず、1行にまとめて一覧画面へ(E05-07)。期日は通知で知らせる
+        val reminders = state.overviews.filterIsInstance<ItemOverview.Reminder>()
+        if (reminders.isNotEmpty()) {
+            item(key = "reminders") {
+                ReminderSummaryRow(reminders, onClick = onOpenReminders)
+                HorizontalDivider()
+            }
+        }
+
+        // まとめ先のある系列は親の1行にまとめる(E07-18)
+        val children = MetricGroups.children(state.overviews)
+        items(MetricGroups.topLevel(state.overviews).filterNot { it is ItemOverview.Reminder }, key = { it.item.id }) { overview ->
+            val count = (overview.item as? Item.Metric)?.let { children[it.metricKey]?.size } ?: 0
+            ItemRow(overview, childCount = count, onClick = { onOpenItem(overview.item.id) })
             HorizontalDivider()
         }
 
@@ -276,8 +292,10 @@ private fun NetWorthRow(netWorth: NetWorth, onClick: () -> Unit) {
     }
 }
 
+/** リマインダーをまとめた1行(E05-07)。件数と、いちばん近いもの。 */
 @Composable
-private fun ItemRow(overview: ItemOverview, onClick: () -> Unit) {
+private fun ReminderSummaryRow(reminders: List<ItemOverview.Reminder>, onClick: () -> Unit) {
+    val next = reminders.minBy { it.daysLeft }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,8 +304,36 @@ private fun ItemRow(overview: ItemOverview, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
+            Text("リマインダー(全${reminders.size}件)", style = MaterialTheme.typography.titleMedium)
+            Text("次は ${next.item.name}", style = MaterialTheme.typography.labelSmall)
+        }
+        Text(
+            Formatters.daysLeft(next.daysLeft),
+            style = MaterialTheme.typography.titleMedium,
+            color = if (next.daysLeft < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun ItemRow(overview: ItemOverview, childCount: Int = 0, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 系列には色の丸(E03-08)。推移の線・純資産の円グラフと同じ色
+        (overview.item as? Item.Metric)?.let { metric ->
+            SeriesColors.of(metric.metricKey)?.let { ColorDot(it, modifier = Modifier.padding(end = 10.dp)) }
+        }
+        Column(modifier = Modifier.weight(1f)) {
             Text(overview.item.name, style = MaterialTheme.typography.titleMedium)
-            Text(kindLabel(overview.item), style = MaterialTheme.typography.labelSmall)
+            Text(
+                kindLabel(overview.item) + if (childCount > 0) " ・内訳 ${childCount}系列" else "",
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
         Column(horizontalAlignment = Alignment.End) {
             val (main, sub) = values(overview, LocalMoney.current)

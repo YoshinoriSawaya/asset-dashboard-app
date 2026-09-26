@@ -57,6 +57,8 @@ data class ItemEntity(
     val sinkingYears: Int? = null,
     /** 大型出費の積立で使う物価上昇率(E07-15)。年率の1万分率(2% = 200)。 */
     val growthRateBp: Int? = null,
+    /** 系列のまとめ先(E07-18)。親の系列のmetricKey。Metricだけが使う。 */
+    val groupKey: String? = null,
 )
 
 /**
@@ -103,6 +105,11 @@ sealed interface Item {
          * 全部を足さず、人が選んだ系列だけを足す。一覧から隠していても数える。
          */
         val inNetWorth: Boolean = false,
+        /**
+         * まとめ先の系列(E07-18)。親の系列のmetricKey。トップでは親の1行にまとめ、
+         * 親の詳細に内訳として並べる。親が一覧に無ければ(隠している・消えた)、自分の行を出す。
+         */
+        val groupKey: String? = null,
     ) : Item
 
     /**
@@ -174,7 +181,7 @@ sealed interface Item {
  */
 fun ItemEntity.toItem(): Item? = when (type) {
     ItemType.METRIC -> metricKey?.let {
-        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth)
+        Item.Metric(id, name, it, sortOrder, hidden, inNetWorth, groupKey)
     }
     ItemType.GOAL -> {
         val auto = if (autoAverageMonths != null && autoCoverMonths != null) {
@@ -201,6 +208,7 @@ fun Item.toEntity(): ItemEntity = when (this) {
         metricKey = metricKey,
         sortOrder = sortOrder, hidden = hidden,
         inNetWorth = inNetWorth,
+        groupKey = groupKey,
     )
     is Item.Goal -> ItemEntity(
         id = id, type = ItemType.GOAL, name = name,

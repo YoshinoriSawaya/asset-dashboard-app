@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +47,7 @@ import com.yswy.assetdashboard.ui.chart.ChangeBarChart
 import com.yswy.assetdashboard.ui.chart.LineChart
 import com.yswy.assetdashboard.ui.chart.ColorDot
 import com.yswy.assetdashboard.ui.chart.GoalColors
+import com.yswy.assetdashboard.ui.chart.SeriesColors
 import com.yswy.assetdashboard.ui.chart.StackedChart
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import java.time.LocalDate
@@ -72,6 +74,9 @@ fun ItemDetailScreen(
     onCompleteReminder: (Item.Reminder, (String?) -> Unit) -> Unit = { _, _ -> },
     /** 目標を一覧で1つ上(true)・下(false)へ。配分の順番になる(E07-10) */
     onMoveGoal: (String, Boolean, (String?) -> Unit) -> Unit = { _, _, _ -> },
+    /** この系列にまとめた内訳の系列(E07-18) */
+    children: List<ItemOverview.Metric> = emptyList(),
+    onOpenItem: (String) -> Unit = {},
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -93,6 +98,7 @@ fun ItemDetailScreen(
         when (detail) {
             is ItemDetail.Metric -> {
                 metricHeader(detail)
+                childrenContent(children, onOpenItem)
                 // 補正の入口は上に置く。月次の表の下だと、スクロールしないと見つからない
                 item {
                     TextButton(onClick = { onEditMetric(detail.overview.item.metricKey) }, enabled = !busy) {
@@ -159,6 +165,26 @@ private fun LazyListScope.metricHeader(detail: ItemDetail.Metric) {
     }
 }
 
+/** まとめた内訳の系列(E07-18)。色の丸・名前・最新値。タップでその系列の詳細へ。 */
+private fun LazyListScope.childrenContent(children: List<ItemOverview.Metric>, onOpenItem: (String) -> Unit) {
+    if (children.isEmpty()) return
+    item {
+        Spacer8()
+        Text("内訳", style = MaterialTheme.typography.titleMedium)
+    }
+    items(children, key = { "child-" + it.item.id }) { child ->
+        val money = LocalMoney.current
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { onOpenItem(child.item.id) }.padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SeriesColors.of(child.item.metricKey)?.let { ColorDot(it, modifier = Modifier.padding(end = 10.dp)) }
+            Text(child.item.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(child.latest?.let { money.amount(it.valueYen) } ?: "データなし", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 internal fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
     item {
         val money = LocalMoney.current
@@ -171,7 +197,11 @@ internal fun LazyListScope.metricContent(detail: ItemDetail.Metric) {
                     StackedChart(stack, axisLabel = money::shareAxis)
                     StackLegend(stack)
                 } else {
-                    LineChart(detail.series.map { it.date to it.valueYen }, axisLabel = money::lineAxis)
+                    LineChart(
+                        detail.series.map { it.date to it.valueYen },
+                        axisLabel = money::lineAxis,
+                        lineColor = SeriesColors.of(detail.overview.item.metricKey),
+                    )
                 }
                 Spacer8()
                 Text("月ごとの増減", style = MaterialTheme.typography.titleMedium)

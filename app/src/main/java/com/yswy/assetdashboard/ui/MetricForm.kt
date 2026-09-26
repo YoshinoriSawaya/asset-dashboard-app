@@ -22,15 +22,23 @@ object MetricForm {
         data class Invalid(val message: String) : Result
     }
 
-    fun parse(current: Item.Metric, name: String, hidden: Boolean, inNetWorth: Boolean = current.inNetWorth): Result {
+    fun parse(
+        current: Item.Metric,
+        name: String,
+        hidden: Boolean,
+        inNetWorth: Boolean = current.inNetWorth,
+        /** まとめ先の系列(E07-18)。無ければnull */
+        groupKey: String? = current.groupKey,
+    ): Result {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return Result.Invalid("名前を入れてください")
+        if (groupKey == current.metricKey) return Result.Invalid("自分自身にはまとめられません")
 
-        val edited = current.copy(name = trimmed, hidden = hidden, inNetWorth = inNetWorth)
+        val edited = current.copy(name = trimmed, hidden = hidden, inNetWorth = inNetWorth, groupKey = groupKey)
         return if (isDefault(edited)) Result.Reset(current.id) else Result.Save(edited)
     }
 
     /** CSVの列から自動で生えたときと同じか。 */
     fun isDefault(metric: Item.Metric): Boolean =
-        metric.name == metric.metricKey && !metric.hidden && metric.sortOrder == 0 && !metric.inNetWorth
+        metric.name == metric.metricKey && !metric.hidden && metric.sortOrder == 0 && !metric.inNetWorth && metric.groupKey == null
 }

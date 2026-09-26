@@ -63,8 +63,11 @@ fun LineChart(
     modifier: Modifier = Modifier,
     /** 目盛りの文字。(値, 最初の点の値) → 文字。nullなら出さない(プライバシーモード。E06-04) */
     axisLabel: (Long, Long) -> String? = { v, _ -> Formatters.yenCompact(v) },
+    /** 線の色。系列の色(E03-08)。nullならテーマの色 */
+    lineColor: Color? = null,
 ) {
     val colors = chartColors()
+    val line = lineColor ?: colors.line
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.label)
     val sorted = points.sortedBy { it.first }
@@ -86,10 +89,10 @@ fun LineChart(
         sorted.forEachIndexed { i, (date, value) ->
             if (i == 0) path.moveTo(x(date), y(value)) else path.lineTo(x(date), y(value))
         }
-        drawPath(path, colors.line, style = Stroke(width = 2.dp.toPx()))
-        sorted.forEach { (date, value) -> drawCircle(colors.line, 2.5.dp.toPx(), Offset(x(date), y(value))) }
+        drawPath(path, line, style = Stroke(width = 2.dp.toPx()))
+        sorted.forEach { (date, value) -> drawCircle(line, 2.5.dp.toPx(), Offset(x(date), y(value))) }
         // 最新の点を目立たせる
-        sorted.last().let { (date, value) -> drawCircle(colors.line, 4.5.dp.toPx(), Offset(x(date), y(value))) }
+        sorted.last().let { (date, value) -> drawCircle(line, 4.5.dp.toPx(), Offset(x(date), y(value))) }
 
         // 横軸は両端の年月だけ。中間は月次の表で読める
         drawBottomLabel(measurer, sorted.first().first.yearMonthText(), labelStyle, plot.left, plot, alignEnd = false)

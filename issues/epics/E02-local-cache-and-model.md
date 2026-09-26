@@ -12,6 +12,7 @@ Metric/Reminder/Goalの汎用スキーマを設計し、Drive取り込み結果�
 - [x] [E02-04: アプリ起動時の同期トリガー判定(前回同期から一定期間経過)](../tasks/E02-04-sync-trigger.md)
 - [x] [E02-05: 月次・年次集計ロジック](../tasks/E02-05-summary-aggregation.md)
 - [x] [E02-06: 書いた直後のbackupを落とせないときの読み直し](../tasks/E02-06-backup-download-retry.md)
+- [x] [E02-07: 銀行明細の残高から口座ごとの系列を作る](../tasks/E02-07-account-balances.md)
 
 ## 完了条件
 E01で取り込んだCSVデータが、Metric/Reminder/Goalの汎用スキーマに

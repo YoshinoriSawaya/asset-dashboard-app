@@ -30,6 +30,7 @@ import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.ui.chart.ColorDot
 import com.yswy.assetdashboard.ui.chart.DonutChart
 import com.yswy.assetdashboard.ui.chart.GoalColors
+import com.yswy.assetdashboard.ui.chart.SeriesColors
 import com.yswy.assetdashboard.ui.theme.AssetDashboardTheme
 import java.time.LocalDate
 
@@ -79,7 +80,8 @@ fun NetWorthScreen(
                 // 配分(E10-03)。数えている系列の最新値の比率
                 val pie = netWorth.pieParts
                 if (pie.isNotEmpty()) {
-                    val colors = pie.indices.map { GoalColors.of(it) }
+                    // 系列の色(E03-08)。トップの一覧・推移の線と同じ色
+                    val colors = pie.map { (part, _) -> SeriesColors.of(part.metric.metricKey) ?: GoalColors.of(null) }
                     DonutChart(
                         pie.mapIndexed { i, (_, ratio) -> ratio to colors[i] },
                         modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp),
@@ -94,7 +96,7 @@ fun NetWorthScreen(
             val part = netWorth.breakdown.firstOrNull { it.metric.id == metric.id }
             LegendRow(
                 metric = metric,
-                color = index.takeIf { it >= 0 }?.let { GoalColors.of(it) },
+                color = if (index >= 0) SeriesColors.of(metric.metricKey) ?: GoalColors.of(null) else null,
                 ratio = pie.getOrNull(index)?.second,
                 part = part,
                 latestDate = netWorth.latest?.date,

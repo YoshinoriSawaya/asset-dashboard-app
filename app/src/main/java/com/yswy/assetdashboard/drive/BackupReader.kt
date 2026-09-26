@@ -18,6 +18,8 @@ object BackupReader {
         val sourceFileId: String,
         val sourceFileName: String,
         val data: ParsedData,
+        /** どの形式で読んだか。口座ごとの残高(E02-07)で口座を分けるのに使う。 */
+        val adapterId: String = "",
     )
 
     /**
@@ -42,7 +44,7 @@ object BackupReader {
             )
             else -> return null
         }
-        return Backup(sourceFileId, sourceFileName, data)
+        return Backup(sourceFileId, sourceFileName, data, root.optString("adapterId"))
     }
 
     private fun JSONObject.objects(key: String): List<JSONObject> {

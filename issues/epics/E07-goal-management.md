@@ -23,6 +23,7 @@
 - [x] [E07-15: 大型出費の積立(家電・車の買い替えなど)](../tasks/E07-15-sinking-fund.md)
 - [x] [E07-16: 大型出費の予定のまとめ取り込み](../tasks/E07-16-plan-import.md)
 - [x] [E07-17: 日付を yyyymmdd で入れる](../tasks/E07-17-date-input.md)
+- [x] [E07-18: 系列のまとめ先(内訳)](../tasks/E07-18-metric-groups.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

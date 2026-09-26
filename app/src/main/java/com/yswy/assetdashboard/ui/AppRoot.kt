@@ -24,8 +24,10 @@ import com.yswy.assetdashboard.data.ExpenseCalendar
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemOverview
+import com.yswy.assetdashboard.data.MetricGroups
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
+import com.yswy.assetdashboard.ui.chart.LocalSeriesColors
 import java.time.LocalDate
 
 /**
@@ -47,6 +49,7 @@ object Routes {
     const val NET_WORTH = "net_worth"
     const val SURPLUS = "surplus"
     const val PLAN_IMPORT = "plan_import"
+    const val REMINDERS = "reminders"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -95,7 +98,8 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     // 金額の見せ方(E06-04)。端末に覚えておき、全画面に効かせる
     val privacyPrefs = remember { PrivacyPrefs(context) }
     var privacy by remember { mutableStateOf(privacyPrefs.mode) }
-    CompositionLocalProvider(LocalMoney provides MoneyFormat(privacy)) {
+    // 系列の色(E03-08)も全画面に配る
+    CompositionLocalProvider(LocalMoney provides MoneyFormat(privacy), LocalSeriesColors provides state.seriesColors) {
         Screens(state, viewModel, modifier) { privacy = it; privacyPrefs.mode = it }
     }
 }
@@ -168,6 +172,9 @@ private fun Screens(
             onSave = viewModel::saveMetric,
             onBack = { close(route) },
             modifier = modifier,
+            // まとめ先の候補(E07-18)。隠している系列も含む
+            others = (state.overviews.map { it.item }.filterIsInstance<Item.Metric>() + state.hiddenMetrics)
+                .filter { it.metricKey != metricKey },
         )
         goalId != null -> GoalEditScreen(
             existing = state.overviews.map { it.item }.filterIsInstance<Item.Goal>().firstOrNull { it.id == goalId },
@@ -222,11 +229,22 @@ private fun Screens(
                 onDeleteCorrection = { key, date, onResult -> viewModel.deleteCorrection(key, date, onResult) },
                 busy = state.syncing,
                 modifier = modifier,
+                // まとめた内訳の系列(E07-18)
+                children = (overview?.item as? Item.Metric)
+                    ?.let { MetricGroups.children(state.overviews)[it.metricKey] }.orEmpty(),
+                onOpenItem = { stack.add(Routes.item(it)) },
             )
         }
         route == Routes.NET_WORTH -> NetWorthScreen(
             netWorth = state.netWorth,
             onEditMetric = { stack.add(Routes.metric(it)) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
+        route == Routes.REMINDERS -> ReminderListScreen(
+            reminders = state.overviews.filterIsInstance<ItemOverview.Reminder>(),
+            onOpenItem = { stack.add(Routes.item(it)) },
+            onAdd = { stack.add(Routes.reminder(null)) },
             onBack = { close(route) },
             modifier = modifier,
         )
@@ -297,6 +315,7 @@ private fun Screens(
             onOpenNetWorth = { stack.add(Routes.NET_WORTH) },
             onOpenSurplus = { stack.add(Routes.SURPLUS) },
             onOpenPlanImport = { stack.add(Routes.PLAN_IMPORT) },
+            onOpenReminders = { stack.add(Routes.REMINDERS) },
             modifier = modifier,
         )
     }
