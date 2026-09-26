@@ -51,6 +51,7 @@ object Routes {
     const val PLAN_IMPORT = "plan_import"
     const val REMINDERS = "reminders"
     const val INVEST = "invest"
+    const val CATEGORY_IMPORT = "category_import"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -242,6 +243,23 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
+        route == Routes.CATEGORY_IMPORT -> CategoryImportScreen(
+            load = viewModel::loadCategoryImport,
+            saving = state.syncing,
+            onImport = { plan, onResult ->
+                viewModel.saveCategories(plan.result) { error ->
+                    onResult(error)
+                    // 取り込めたら、下のカテゴリの画面(取り込む前の内容を持っている)も閉じる。
+                    // 開いたままそこで保存すると、取り込んだ分を古い内容で上書きしてしまうため
+                    if (error == null) {
+                        close(route)
+                        close(Routes.SPENDING_RULES)
+                    }
+                }
+            },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.INVEST -> InvestPlanScreen(
             load = viewModel::investPlan,
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
@@ -279,6 +297,7 @@ private fun Screens(
             candidatesOf = viewModel::withdrawalDescriptions,
             saving = state.syncing,
             onSave = viewModel::saveCategories,
+            onOpenImport = { stack.add(Routes.CATEGORY_IMPORT) },
             onBack = { close(route) },
             modifier = modifier,
         )

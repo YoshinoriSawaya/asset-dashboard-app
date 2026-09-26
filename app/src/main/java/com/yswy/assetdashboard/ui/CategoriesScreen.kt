@@ -61,6 +61,8 @@ fun CategoriesScreen(
     onSave: (CategorySettings, (String?) -> Unit) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** CSVからまとめて取り込む(E07-22) */
+    onOpenImport: () -> Unit = {},
 ) {
     var settings by remember { mutableStateOf<CategorySettings?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -83,6 +85,7 @@ fun CategoriesScreen(
             item {
                 TextButton(onClick = onBack) { Text("← 戻る") }
                 Text("明細のカテゴリ", style = MaterialTheme.typography.headlineSmall)
+                TextButton(onClick = onOpenImport) { Text("CSV(settings/${CategoryImport.FILE_NAME})からまとめて取り込む") }
                 Text(
                     "明細の摘要にカテゴリを付けます。同じ摘要の明細は、過去もこれからも同じカテゴリになります。" +
                         "カテゴリの種類で、生活費(生活防衛資金の元)・消費(積立投資の目安)に入るかが決まります。" +

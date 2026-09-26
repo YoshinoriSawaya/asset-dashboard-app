@@ -230,6 +230,30 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** カテゴリの決まりの取り込み(E07-22)で読んだもの。ファイルが無ければ[plan]がnull。 */
+    data class CategoryImportPreview(val parsed: CategoryImport.Parsed?, val plan: CategoryImport.Plan?)
+
+    /** Driveの `settings/category_rules.csv` と今のカテゴリを読んで突き合わせる。まだ何も書かない。 */
+    suspend fun loadCategoryImport(): Result<CategoryImportPreview> {
+        val outcome = DriveSession.withDrive(getApplication()) { api ->
+            val folders = DriveFolderSetup.ensure(api).folders
+            val fileId = api.findFile(CategoryImport.FILE_NAME, folders.settings)
+                ?: return@withDrive CategoryImportPreview(null, null)
+            val current = CategoryStore.load(api, folders) ?: error("明細のカテゴリを読めない")
+            val parsed = CategoryImport.parse(api.download(fileId))
+            CategoryImportPreview(parsed, CategoryImport.plan(parsed.rows, current))
+        }
+        return when (outcome) {
+            is DriveSession.Outcome.Success -> Result.success(outcome.value)
+            is DriveSession.Outcome.Offline -> Result.failure(Exception("オフライン"))
+            is DriveSession.Outcome.Failed -> Result.failure(Exception(outcome.message))
+            is DriveSession.Outcome.ConsentRequired -> {
+                _state.update { it.copy(consentRequest = outcome.pendingIntent) }
+                Result.failure(Exception("Googleの同意が必要"))
+            }
+        }
+    }
+
     /** 予定の取り込み(E07-16)で読んだもの。ファイルが無ければ[plan]がnull。 */
     data class PlanPreview(val parsed: PlanImport.Parsed?, val plan: PlanImport.Plan?)
 

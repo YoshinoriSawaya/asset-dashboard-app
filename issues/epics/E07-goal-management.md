@@ -27,6 +27,7 @@
 - [x] [E07-19: 足りないとき何か月で埋めるか(判定と月々の額を1つに)](../tasks/E07-19-refill-months.md)
 - [x] [E07-20: 生活費から除く出金の登録を楽にする](../tasks/E07-20-spending-rules-ux.md)
 - [x] [E07-21: 明細のカテゴリ(生活費・遊び代・大型出費・振替・積立投資)](../tasks/E07-21-transaction-categories.md)
+- [x] [E07-22: カテゴリの決まりのまとめ取り込み](../tasks/E07-22-category-import.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で
