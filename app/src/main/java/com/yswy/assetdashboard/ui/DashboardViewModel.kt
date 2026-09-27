@@ -27,6 +27,7 @@ import com.yswy.assetdashboard.data.InvestPlan
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.Summary
 import com.yswy.assetdashboard.data.MonthlyReview
+import com.yswy.assetdashboard.data.YearlyReview
 import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.NetWorthOutlook
 import com.yswy.assetdashboard.data.PeriodSummary
@@ -351,6 +352,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         budgets = budgetStore.load(),
         netWorthSeries = _state.value.netWorth?.series.orEmpty(),
     )
+
+    /** 1年の振り返り(E03-12)の選べる期間。 */
+    suspend fun yearlyPeriods(): List<YearlyReview.Period> = YearlyReview.periods(db.bankTransactionDao().all(), LocalDate.now())
+
+    /** 1年の振り返り(E03-12)。手元のキャッシュから作る。 */
+    suspend fun yearlyReview(period: YearlyReview.Period): YearlyReview =
+        YearlyReview.of(db.bankTransactionDao().all(), period, _state.value.netWorth?.series.orEmpty())
 
     /** 手元の明細の全部。カテゴリ別の支出(E07-25)に使う。 */
     suspend fun transactions(): List<BankTransactionEntity> = db.bankTransactionDao().all()

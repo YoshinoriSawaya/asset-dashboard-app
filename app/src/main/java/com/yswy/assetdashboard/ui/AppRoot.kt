@@ -55,6 +55,7 @@ object Routes {
     const val CATEGORY_SPENDING = "category_spending"
     const val FIXED_COSTS = "fixed_costs"
     const val REVIEW = "review"
+    const val YEARLY_REVIEW = "yearly_review"
     const val FUNDS = "funds"
     private const val ITEM = "item/"
 
@@ -310,6 +311,15 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
+        route == Routes.YEARLY_REVIEW -> YearlyReviewScreen(
+            loadPeriods = viewModel::yearlyPeriods,
+            load = viewModel::yearlyReview,
+            onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
+            onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
+            onOpenNetWorth = { stack.add(Routes.NET_WORTH) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.FIXED_COSTS -> FixedCostsScreen(
             load = viewModel::transactions,
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
@@ -404,6 +414,7 @@ private fun Screens(
             onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
             onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
             onOpenReview = { stack.add(Routes.REVIEW) },
+            onOpenYearlyReview = { stack.add(Routes.YEARLY_REVIEW) },
             onOpenFunds = { stack.add(Routes.FUNDS) },
             modifier = modifier,
         )

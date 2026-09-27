@@ -81,6 +81,8 @@ fun TopScreen(
     onOpenFixedCosts: () -> Unit = {},
     /** 前の月の振り返り(E03-10) */
     onOpenReview: () -> Unit = {},
+    /** 1年の振り返り(E03-12) */
+    onOpenYearlyReview: () -> Unit = {},
     /** 投資信託の損益(E01-17) */
     onOpenFunds: () -> Unit = {},
 ) {
@@ -189,6 +191,7 @@ fun TopScreen(
                     "振り返る",
                     listOf(
                         "前の月の振り返り" to onOpenReview,
+                        "1年の振り返り" to onOpenYearlyReview,
                         "カテゴリ別の支出" to onOpenCategorySpending,
                         "固定費・サブスク" to onOpenFixedCosts,
                     ),
