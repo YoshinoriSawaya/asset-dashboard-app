@@ -299,6 +299,7 @@ private fun Screens(
             onRefreshNavs = viewModel::refreshNavs,
             onFindMissing = viewModel::findMissingSources,
             onSearch = viewModel::searchFunds,
+            onLoadHistory = viewModel::navHistory,
             saving = state.syncing,
         )
         route == Routes.REVIEW -> MonthlyReviewScreen(

@@ -29,6 +29,10 @@ import androidx.compose.material3.OutlinedTextField
 import com.yswy.assetdashboard.data.FundHoldings
 import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.data.NavHistory
+import com.yswy.assetdashboard.data.NavPeriod
+import com.yswy.assetdashboard.ui.chart.LineChart
+import androidx.compose.material3.FilterChip
 import com.yswy.assetdashboard.notify.FundSearch
 import com.yswy.assetdashboard.notify.NavAlert
 import kotlinx.coroutines.launch
@@ -53,6 +57,8 @@ fun FundHoldingsScreen(
     onFindMissing: suspend () -> String = { "" },
     /** ファンド名で取り先の候補を探す(E05-10)。探せなければnull */
     onSearch: suspend (String) -> List<FundSearch.Candidate>? = { null },
+    /** 基準価額の推移を取る(E05-11)。見るときに取る。取れなければnull */
+    onLoadHistory: suspend (FundSource) -> List<Nav>? = { null },
     saving: Boolean = false,
 ) {
     val holdings by produceState<FundHoldings?>(null) { value = load() }
@@ -148,6 +154,9 @@ fun FundHoldingsScreen(
                     )
                 }
                 if (open == key) {
+                    sources.firstOrNull { it.fundKey == key }?.let { source ->
+                        NavHistorySection(source, s.unitCost, onLoadHistory)
+                    }
                     SourceEditor(
                         fundName = fund.name,
                         current = sources.firstOrNull { it.fundKey == key },
@@ -176,6 +185,44 @@ fun FundHoldingsScreen(
                 }
             }
             HorizontalDivider()
+        }
+    }
+}
+
+/**
+ * 基準価額の推移(E05-11)。行を開いたときに投資信託協会から取る(本人が選んだ。端末には残さない)。
+ * 期間は3か月・1年・全期間を切り替え、平均取得単価の横線を付ける。
+ */
+@Composable
+private fun NavHistorySection(source: FundSource, unitCost: Long?, onLoadHistory: suspend (FundSource) -> List<Nav>?) {
+    val money = LocalMoney.current
+    // null: 取得中、空: 取れなかった
+    val history by produceState<List<Nav>?>(null, source) { value = onLoadHistory(source) ?: emptyList() }
+    var period by rememberSaveable { mutableStateOf(NavPeriod.ONE_YEAR) }
+    Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("基準価額の推移", style = MaterialTheme.typography.titleSmall)
+        val all = history
+        when {
+            all == null -> Label("投資信託協会から取得中...")
+            all.isEmpty() -> Label("基準価額の推移を取れませんでした(通信できないか、取り先が違います)")
+            else -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NavPeriod.entries.forEach { p -> FilterChip(period == p, onClick = { period = p }, label = { Text(p.label) }) }
+                }
+                val window = NavHistory.window(all, period)
+                LineChart(
+                    points = window.map { it.date to it.yen },
+                    axisLabel = { v, _ -> money.unitAxis(v, unitCost) },
+                    reference = unitCost,
+                    maxDots = 40,
+                )
+                val change = NavHistory.change(window)
+                Label(
+                    "${window.first().date} 〜 ${window.last().date}" +
+                        (change?.let { " ・ この期間 ${if (money.mode == PrivacyMode.MASK) MoneyFormat.HIDDEN else MoneyFormat.signedPercent(it)}" } ?: ""),
+                )
+                if (unitCost != null) Label("破線は平均取得単価")
+            }
         }
     }
 }

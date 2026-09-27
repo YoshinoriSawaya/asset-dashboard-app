@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextMeasurer
@@ -65,13 +66,17 @@ fun LineChart(
     axisLabel: (Long, Long) -> String? = { v, _ -> Formatters.yenCompact(v) },
     /** 線の色。系列の色(E03-08)。nullならテーマの色 */
     lineColor: Color? = null,
+    /** 横に引く基準の値(平均取得単価など。E05-11)。目盛りの範囲に含める */
+    reference: Long? = null,
+    /** 点の数がこれより多ければ、点を打たずに線だけにする(毎日の値など) */
+    maxDots: Int = Int.MAX_VALUE,
 ) {
     val colors = chartColors()
     val line = lineColor ?: colors.line
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.label)
     val sorted = points.sortedBy { it.first }
-    val axis = ValueAxis.of(sorted.map { it.second })
+    val axis = ValueAxis.of(sorted.map { it.second } + listOfNotNull(reference))
 
     Canvas(modifier = modifier.fillMaxWidth().height(200.dp)) {
         if (sorted.isEmpty()) return@Canvas
@@ -85,12 +90,19 @@ fun LineChart(
             else plot.left + plot.width * (date.toEpochDay() - firstDay) / span
         fun y(value: Long) = plot.bottom - plot.height * axis.fraction(value)
 
+        // 基準の横線は、目盛りより目立ち、データの線より控えめな破線にする
+        reference?.let { ref ->
+            drawLine(
+                colors.baseline, Offset(plot.left, y(ref)), Offset(plot.right, y(ref)), 1.5.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+            )
+        }
         val path = Path()
         sorted.forEachIndexed { i, (date, value) ->
             if (i == 0) path.moveTo(x(date), y(value)) else path.lineTo(x(date), y(value))
         }
         drawPath(path, line, style = Stroke(width = 2.dp.toPx()))
-        sorted.forEach { (date, value) -> drawCircle(line, 2.5.dp.toPx(), Offset(x(date), y(value))) }
+        if (sorted.size <= maxDots) sorted.forEach { (date, value) -> drawCircle(line, 2.5.dp.toPx(), Offset(x(date), y(value))) }
         // 最新の点を目立たせる
         sorted.last().let { (date, value) -> drawCircle(line, 4.5.dp.toPx(), Offset(x(date), y(value))) }
 

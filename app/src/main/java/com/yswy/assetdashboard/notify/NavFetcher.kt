@@ -34,7 +34,13 @@ object NavFetcher {
         sources.map { s -> async { fetch(s)?.let { s.fundKey to it } } }.awaitAll().filterNotNull().toMap()
     }
 
-    suspend fun fetch(source: FundSource): Nav? = withContext(Dispatchers.IO) {
+    suspend fun fetch(source: FundSource): Nav? = download(source)?.let { parseLatest(it) }
+
+    /** 設定来の基準価額の推移(E05-11)。見るときに取る(本人が選んだ。端末には残さない)。取れなければnull。 */
+    suspend fun fetchHistory(source: FundSource): List<Nav>? = download(source)?.let { parseAll(it) }
+
+    /** ファンドのCSVを取る。通信や形がおかしければnull。 */
+    private suspend fun download(source: FundSource): String? = withContext(Dispatchers.IO) {
         try {
             val conn = URL(url(source)).openConnection() as HttpURLConnection
             conn.connectTimeout = TIMEOUT_MS
@@ -45,7 +51,7 @@ object NavFetcher {
                     Log.w(TAG, "基準価額を取れなかった: HTTP ${conn.responseCode}")
                     return@withContext null
                 }
-                parseLatest(String(conn.inputStream.readBytes(), Charset.forName("MS932")))
+                String(conn.inputStream.readBytes(), Charset.forName("MS932"))
             } finally {
                 conn.disconnect()
             }
@@ -58,11 +64,14 @@ object NavFetcher {
     private val DATE = Regex("""(\d{4})年(\d{1,2})月(\d{1,2})日""")
 
     /** CSVのいちばん新しい日付の行の基準価額。読めなければnull。 */
-    fun parseLatest(text: String): Nav? = text.lineSequence().mapNotNull { line ->
+    fun parseLatest(text: String): Nav? = parseAll(text).lastOrNull()
+
+    /** CSVの読める行を日付順に。同じ日が2行あれば後の行。読めない行は飛ばす。 */
+    fun parseAll(text: String): List<Nav> = text.lineSequence().mapNotNull { line ->
         val cells = line.split(",")
         val m = DATE.find(cells.firstOrNull().orEmpty()) ?: return@mapNotNull null
         val yen = cells.getOrNull(1)?.trim()?.toLongOrNull() ?: return@mapNotNull null
         val date = runCatching { LocalDate.of(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt()) }.getOrNull()
         date?.let { Nav(it, yen) }
-    }.maxByOrNull { it.date }
+    }.associateBy { it.date }.values.sortedBy { it.date }
 }

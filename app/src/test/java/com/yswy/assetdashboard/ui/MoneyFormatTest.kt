@@ -25,6 +25,14 @@ class MoneyFormatTest {
     private val mask = MoneyFormat(PrivacyMode.MASK)
 
     @Test
+    fun `基準価額の目盛りは実額で単価、%で平均取得単価に対する増減、マスクで出さない`() {
+        assertEquals("12,500", real.unitAxis(12_500, 10_000))
+        assertEquals("+25.0%", percent.unitAxis(12_500, 10_000))
+        assertNull(percent.unitAxis(12_500, null))
+        assertNull(mask.unitAxis(12_500, 10_000))
+    }
+
+    @Test
     fun `実額はこれまでどおり`() {
         assertEquals("1,234,567円", real.amount(1_234_567))
         assertEquals("+12,345円", real.change(12_345, 1_000_000))

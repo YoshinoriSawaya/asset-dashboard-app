@@ -75,6 +75,16 @@ class MoneyFormat(val mode: PrivacyMode) {
     }
 
     /**
+     * 基準価額の推移(E05-11)の目盛り。単価は円ではないので桁区切りだけ。%のときは基準(平均取得単価)に対する増減率。
+     * 基準が無ければ、%のときは出さない。マスクなら出さない。
+     */
+    fun unitAxis(value: Long, base: Long?): String? = when (mode) {
+        PrivacyMode.REAL -> "%,d".format(value)
+        PrivacyMode.PERCENT -> base?.takeIf { it != 0L }?.let { signedPercent((value - it).toDouble() / abs(it)) }
+        PrivacyMode.MASK -> null
+    }
+
+    /**
      * 積み上げグラフ(E07-13)の目盛り。0から積むので、%のときは最初の点からの増減率ではなく
      * 最新の合計に対する割合にする(増減率だと0円が「-100%」になる)。マスクなら出さない。
      */

@@ -395,6 +395,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 基準価額の推移(E05-11)。見るときに取り、端末には残さない。取れなければnull。 */
+    suspend fun navHistory(source: FundSource): List<Nav>? = NavFetcher.fetchHistory(source)
+
     /** 基準価額の取り先をファンド名で探す(E05-10)。探せなければnull。 */
     suspend fun searchFunds(keyword: String): List<FundSearch.Candidate>? = FundSearch.search(keyword)
 
