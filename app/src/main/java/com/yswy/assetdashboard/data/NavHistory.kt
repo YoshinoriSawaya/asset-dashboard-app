@@ -23,6 +23,9 @@ object NavHistory {
         return sorted.filter { !it.date.isBefore(from) }
     }
 
+    /** その日の基準価額。その日が無ければ(休日など)それより前でいちばん近い日。無ければnull(E01-19)。 */
+    fun priceOn(navs: List<Nav>, date: LocalDate): Nav? = navs.filter { !it.date.isAfter(date) }.maxByOrNull { it.date }
+
     /** 期間の最初の点から最新の点までの増減の割合。点が足りない・最初が0ならnull。 */
     fun change(window: List<Nav>): Double? {
         val first = window.firstOrNull()?.yen ?: return null

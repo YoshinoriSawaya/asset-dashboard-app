@@ -70,6 +70,8 @@ fun LineChart(
     reference: Long? = null,
     /** 点の数がこれより多ければ、点を打たずに線だけにする(毎日の値など) */
     maxDots: Int = Int.MAX_VALUE,
+    /** 縦に点線を引く日(売却に気づいた日など。E01-19)。最初の点より前は描かず、最後の点より後は右端に引く */
+    markers: List<LocalDate> = emptyList(),
 ) {
     val colors = chartColors()
     val line = lineColor ?: colors.line
@@ -95,6 +97,13 @@ fun LineChart(
             drawLine(
                 colors.baseline, Offset(plot.left, y(ref)), Offset(plot.right, y(ref)), 1.5.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+            )
+        }
+        // 最後の点より後の日は右端に引く(保有商品一覧を取り込んだ日は、基準価額の最新の日より後になりやすい)
+        markers.filter { !it.isBefore(sorted.first().first) }.map { minOf(it, sorted.last().first) }.forEach { day ->
+            drawLine(
+                colors.label, Offset(x(day), plot.top), Offset(x(day), plot.bottom), 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx())),
             )
         }
         val path = Path()

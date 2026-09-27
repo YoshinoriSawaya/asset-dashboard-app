@@ -35,7 +35,8 @@ object NavAlert {
     fun evaluate(holdings: FundHoldings, navs: Map<String, Nav>, lastNotified: Map<String, *>): Result {
         val notices = mutableListOf<NotificationRules.Notice>()
         val forget = mutableListOf<String>()
-        for (fund in holdings.funds) {
+        // 売り切ったファンドは知らせない(平均取得単価は売る前のもので、もう持っていない。E01-19)
+        for (fund in holdings.held) {
             val fundKey = FundSource.keyOf(fund.section, fund.name)
             val g = gain(fund.latest.unitCost, navs[fundKey]) ?: continue
             val key = key(fundKey)

@@ -290,3 +290,4 @@ Get-Content -Raw -Encoding UTF8 tmp.sql | & $adb -s emulator-5554 shell sqlite3 
 | worktree を消そうとしても、フォルダが残る | Gradleのデーモンがフォルダの中をつかんでいる。先に `gradlew --stop` |
 | Git Bash から adb で sqlite にDBのパスを渡すとエラー(`C:/Program`) | Git Bash が `/data/...` をWindowsのパスに書き換える。sqlite はPowerShellから流す |
 | 画面の自動操作で、似た名前の文字を取り違える | 見出しと同じ文字のボタン、欄に入っている文字などを拾う。探す範囲(見出しより下など)を絞る。大量の付け直しの自動操作は遅く壊れやすい(E07-24で中止した)ので、CSVのまとめ取り込みか手作業にする |
+| `adb shell sed -i s/>REAL</>MASK</ …` で表示の設定が変わらない | `adb shell` は引数を1行につないで端末のシェルに渡すので、`<` `>` がリダイレクトになる。`adb shell "sed -i 's/>REAL</>MASK</' …"` のように全体をクォートする(E05-11で踏み、E01-19で直した) |

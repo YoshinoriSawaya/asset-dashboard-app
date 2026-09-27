@@ -36,6 +36,7 @@ import androidx.compose.material3.FilterChip
 import com.yswy.assetdashboard.notify.FundSearch
 import com.yswy.assetdashboard.notify.NavAlert
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * 投資信託の損益(E01-17)。ファンドごとの評価額・取得額・含み益と、平均取得単価・現在値(本人が選んだ: ファンドごとだけ)。
@@ -119,13 +120,76 @@ fun FundHoldingsScreen(
             navMessage?.let { Label(it) }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
-        items(h.funds, key = { it.section + "|" + it.name }) { fund ->
-            val key = fund.section + "|" + fund.name
-            val s = fund.latest
-            Column(modifier = Modifier.fillMaxWidth().clickable { open = if (open == key) null else key }.padding(vertical = 8.dp)) {
+        items(h.held, key = { it.section + "|" + it.name }) { fund ->
+            FundRow(
+                fund = fund,
+                open = open == fund.section + "|" + fund.name,
+                onToggle = { key -> open = if (open == key) null else key },
+                sources = sources,
+                navs = navs,
+                saving = saving,
+                onSearch = onSearch,
+                onLoadHistory = onLoadHistory,
+                onSaveSource = { section, name, isin, code, done ->
+                    onSaveSource(section, name, isin, code) { error ->
+                        if (error == null) sources = loadSources()
+                        done(error)
+                    }
+                },
+            )
+        }
+        // 売り切ったファンド(E01-19)。売った値と今の値を比べられるように残す
+        if (h.soldOut.isNotEmpty()) {
+            item {
+                Text("売り切ったファンド", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+                Label("保有商品一覧に載らなくなったファンド。売った日は取り込みと取り込みのあいだまでしか分かりません。")
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+            items(h.soldOut, key = { "sold|" + it.section + "|" + it.name }) { fund ->
+                FundRow(
+                    fund = fund,
+                    open = open == fund.section + "|" + fund.name,
+                    onToggle = { key -> open = if (open == key) null else key },
+                    sources = sources,
+                    navs = navs,
+                    saving = saving,
+                    onSearch = onSearch,
+                    onLoadHistory = onLoadHistory,
+                    onSaveSource = { section, name, isin, code, done ->
+                        onSaveSource(section, name, isin, code) { error ->
+                            if (error == null) sources = loadSources()
+                            done(error)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** ファンド1本の行(E01-17)。押すと取り先・推移・取り込んだ日ごとの値が開く。 */
+@Composable
+private fun FundRow(
+    fund: FundHoldings.Fund,
+    open: Boolean,
+    onToggle: (String) -> Unit,
+    sources: List<FundSource>,
+    navs: Map<String, Nav>,
+    saving: Boolean,
+    onSearch: suspend (String) -> List<FundSearch.Candidate>?,
+    onLoadHistory: suspend (FundSource) -> List<Nav>?,
+    onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit,
+) {
+    val money = LocalMoney.current
+    val key = fund.section + "|" + fund.name
+    val s = fund.latest
+    val sold = fund.soldOutBy != null
+    Column {
+            Column(modifier = Modifier.fillMaxWidth().clickable { onToggle(key) }.padding(vertical = 8.dp)) {
                 Text(fund.name, style = MaterialTheme.typography.bodyLarge)
                 Label("${fund.section} ・ ${s.date}")
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                SalesText(fund, navs[key], sources.any { it.fundKey == key })
+                if (!sold) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Label("評価額 ${money.amount(s.valueYen)}")
                         s.costYen?.let { Label("取得額 ${money.amount(it)}") }
@@ -139,13 +203,14 @@ fun FundHoldingsScreen(
                         )
                     }
                 }
-                if (s.unitCost != null && s.price != null) {
+                if (!sold && s.unitCost != null && s.price != null) {
                     // 単価は金額ではない(1万口あたりの値など)が、実額の表示でだけ出す
                     // 単価の差は円ではないので、割合で出す
                     Label("平均取得単価 ${money.unit(s.unitCost)} → 現在値 ${money.unit(s.price)}(${ratioText(money, s.price - s.unitCost, s.unitCost)})")
                 }
                 // 毎朝取った基準価額(E05-09)と、平均取得単価に対する増減。10%以上なら目立たせる
-                navs[key]?.let { nav ->
+                // 売り切ったファンドは平均取得単価と比べない(もう持っていない。売った値との比べは上の行)
+                if (!sold) navs[key]?.let { nav ->
                     val g = NavAlert.gain(s.unitCost, nav)
                     Text(
                         "基準価額 ${money.unit(nav.yen)}(${nav.date})" + (g?.let { " ・ 平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}" } ?: ""),
@@ -153,21 +218,16 @@ fun FundHoldingsScreen(
                         color = if (g != null && g >= NavAlert.THRESHOLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (open == key) {
+                if (open) {
                     sources.firstOrNull { it.fundKey == key }?.let { source ->
-                        NavHistorySection(source, s.unitCost, onLoadHistory)
+                        NavHistorySection(source, if (sold) null else s.unitCost, fund.sales, onLoadHistory)
                     }
                     SourceEditor(
                         fundName = fund.name,
                         current = sources.firstOrNull { it.fundKey == key },
                         saving = saving,
                         onSearch = onSearch,
-                        onSave = { isin, code, done ->
-                            onSaveSource(fund.section, fund.name, isin, code) { error ->
-                                if (error == null) sources = loadSources()
-                                done(error)
-                            }
-                        },
+                        onSave = { isin, code, done -> onSaveSource(fund.section, fund.name, isin, code, done) },
                     )
                     Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         fund.history.forEach { past ->
@@ -185,16 +245,50 @@ fun FundHoldingsScreen(
                 }
             }
             HorizontalDivider()
-        }
     }
 }
+
+/**
+ * 売却(E01-19)の一言。本人が選んだ使い道は「売った値と今の値を比べる」。
+ * 売った値が分かる(一部売却)ときは、今の値(毎朝の基準価額、無ければいちばん新しい取り込みの現在値)と比べる。
+ * 売り切ったときは一覧に値が無いので、行を開いたときに投資信託協会の推移から出す。
+ */
+@Composable
+private fun SalesText(fund: FundHoldings.Fund, nav: Nav?, hasSource: Boolean) {
+    val money = LocalMoney.current
+    val now = nav?.yen ?: fund.latest.price.takeIf { fund.soldOutBy == null }
+    fund.sales.forEach { sale ->
+        val what = if (sale.share >= 1.0) "売り切り" else "一部売却(口数の約${shareText(money, sale.share)}減)"
+        val compare = if (sale.price != null && now != null) {
+            " ・ 売った値 ${money.unit(sale.price)} → 今 ${money.unit(now)}(${ratioText(money, now - sale.price, sale.price)})"
+        } else if (sale.price == null) {
+            if (hasSource) " ・ 行を開くと売った値と比べます" else " ・ 基準価額の取り先を決めると、売った値と比べられます"
+        } else {
+            ""
+        }
+        Text(
+            "$what ${sale.after}〜${sale.by}$compare",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+    }
+}
+
+/** 減った口数の割合(E01-19)。割合なのでマスクのときだけ伏せる。 */
+private fun shareText(money: MoneyFormat, share: Double): String =
+    if (money.mode == PrivacyMode.MASK) MoneyFormat.HIDDEN else "${(share * 100).roundToInt()}%"
 
 /**
  * 基準価額の推移(E05-11)。行を開いたときに投資信託協会から取る(本人が選んだ。端末には残さない)。
  * 期間は3か月・1年・全期間を切り替え、平均取得単価の横線を付ける。
  */
 @Composable
-private fun NavHistorySection(source: FundSource, unitCost: Long?, onLoadHistory: suspend (FundSource) -> List<Nav>?) {
+private fun NavHistorySection(
+    source: FundSource,
+    unitCost: Long?,
+    sales: List<FundHoldings.Sale>,
+    onLoadHistory: suspend (FundSource) -> List<Nav>?,
+) {
     val money = LocalMoney.current
     // null: 取得中、空: 取れなかった
     val history by produceState<List<Nav>?>(null, source) { value = onLoadHistory(source) ?: emptyList() }
@@ -210,11 +304,16 @@ private fun NavHistorySection(source: FundSource, unitCost: Long?, onLoadHistory
                     NavPeriod.entries.forEach { p -> FilterChip(period == p, onClick = { period = p }, label = { Text(p.label) }) }
                 }
                 val window = NavHistory.window(all, period)
+                // 売った値(E01-19): 一部売却は取り込みの現在値、売り切りは推移のその日の基準価額
+                val salePrices = sales.map { it to (it.price ?: NavHistory.priceOn(all, it.by)?.yen) }
+                // %表示の目盛りの基準: 平均取得単価。売り切ったファンドは最後に売った値
+                val base = unitCost ?: salePrices.firstOrNull()?.second
                 LineChart(
                     points = window.map { it.date to it.yen },
-                    axisLabel = { v, _ -> money.unitAxis(v, unitCost) },
+                    axisLabel = { v, _ -> money.unitAxis(v, base) },
                     reference = unitCost,
                     maxDots = 40,
+                    markers = sales.map { it.by },
                 )
                 val change = NavHistory.change(window)
                 Label(
@@ -222,6 +321,13 @@ private fun NavHistorySection(source: FundSource, unitCost: Long?, onLoadHistory
                         (change?.let { " ・ この期間 ${if (money.mode == PrivacyMode.MASK) MoneyFormat.HIDDEN else MoneyFormat.signedPercent(it)}" } ?: ""),
                 )
                 if (unitCost != null) Label("破線は平均取得単価")
+                if (sales.isNotEmpty()) Label("縦の点線は売却に気づいた取り込みの日")
+                val latest = all.last()
+                salePrices.forEach { (sale, price) ->
+                    if (price != null) {
+                        Label("${sale.by}に売った値 ${money.unit(price)} → ${latest.date} ${money.unit(latest.yen)}(${ratioText(money, latest.yen - price, price)})")
+                    }
+                }
             }
         }
     }
