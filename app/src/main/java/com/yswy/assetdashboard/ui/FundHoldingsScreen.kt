@@ -30,6 +30,7 @@ import com.yswy.assetdashboard.data.FundHoldings
 import com.yswy.assetdashboard.data.FundNow
 import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.data.NavBase
 import com.yswy.assetdashboard.data.NavHistory
 import com.yswy.assetdashboard.data.NavPeriod
 import com.yswy.assetdashboard.ui.chart.LineChart
@@ -55,6 +56,8 @@ fun FundHoldingsScreen(
     loadPeaks: () -> Map<String, Nav> = { emptyMap() },
     /** 取り先を保存する。(区分, ファンド名, ISIN, 協会コード, 結果) */
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
+    /** 比べる基準を保存する(E05-14)。(区分, ファンド名, 基準, 結果) */
+    onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
     /** 今すぐ基準価額を取る。取れた本数 */
     onRefreshNavs: suspend () -> Int = { 0 },
     /** 取り先の無いファンドをまとめて名前で探して保存する(E05-10)。結果の一言 */
@@ -71,8 +74,6 @@ fun FundHoldingsScreen(
     var sources by remember { mutableStateOf(loadSources()) }
     var navs by remember { mutableStateOf(loadNavs()) }
     var peaks by remember { mutableStateOf(loadPeaks()) }
-    // 何と比べるか(E05-12)。本人が「最高値を基準にする」切り替えを求めた
-    var base by rememberSaveable { mutableStateOf(NavBase.COST) }
     var navMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -125,12 +126,7 @@ fun FundHoldingsScreen(
                 }) { Text("今すぐ基準価額を取る") }
             }
             navMessage?.let { Label(it) }
-            if (sources.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NavBase.entries.forEach { b -> FilterChip(base == b, onClick = { base = b }, label = { Text(b.label) }) }
-                }
-                NowSummary(h.held, navs, peaks, base)
-            }
+            if (sources.isNotEmpty()) NowSummary(h.held, navs, peaks, sources)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
         items(h.held, key = { it.section + "|" + it.name }) { fund ->
@@ -141,7 +137,12 @@ fun FundHoldingsScreen(
                 sources = sources,
                 navs = navs,
                 peak = peaks[fund.section + "|" + fund.name],
-                base = base,
+                onSaveBase = { section, name, b, done ->
+                    onSaveBase(section, name, b) { error ->
+                        if (error == null) sources = loadSources()
+                        done(error)
+                    }
+                },
                 saving = saving,
                 onSearch = onSearch,
                 onLoadHistory = onLoadHistory,
@@ -168,7 +169,6 @@ fun FundHoldingsScreen(
                     sources = sources,
                     navs = navs,
                     peak = peaks[fund.section + "|" + fund.name],
-                    base = base,
                     saving = saving,
                     onSearch = onSearch,
                     onLoadHistory = onLoadHistory,
@@ -193,14 +193,16 @@ private fun FundRow(
     sources: List<FundSource>,
     navs: Map<String, Nav>,
     peak: Nav?,
-    base: NavBase,
     saving: Boolean,
     onSearch: suspend (String) -> List<FundSearch.Candidate>?,
     onLoadHistory: suspend (FundSource) -> List<Nav>?,
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit,
+    onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
 ) {
     val money = LocalMoney.current
     val key = fund.section + "|" + fund.name
+    // 何と比べるか。ファンドごとに決めて保存する(E05-14)。取り先が無ければ平均取得単価
+    val base = sources.firstOrNull { it.fundKey == key }?.base ?: NavBase.COST
     val s = fund.latest
     val sold = fund.soldOutBy != null
     Column {
@@ -272,6 +274,7 @@ private fun FundRow(
                 if (open) {
                     sources.firstOrNull { it.fundKey == key }?.let { source ->
                         NavHistorySection(source, if (sold) null else s.unitCost, fund.sales, onLoadHistory)
+                        if (!sold) BaseEditor(source.base, saving) { b, done -> onSaveBase(fund.section, fund.name, b, done) }
                     }
                     SourceEditor(
                         fundName = fund.name,
@@ -325,56 +328,68 @@ private fun SalesText(fund: FundHoldings.Fund, nav: Nav?, hasSource: Boolean) {
     }
 }
 
-/** 何と比べるか(E05-12)。 */
-internal enum class NavBase(val label: String) {
-    COST("平均取得単価と比べる"),
-    PEAK("最高値と比べる"),
+/** 比べる基準を選んで保存する(E05-14)。押すとすぐDriveの funds.json に書く。 */
+@Composable
+private fun BaseEditor(current: NavBase, saving: Boolean, onSave: (NavBase, (String?) -> Unit) -> Unit) {
+    var message by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("比べる基準", style = MaterialTheme.typography.titleSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NavBase.entries.forEach { b ->
+                FilterChip(current == b, enabled = !saving, onClick = {
+                    if (b != current) {
+                        message = "保存中..."
+                        onSave(b) { error -> message = error ?: "保存しました(Driveの settings)" }
+                    }
+                }, label = { Text(b.label) })
+            }
+        }
+        message?.let { Label(it) }
+    }
 }
 
 /**
- * 今の基準価額で見直した合計(E05-12)。平均取得単価と比べるときは含み益の合計、最高値と比べるときは最高値のときとの差。
+ * 今の基準価額で見直した合計(E05-12)。含み益はいつも、最高値のときとの差は最高値と比べるファンド(E05-14)だけで出す。
  * どちらも取り込み時の口数のままの見積もり。
  */
 @Composable
-private fun NowSummary(held: List<FundHoldings.Fund>, navs: Map<String, Nav>, peaks: Map<String, Nav>, base: NavBase) {
+private fun NowSummary(held: List<FundHoldings.Fund>, navs: Map<String, Nav>, peaks: Map<String, Nav>, sources: List<FundSource>) {
     val money = LocalMoney.current
     Column(modifier = Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        when (base) {
-            NavBase.COST -> {
-                val t = FundNow.total(held, navs)
-                if (t.refreshed == 0) {
-                    Label(
-                        if (held.any { navs.containsKey(FundSource.keyOf(it.section, it.name)) }) {
-                            "取れた基準価額は取り込みより前のものなので、取り込み時の値のままです"
-                        } else {
-                            "「今すぐ基準価額を取る」を押すと、今の基準価額で評価額と含み益を見直します"
-                        },
-                    )
+        val t = FundNow.total(held, navs)
+        if (t.refreshed == 0) {
+            Label(
+                if (held.any { navs.containsKey(FundSource.keyOf(it.section, it.name)) }) {
+                    "取れた基準価額は取り込みより前のものなので、取り込み時の値のままです"
                 } else {
-                    Text(
-                        "今なら 評価額 ${money.amount(t.valueYen)} ・ 含み益 ${gainText(money, t.gainYen, t.costYen)}",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (t.gainYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    )
-                    Label("${t.count}本のうち${t.refreshed}本を今の基準価額で見直し、残りは取り込み時の値。取り込み時の口数のままの見積もりです(あとで積み立てた・売った分は入りません)。")
-                }
-            }
-            NavBase.PEAK -> {
-                val t = FundNow.peakTotal(held, navs, peaks)
-                val r = t.ratio
-                if (t.count == 0 || r == null) {
-                    Label("「今すぐ基準価額を取る」を押すか次の朝の確認で、ファンドごとの設定来の最高値を取って比べます")
-                } else {
-                    Text(
-                        // 実額では額と%、%表示では%だけ(含み益と同じ出し方)
-                        "最高値のときより ${gainText(money, t.diffYen, t.atPeakYen)}",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (t.diffYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    )
-                    Label("${held.size}本のうち${t.count}本の合計。ファンドごとの設定来の最高値(基準価額)のときの評価額と、取り込み時の口数のままで比べています。分配金は入れていません。")
-                }
+                    "「今すぐ基準価額を取る」を押すと、今の基準価額で評価額と含み益を見直します"
+                },
+            )
+        } else {
+            Text(
+                "今なら 評価額 ${money.amount(t.valueYen)} ・ 含み益 ${gainText(money, t.gainYen, t.costYen)}",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (t.gainYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            Label("${t.count}本のうち${t.refreshed}本を今の基準価額で見直し、残りは取り込み時の値。取り込み時の口数のままの見積もりです(あとで積み立てた・売った分は入りません)。")
+        }
+        val peakKeys = sources.filter { it.base == NavBase.PEAK }.map { it.fundKey }.toSet()
+        val peakFunds = held.filter { FundSource.keyOf(it.section, it.name) in peakKeys }
+        if (peakFunds.isNotEmpty()) {
+            val p = FundNow.peakTotal(peakFunds, navs, peaks)
+            if (p.count == 0 || p.ratio == null) {
+                Label("最高値と比べるファンドが${peakFunds.size}本。「今すぐ基準価額を取る」を押すか次の朝の確認で、設定来の最高値を取って比べます")
+            } else {
+                Text(
+                    // 実額では額と%、%表示では%だけ(含み益と同じ出し方)
+                    "最高値と比べる${peakFunds.size}本: 最高値のときより ${gainText(money, p.diffYen, p.atPeakYen)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (p.diffYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                )
+                Label("うち${p.count}本の合計。設定来の最高値(基準価額)のときの評価額と、取り込み時の口数のままで比べています。分配金は入れていません。")
             }
         }
+        Label("比べる基準(平均取得単価・最高値)は、ファンドの行を開いて選べます。")
     }
 }
 

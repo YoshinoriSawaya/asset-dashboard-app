@@ -298,6 +298,7 @@ private fun Screens(
             loadNavs = viewModel::navs,
             loadPeaks = viewModel::navPeaks,
             onSaveSource = viewModel::saveFundSource,
+            onSaveBase = viewModel::saveFundBase,
             onRefreshNavs = viewModel::refreshNavs,
             onFindMissing = viewModel::findMissingSources,
             onSearch = viewModel::searchFunds,

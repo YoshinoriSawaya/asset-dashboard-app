@@ -11,6 +11,7 @@ import com.yswy.assetdashboard.data.BudgetStore
 import com.yswy.assetdashboard.data.FundHoldings
 import com.yswy.assetdashboard.data.FundLocalStore
 import com.yswy.assetdashboard.data.FundSource
+import com.yswy.assetdashboard.data.NavBase
 import com.yswy.assetdashboard.data.Nav
 import com.yswy.assetdashboard.drive.FundSourceStore
 import com.yswy.assetdashboard.notify.NavFetcher
@@ -402,6 +403,20 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 editOnDrive { api, folders ->
                     val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
                     val updated = FundSourceStore.upsert(current, FundSource(section, name, i, c), remove)
+                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
+                },
+            )
+        }
+    }
+
+    /** ファンドの比べる基準を保存する(E05-14)。Driveの funds.json を読み直して、そのファンドだけ変える。 */
+    fun saveFundBase(section: String, name: String, base: NavBase, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                editOnDrive { api, folders ->
+                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
+                    val updated = FundSourceStore.setBase(current, FundSource.keyOf(section, name), base)
+                        ?: return@editOnDrive "取り先が無いので保存しない"
                     if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
                 },
             )

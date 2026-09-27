@@ -9,7 +9,14 @@ import java.time.LocalDate
  * ファンドの基準価額の取り先(E05-09)。投資信託協会の投信総合検索ライブラリーのISINコードと協会コード。
  * 正はDriveの `settings/funds.json`。ファンドは保有商品一覧(E01-15)の区分とファンド名で見分ける([FundHoldings.Fund])。
  */
-data class FundSource(val section: String, val name: String, val isin: String, val code: String) {
+data class FundSource(
+    val section: String,
+    val name: String,
+    val isin: String,
+    val code: String,
+    /** 比べる基準(E05-14)。本人がファンドごとに決めて保存する */
+    val base: NavBase = NavBase.COST,
+) {
     val fundKey: String get() = keyOf(section, name)
 
     companion object {
@@ -18,6 +25,18 @@ data class FundSource(val section: String, val name: String, val isin: String, v
         /** ISINは英数字12文字、協会コードは英数字8文字(例: JP90C000H1T1 / 0331418A)。 */
         fun isValidIsin(value: String) = Regex("[A-Z]{2}[A-Z0-9]{10}").matches(value)
         fun isValidCode(value: String) = Regex("[A-Z0-9]{8}").matches(value)
+    }
+}
+
+/** 基準価額を何と比べるか(E05-12)。ファンドごとに決めて取り先と一緒に保存する(E05-14)。[key]はfunds.jsonに書く値。 */
+enum class NavBase(val key: String, val label: String) {
+    COST("cost", "平均取得単価と比べる"),
+    PEAK("peak", "最高値と比べる"),
+    ;
+
+    companion object {
+        /** 知らない値・無いときは平均取得単価(E05-14より前のfunds.jsonには無い)。 */
+        fun of(key: String?): NavBase = entries.firstOrNull { it.key == key } ?: COST
     }
 }
 
@@ -53,7 +72,7 @@ class FundLocalStore(context: Context) {
         private const val PEAKS = "peaks"
 
         fun encodeSources(sources: List<FundSource>): String = JSONArray().apply {
-            sources.forEach { put(JSONObject().put("section", it.section).put("name", it.name).put("isin", it.isin).put("code", it.code)) }
+            sources.forEach { put(JSONObject().put("section", it.section).put("name", it.name).put("isin", it.isin).put("code", it.code).put("base", it.base.key)) }
         }.toString()
 
         /** 読めない行は落とす(落ちるよりスキップ)。 */
@@ -61,7 +80,10 @@ class FundLocalStore(context: Context) {
             val a = JSONArray(json ?: return emptyList())
             (0 until a.length()).mapNotNull { i ->
                 val o = a.optJSONObject(i) ?: return@mapNotNull null
-                val s = FundSource(o.optString("section"), o.optString("name"), o.optString("isin"), o.optString("code"))
+                val s = FundSource(
+                    o.optString("section"), o.optString("name"), o.optString("isin"), o.optString("code"),
+                    NavBase.of(o.optString("base").ifEmpty { null }),
+                )
                 s.takeIf { it.name.isNotBlank() && FundSource.isValidIsin(it.isin) && FundSource.isValidCode(it.code) }
             }
         }.getOrDefault(emptyList())
