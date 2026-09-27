@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import com.yswy.assetdashboard.MainActivity
 import com.yswy.assetdashboard.R
 import com.yswy.assetdashboard.data.AppDatabase
+import com.yswy.assetdashboard.data.BudgetStore
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncStatus
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,7 @@ object DailyCheck {
             lastNotified = store.load(),
             lastMonth = NotificationRules.lastMonthSpending(transactions, today),
             fixedCosts = NotificationRules.lastMonthFixedCosts(transactions, today),
+            budgets = BudgetStore(context).load(),
         )
         if (!canNotify(context)) {
             // 許可が無ければ出せない。記録もしない(許可されたら出せるように)

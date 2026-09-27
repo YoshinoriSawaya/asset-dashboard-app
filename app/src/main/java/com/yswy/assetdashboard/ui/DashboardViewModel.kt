@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
 import com.yswy.assetdashboard.data.BankTransactionEntity
+import com.yswy.assetdashboard.data.BudgetStore
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
@@ -80,6 +81,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private val db = AppDatabase.get(app)
     private val lastSyncStore = LastSyncStore(app)
+    private val budgetStore = BudgetStore(app)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -305,6 +307,25 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** カテゴリの月の予算(E07-29)。端末の控えから読む。 */
+    fun budgets(): Map<String, Long> = budgetStore.load()
+
+    /**
+     * カテゴリの月の予算を保存する(E07-29)。Driveの categories.json を読み直して、そのカテゴリの予算だけを変える
+     * (画面が古い内容を持ったまま、ほかの決まりを上書きしないように)。nullなら予算をやめる。
+     */
+    fun saveBudget(category: String, yen: Long?, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                editOnDrive { api, folders ->
+                    val current = CategoryStore.load(api, folders) ?: return@editOnDrive "明細のカテゴリを読めないので保存しない"
+                    if (current.categories.none { it.name == category }) return@editOnDrive "カテゴリ「$category」が見つからない"
+                    if (CategoryStore.save(api, folders, current.withBudget(category, yen))) null else "Driveに書けないので保存しない"
+                },
+            )
+        }
+    }
+
     /** 積立投資の目安(E10-04)。手元のキャッシュから計算する。 */
     /** 明細に付いている、種類が積立投資のカテゴリの名前(E09-05)。将来の評価額の積立額に選べる。 */
     suspend fun investmentCategories(): List<String> =
@@ -381,7 +402,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             val folders = DriveFolderSetup.ensure(api).folders
             write(api, folders)?.let { return@withDrive it }
             when (val cache = CacheSync.rebuild(api, folders, db)) {
-                is CacheSync.Outcome.Rebuilt -> null
+                is CacheSync.Outcome.Rebuilt -> {
+                    budgetStore.save(cache.snapshot.budgets)
+                    null
+                }
                 is CacheSync.Outcome.Kept -> "Driveには保存したが、画面の更新に失敗: ${cache.reason}(次の同期で反映)"
             }
         }
@@ -422,6 +446,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val outcome = DriveSession.withDrive(getApplication()) { FullSync.run(it, db) }
         val now = Instant.now()
         // 同期を試し終えたものだけ記録する。同意待ちは試し終えていないので残さない。
+        // カテゴリの予算(E07-29)を端末に控える。毎朝の確認はDriveを読まないため
+        ((outcome as? DriveSession.Outcome.Success)?.value?.cache as? CacheSync.Outcome.Rebuilt)
+            ?.let { budgetStore.save(it.snapshot.budgets) }
         val last = when (outcome) {
             is DriveSession.Outcome.Success -> LastSync.of(outcome.value, now)
             is DriveSession.Outcome.Offline -> LastSync.notSynced("オフラインでスキップ", now, isProblem = false)

@@ -34,6 +34,7 @@
 - [x] [E07-26: 固定費・サブスクの一覧](../tasks/E07-26-fixed-costs.md)
 - [x] [E07-27: カテゴリの推移グラフ](../tasks/E07-27-category-trend.md)
 - [x] [E07-28: 固定費の値上がりに気づく](../tasks/E07-28-fixed-cost-increase.md)
+- [x] [E07-29: カテゴリごとの予算](../tasks/E07-29-category-budgets.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で

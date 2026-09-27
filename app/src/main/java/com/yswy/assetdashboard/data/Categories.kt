@@ -31,7 +31,12 @@ enum class CategoryKind(val label: String, val note: String) {
 }
 
 /** カテゴリ。名前は人が付ける(食費・遊び代・家具など)。 */
-data class Category(val name: String, val kind: CategoryKind)
+data class Category(
+    val name: String,
+    val kind: CategoryKind,
+    /** 月の予算(E07-29)。決めていなければnull。 */
+    val budgetYen: Long? = null,
+)
 
 /** 摘要にこの言葉を含む明細を、このカテゴリにする。 */
 data class CategoryRule(val keyword: String, val category: String)
@@ -67,9 +72,18 @@ data class CategorySettings(
         return copy(rules = if (category == null) others else others + CategoryRule(description, category))
     }
 
-    /** カテゴリを足す。同じ名前があれば種類を置き換える。 */
-    fun withCategory(category: Category): CategorySettings =
-        copy(categories = categories.filterNot { it.name == category.name } + category)
+    /** カテゴリを足す。同じ名前があれば種類を置き換える(予算は、新しく決めていなければ引き継ぐ)。 */
+    fun withCategory(category: Category): CategorySettings {
+        val kept = category.copy(budgetYen = category.budgetYen ?: byName[category.name]?.budgetYen)
+        return copy(categories = categories.filterNot { it.name == category.name } + kept)
+    }
+
+    /** カテゴリの月の予算を決める(E07-29)。nullなら予算をやめる。無いカテゴリなら何もしない。 */
+    fun withBudget(name: String, yen: Long?): CategorySettings =
+        copy(categories = categories.map { if (it.name == name) it.copy(budgetYen = yen) else it })
+
+    /** 予算を決めたカテゴリ → 月の予算(E07-29)。 */
+    val budgets: Map<String, Long> get() = categories.mapNotNull { c -> c.budgetYen?.let { c.name to it } }.toMap()
 
     /** カテゴリを消す。そのカテゴリの決まりも消える。 */
     fun withoutCategory(name: String): CategorySettings =

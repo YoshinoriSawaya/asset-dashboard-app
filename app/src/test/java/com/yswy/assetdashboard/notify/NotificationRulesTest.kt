@@ -224,6 +224,20 @@ class NotificationRulesTest {
     }
 
     @Test
+    fun `前の月に予算を超えたカテゴリがあれば、その月につき1度、カテゴリ名だけで知らせる`() {
+        val august = NotificationRules.lastMonthSpending(spendingRows(withThisMonth = true), today)!!
+        // 8月: 外食5万、家具・家電30万。外食の予算4万は超え、家具・家電の予算50万は超えない。予算の無い食費は見ない
+        val budgets = mapOf("外食" to 40_000L, "家具・家電" to 500_000L)
+        val notice = NotificationRules.evaluate(today, fresh, emptyList(), mapOf("highspend:2026-08" to today), august, budgets = budgets).single()
+        assertEquals("overbudget:2026-08", notice.key)
+        assertEquals("8月は外食が予算を超えました", notice.title)
+        assertFalse((notice.title + notice.text).contains("円"))
+        assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf("highspend:2026-08" to today, notice.key to today), august, budgets = budgets).isEmpty())
+        // 予算が無ければ出さない
+        assertEquals(emptyList<String>(), NotificationRules.overBudget(august, emptyMap()))
+    }
+
+    @Test
     fun `前の月が締まっていなければ固定費の値上がりは知らせない`() {
         assertNull(NotificationRules.lastMonthFixedCosts(fixedRows(withThisMonth = false), today))
         // 10月に見ると、見た月の最後(9月)に明細が無いので、古い月の値上がりで知らせない

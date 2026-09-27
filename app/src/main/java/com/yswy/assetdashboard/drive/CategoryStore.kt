@@ -57,7 +57,13 @@ object CategoryStore {
     fun render(settings: CategorySettings): String = JSONObject()
         .put("formatVersion", FORMAT_VERSION)
         .put("categories", JSONArray().apply {
-            settings.categories.forEach { put(JSONObject().put("name", it.name).put("kind", it.kind.name)) }
+            settings.categories.forEach { c ->
+                put(
+                    JSONObject().put("name", c.name).put("kind", c.kind.name)
+                        // 月の予算(E07-29)。決めていなければ書かない
+                        .also { json -> c.budgetYen?.let { json.put("budgetYen", it) } },
+                )
+            }
         })
         .put("rules", JSONArray().apply {
             settings.rules.forEach { put(JSONObject().put("keyword", it.keyword).put("category", it.category)) }
@@ -70,7 +76,8 @@ object CategoryStore {
         val categories = root.optJSONArray("categories").objects().mapNotNull { o ->
             val name = o.optString("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val kind = runCatching { CategoryKind.valueOf(o.optString("kind")) }.getOrNull() ?: return@mapNotNull null
-            Category(name, kind)
+            val budget = if (o.has("budgetYen")) o.optLong("budgetYen").takeIf { it > 0 } else null
+            Category(name, kind, budget)
         }.distinctBy { it.name }
         val names = categories.map { it.name }.toSet()
         val rules = root.optJSONArray("rules").objects().mapNotNull { o ->

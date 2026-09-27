@@ -83,6 +83,11 @@ object CacheSync {
         val transactions: List<BankTransactionEntity>,
         /** 重複として落とした行数(期間の重なるCSVなど)。 */
         val droppedDuplicates: Int,
+        /**
+         * カテゴリの月の予算(E07-29)。DBには入れず、端末に控える([com.yswy.assetdashboard.data.BudgetStore])。
+         * 毎朝の確認は同期しないので、Driveの categories.json を読めないため
+         */
+        val budgets: Map<String, Long> = emptyMap(),
     ) {
         /**
          * 中身の指紋(E06-03)。同じDriveの中身から作れば、いつ・どの端末で作っても
@@ -290,6 +295,7 @@ object CacheSync {
             points = points.values.toList(),
             transactions = transactions.values.toList(),
             droppedDuplicates = dropped,
+            budgets = categories.budgets,
         )
     }
 

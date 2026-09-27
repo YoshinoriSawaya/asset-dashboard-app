@@ -8,6 +8,7 @@ import com.yswy.assetdashboard.drive.CacheSync
 import com.yswy.assetdashboard.drive.CategoryStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
@@ -51,6 +52,30 @@ class CategoriesTest {
         val legacy = CategorySettings.fromLegacy(listOf("投信積立"))
         assertEquals(CategoryKind.DISCRETIONARY, legacy.categoryOf("ＳＢＩ証券投信積立サービス")?.kind)
         assertEquals(CategorySettings.EMPTY, CategorySettings.fromLegacy(emptyList()))
+    }
+
+    @Test
+    fun `カテゴリの月の予算を決め・やめられ、categoriesjsonに書いて読み戻せる`() {
+        val withBudget = settings.withBudget("食費", 40_000)
+        assertEquals(mapOf("食費" to 40_000L), withBudget.budgets)
+        assertEquals(withBudget, CategoryStore.parse(CategoryStore.render(withBudget)))
+        assertEquals(emptyMap<String, Long>(), withBudget.withBudget("食費", null).budgets)
+        // 同じ名前のカテゴリを足し直しても予算は残る
+        assertEquals(40_000L, withBudget.withCategory(Category("食費", CategoryKind.LIVING)).budgets["食費"])
+        // 無いカテゴリには付かない
+        assertEquals(emptyMap<String, Long>(), settings.withBudget("旅行", 10_000).budgets)
+    }
+
+    @Test
+    fun `予算の入力と端末の控え`() {
+        assertEquals(com.yswy.assetdashboard.ui.BudgetInput.Result.Ok(30_000), com.yswy.assetdashboard.ui.BudgetInput.parse(" 30,000円 "))
+        assertEquals(com.yswy.assetdashboard.ui.BudgetInput.Result.Ok(null), com.yswy.assetdashboard.ui.BudgetInput.parse(""))
+        assertTrue(com.yswy.assetdashboard.ui.BudgetInput.parse("abc") is com.yswy.assetdashboard.ui.BudgetInput.Result.Invalid)
+        assertTrue(com.yswy.assetdashboard.ui.BudgetInput.parse("0") is com.yswy.assetdashboard.ui.BudgetInput.Result.Invalid)
+        val budgets = mapOf("外食" to 30_000L, "食費" to 50_000L)
+        assertEquals(budgets, BudgetStore.decode(BudgetStore.encode(budgets)))
+        assertEquals(emptyMap<String, Long>(), BudgetStore.decode("壊れた"))
+        assertEquals(emptyMap<String, Long>(), BudgetStore.decode(null))
     }
 
     @Test

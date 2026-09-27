@@ -12,19 +12,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.BankTransactionEntity
@@ -49,9 +54,18 @@ fun CategorySpendingScreen(
     onOpenCategories: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** カテゴリの月の予算(E07-29)。端末の控え */
+    loadBudgets: () -> Map<String, Long> = { emptyMap() },
+    /** 予算を保存する。(カテゴリ, 額かnull, 結果) */
+    onSaveBudget: (String, Long?, (String?) -> Unit) -> Unit = { _, _, _ -> },
+    saving: Boolean = false,
 ) {
     val transactions by produceState<List<BankTransactionEntity>?>(null) { value = load() }
     val money = LocalMoney.current
+    var budgets by remember { mutableStateOf(loadBudgets()) }
+    // 予算を決める小窓を開いているカテゴリと、その行
+    var editing by remember { mutableStateOf<CategorySpending.Row?>(null) }
+    var budgetMessage by remember { mutableStateOf<String?>(null) }
     // 何番目の月を見ているか(0が最新)
     var index by rememberSaveable { mutableStateOf(0) }
     // 明細を開いているカテゴリ。カテゴリなしは空文字で持つ
@@ -136,6 +150,14 @@ fun CategorySpendingScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // 予算(E07-29)。使った割合。超えたら赤
+                        row.category?.let { budgets[it] }?.let { budget ->
+                            Text(
+                                "予算の${money.percent(row.yen.toDouble() / budget)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (row.yen > budget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(money.amount(row.yen), style = MaterialTheme.typography.bodyMedium)
@@ -149,6 +171,19 @@ fun CategorySpendingScreen(
                     }
                 }
                 if (open == key) {
+                    // 予算を決める(E07-29)。カテゴリの無い明細には決められない
+                    row.category?.let { name ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp)) {
+                            Text(
+                                budgets[name]?.let { "予算 月${money.amount(it)}" } ?: "予算なし",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(enabled = !saving, onClick = { budgetMessage = null; editing = row }) {
+                                Text(if (budgets[name] == null) "予算を決める" else "予算を変える")
+                            }
+                        }
+                    }
                     CategorySpending.transactions(all, month, row.category).forEach { t ->
                         Row(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp)) {
                             Text("${t.date.dayOfMonth}日", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
@@ -164,6 +199,64 @@ fun CategorySpendingScreen(
         item {
             TextButton(onClick = onOpenCategories, modifier = Modifier.padding(top = 8.dp)) { Text("明細のカテゴリを見直す") }
         }
+    }
+
+    // 予算を決める小窓(E07-29)
+    val row = editing
+    val name = row?.category
+    if (row != null && name != null) {
+        var text by remember(name) { mutableStateOf(budgets[name]?.toString().orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("「$name」の月の予算") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.averageYen?.let { Label("前の月までの平均 月${money.amount(it)}") }
+                    OutlinedTextField(
+                        value = text, onValueChange = { text = it },
+                        label = { Text("円(空にすると予算をやめる)") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Label("前の月の結果が予算を超えていたら、朝の通知で知らせます。Driveの settings に保存します。")
+                    budgetMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !saving, onClick = {
+                    val yen = BudgetInput.parse(text)
+                    if (yen is BudgetInput.Result.Invalid) {
+                        budgetMessage = yen.message
+                    } else {
+                        budgetMessage = "保存中..."
+                        val value = (yen as BudgetInput.Result.Ok).yen
+                        onSaveBudget(name, value) { error ->
+                            if (error == null) {
+                                budgets = loadBudgets()
+                                editing = null
+                            } else {
+                                budgetMessage = error
+                            }
+                        }
+                    }
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("閉じる") } },
+        )
+    }
+}
+
+/** 予算の入力(E07-29)。空なら予算をやめる。 */
+object BudgetInput {
+    sealed interface Result {
+        data class Ok(val yen: Long?) : Result
+        data class Invalid(val message: String) : Result
+    }
+
+    fun parse(text: String): Result {
+        val t = text.replace(",", "").replace("円", "").trim()
+        if (t.isEmpty()) return Result.Ok(null)
+        val yen = t.toLongOrNull()?.takeIf { it > 0 } ?: return Result.Invalid("1円以上の数で入れてください(例: 30000)")
+        return Result.Ok(yen)
     }
 }
 

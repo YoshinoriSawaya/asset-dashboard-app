@@ -269,6 +269,9 @@ private fun Screens(
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
             onBack = { close(route) },
             modifier = modifier,
+            loadBudgets = viewModel::budgets,
+            onSaveBudget = viewModel::saveBudget,
+            saving = state.syncing,
         )
         route == Routes.FIXED_COSTS -> FixedCostsScreen(
             load = viewModel::transactions,
