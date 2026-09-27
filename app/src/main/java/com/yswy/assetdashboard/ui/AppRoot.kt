@@ -245,6 +245,7 @@ private fun Screens(
             onEditMetric = { stack.add(Routes.metric(it)) },
             onBack = { close(route) },
             modifier = modifier,
+            loadOutlook = viewModel::netWorthOutlook,
         )
         route == Routes.CATEGORY_IMPORT -> CategoryImportScreen(
             load = viewModel::loadCategoryImport,

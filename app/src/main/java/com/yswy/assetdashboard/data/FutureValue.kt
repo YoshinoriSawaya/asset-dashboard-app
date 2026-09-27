@@ -43,18 +43,19 @@ data class FutureValue(
         fun of(currentYen: Long?, rateBp: Int?, monthlyYen: Long?, years: List<Int> = YEARS): FutureValue? {
             if (rateBp == null || currentYen == null) return null
             val monthly = monthlyYen ?: 0L
-            val m = (1 + rateBp / 10_000.0).pow(1.0 / 12) - 1
             val rows = years.map { y ->
                 val n = y * 12
-                val growth = (1 + m).pow(n)
-                val value = if (m == 0.0) {
-                    currentYen.toDouble() + monthly * n
-                } else {
-                    currentYen * growth + monthly * (growth - 1) / m
-                }
-                Row(y, roundMan(value), currentYen + monthly * n)
+                Row(y, roundMan(valueAt(currentYen, rateBp, monthly, n)), currentYen + monthly * n)
             }
             return FutureValue(rateBp, monthlyYen, rows)
+        }
+
+        /** [months]か月後の評価額(丸めない)。純資産の見通し(E09-06)でも使う。 */
+        fun valueAt(currentYen: Long, rateBp: Int, monthlyYen: Long, months: Int): Double {
+            val m = (1 + rateBp / 10_000.0).pow(1.0 / 12) - 1
+            if (m == 0.0) return currentYen.toDouble() + monthlyYen * months
+            val growth = (1 + m).pow(months)
+            return currentYen * growth + monthlyYen * (growth - 1) / m
         }
 
         private fun roundMan(yen: Double): Long = (yen / 10_000).roundToLong() * 10_000

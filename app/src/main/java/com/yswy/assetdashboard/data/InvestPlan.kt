@@ -88,6 +88,16 @@ data class InvestPlan(
             return (usable.sumOf(amount) / usable.size).takeIf { it > 0 }
         }
 
+        /**
+         * 系列への積立額の月平均(E09-05)。積立額のカテゴリを選んでいればそのカテゴリだけ、無ければ積立投資の全部。
+         * 系列の詳細の将来の評価額(E09-03)と、純資産の見通し(E09-06)で同じ額を使う。
+         */
+        fun monthlyFor(metric: Item.Metric, transactions: List<BankTransactionEntity>, monthly: List<Cashflow>, today: LocalDate): Long? =
+            when (val category = metric.investCategory) {
+                null -> currentMonthlyYen(monthly, today)
+                else -> currentMonthlyYen(monthly, today) { Summary.categorySpending(transactions, it.period, category) }
+            }
+
         /** 平均に使う月。今月と、明細の無い月は使わない(生活防衛資金(E07-06)とそろえる)。古い順。 */
         private fun usableMonths(monthly: List<Cashflow>, today: LocalDate, months: Int): List<Cashflow> {
             val thisMonth = YearMonth.from(today)

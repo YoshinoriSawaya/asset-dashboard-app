@@ -112,12 +112,8 @@ sealed interface ItemDetail {
             val today = LocalDate.now()
             val invest = (overview.item as? Item.Metric)?.takeIf { it.expectedReturnBp != null }?.let { metric ->
                 val transactions = db.bankTransactionDao().all()
-                val monthly = Summary.monthlyCashflow(transactions)
                 // 積立投資のカテゴリを選んでいれば、そのカテゴリの分だけ(E09-05)
-                when (val category = metric.investCategory) {
-                    null -> InvestPlan.currentMonthlyYen(monthly, today)
-                    else -> InvestPlan.currentMonthlyYen(monthly, today) { Summary.categorySpending(transactions, it.period, category) }
-                }
+                InvestPlan.monthlyFor(metric, transactions, Summary.monthlyCashflow(transactions), today)
             }
             return of(overview, series, all, today, invest)
         }

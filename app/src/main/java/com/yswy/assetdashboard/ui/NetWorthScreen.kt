@@ -16,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,7 +29,9 @@ import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.NetWorth
+import com.yswy.assetdashboard.data.NetWorthOutlook
 import com.yswy.assetdashboard.ui.chart.ColorDot
+import com.yswy.assetdashboard.ui.chart.LineChart
 import com.yswy.assetdashboard.ui.chart.DonutChart
 import com.yswy.assetdashboard.ui.chart.GoalColors
 import com.yswy.assetdashboard.ui.chart.SeriesColors
@@ -39,6 +43,7 @@ import java.time.LocalDate
  *
  * 合算した値なので、補正の入口は出さない(直すなら元の系列を直す)。
  * 何を足しているかは見えないと信用できないので、数えている系列を並べ、そこから外せるようにする。
+ * 配分の下に、このままなら純資産がどうなるかの見通し(E09-06)を出す。
  */
 @Composable
 fun NetWorthScreen(
@@ -46,6 +51,8 @@ fun NetWorthScreen(
     onEditMetric: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 将来の見通し(E09-06) */
+    loadOutlook: suspend () -> NetWorthOutlook? = { null },
 ) {
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item { TextButton(onClick = onBack) { Text("← 戻る") } }
@@ -109,7 +116,45 @@ fun NetWorthScreen(
             }
         }
 
+        item { OutlookContent(loadOutlook) }
+
         metricContent(asMetricDetail(netWorth))
+    }
+}
+
+/** このままなら純資産がどうなるか(E09-06)。 */
+@Composable
+private fun OutlookContent(load: suspend () -> NetWorthOutlook?) {
+    val outlook by produceState<NetWorthOutlook?>(null) { value = load() }
+    val o = outlook ?: return
+    val money = LocalMoney.current
+    val today = LocalDate.now()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(vertical = 12.dp)) {
+        Text("このままなら(見通し)", style = MaterialTheme.typography.titleMedium)
+        LineChart(
+            points = o.points.map { today.plusYears(it.years.toLong()) to it.totalYen },
+            axisLabel = money::lineAxis,
+        )
+        NetWorthOutlook.TABLE_YEARS.mapNotNull { o.at(it) }.forEach { p ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("${p.years}年後", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "約${money.amount(p.totalYen)}(今より ${money.change(p.totalYen - o.nowYen, o.nowYen)})",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (o.investments.isNotEmpty()) Label("うち投資 約${money.amount(p.investedYen)}")
+                }
+            }
+        }
+        Label("毎月の残り 月${money.amount(o.monthlyCashYen)}(収入 − 消費 − 投資の系列への積立。直近の月の平均)")
+        if (o.monthlyCashYen < 0) Label("残りがマイナスなので、預金などが減っていく前提です")
+        o.investments.forEach { (name, bp) -> Label("投資の系列: $name 年${MetricForm.rateText(bp)}%") }
+        if (o.investments.isNotEmpty()) Label("投資の系列への積立 月${money.amount(o.monthlyInvestYen)}")
+        Label(
+            "利回りを決めていない系列(預金・年金など)は増やしません。家電や車などの大型出費は引いていないので、" +
+                "実際はこれより少なくなります。目安であり、先のことを保証するものではありません",
+        )
     }
 }
 

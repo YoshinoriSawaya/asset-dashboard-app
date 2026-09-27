@@ -19,6 +19,7 @@ import com.yswy.assetdashboard.data.InvestPlan
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.Summary
 import com.yswy.assetdashboard.data.NetWorth
+import com.yswy.assetdashboard.data.NetWorthOutlook
 import com.yswy.assetdashboard.data.PeriodSummary
 import com.yswy.assetdashboard.data.PeriodUnit
 import com.yswy.assetdashboard.data.SummaryBoard
@@ -315,6 +316,12 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 手元の明細の全部。カテゴリ別の支出(E07-25)に使う。 */
     suspend fun transactions(): List<BankTransactionEntity> = db.bankTransactionDao().all()
+
+    /** 純資産の将来の見通し(E09-06)。純資産に数える系列が無い・明細が無ければnull。 */
+    suspend fun netWorthOutlook(): NetWorthOutlook? {
+        val netWorth = _state.value.netWorth ?: return null
+        return NetWorthOutlook.build(netWorth, db.bankTransactionDao().all(), LocalDate.now())
+    }
 
     suspend fun investPlan(): InvestPlan? {
         val monthly = Summary.monthlyCashflow(db.bankTransactionDao().all())

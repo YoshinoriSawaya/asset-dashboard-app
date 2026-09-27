@@ -12,6 +12,7 @@
 - [x] [E09-03: NISA資産の将来価値シミュレーション](../tasks/E09-03-nisa-future-value-simulation.md)
 - [x] [E09-04: 年間の大型出費カレンダー](../tasks/E09-04-annual-expense-calendar.md)
 - [x] [E09-05: 将来の評価額の積立額を、系列ごとの積立投資のカテゴリにする](../tasks/E09-05-invest-category-per-metric.md)
+- [x] [E09-06: 純資産の将来の見通し](../tasks/E09-06-net-worth-outlook.md)
 
 ## 完了条件
 各Goalに「このペースならいつ達成するか」の予測日が表示され、
