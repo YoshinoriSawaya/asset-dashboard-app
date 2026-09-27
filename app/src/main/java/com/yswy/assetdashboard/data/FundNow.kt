@@ -36,6 +36,10 @@ object FundNow {
     /** 設定来の最高値。同じ値が何度もあれば新しい日。 */
     fun peak(history: List<Nav>): Nav? = history.maxWithOrNull(compareBy<Nav> { it.yen }.thenBy { it.date })
 
+    /** ファンドごとの最高値(E05-13)。点の無いファンドは入れない。 */
+    fun peaks(histories: Map<String, List<Nav>>): Map<String, Nav> =
+        histories.mapNotNull { (k, v) -> peak(v)?.let { k to it } }.toMap()
+
     /** 最高値に対する今の基準価額の増減(0以下)。比べられなければnull。 */
     fun fromPeak(nav: Nav?, peak: Nav?): Double? {
         if (nav == null || peak == null || peak.yen <= 0) return null

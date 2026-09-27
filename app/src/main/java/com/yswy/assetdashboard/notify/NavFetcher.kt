@@ -29,14 +29,7 @@ object NavFetcher {
     fun url(source: FundSource) =
         "https://toushin-lib.fwg.ne.jp/FdsWeb/FDST030000/csv-file-download?isinCd=${source.isin}&associFundCd=${source.code}"
 
-    /** ファンドごとに同時に取る。取れたものだけ返す(鍵は [FundSource.fundKey])。 */
-    suspend fun fetchAll(sources: List<FundSource>): Map<String, Nav> = coroutineScope {
-        sources.map { s -> async { fetch(s)?.let { s.fundKey to it } } }.awaitAll().filterNotNull().toMap()
-    }
-
-    suspend fun fetch(source: FundSource): Nav? = download(source)?.let { parseLatest(it) }
-
-    /** ファンドごとの設定来の推移を同時に取る(E05-12)。取れて1点以上あるものだけ返す(鍵は [FundSource.fundKey])。 */
+    /** ファンドごとの設定来の推移を同時に取る(E05-12。朝の確認もこれ: E05-13)。取れて1点以上あるものだけ返す(鍵は [FundSource.fundKey])。 */
     suspend fun fetchAllHistory(sources: List<FundSource>): Map<String, List<Nav>> = coroutineScope {
         sources.map { s -> async { fetchHistory(s)?.takeIf { it.isNotEmpty() }?.let { s.fundKey to it } } }
             .awaitAll().filterNotNull().toMap()

@@ -51,7 +51,7 @@ fun FundHoldingsScreen(
     /** 基準価額の取り先と取れた基準価額(E05-09)。端末の控え */
     loadSources: () -> List<FundSource> = { emptyList() },
     loadNavs: () -> Map<String, Nav> = { emptyMap() },
-    /** 設定来の最高値(E05-12)。「今すぐ基準価額を取る」で取ったもの */
+    /** 設定来の最高値(E05-12)。端末の控え(E05-13) */
     loadPeaks: () -> Map<String, Nav> = { emptyMap() },
     /** 取り先を保存する。(区分, ファンド名, ISIN, 協会コード, 結果) */
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
@@ -253,7 +253,7 @@ private fun FundRow(
                         NavBase.PEAK -> {
                             val d = FundNow.fromPeak(nav, peak)
                             if (peak == null || d == null) {
-                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は「今すぐ基準価額を取る」で取ります")
+                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は「今すぐ基準価額を取る」か、次の朝の確認で取ります")
                             } else {
                                 Text(
                                     "基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値 ${money.unit(peak.yen)}(${peak.date})より ${signedRatio(money, d)}",
@@ -363,7 +363,7 @@ private fun NowSummary(held: List<FundHoldings.Fund>, navs: Map<String, Nav>, pe
                 val t = FundNow.peakTotal(held, navs, peaks)
                 val r = t.ratio
                 if (t.count == 0 || r == null) {
-                    Label("「今すぐ基準価額を取る」を押すと、ファンドごとの設定来の最高値を取って比べます")
+                    Label("「今すぐ基準価額を取る」を押すか次の朝の確認で、ファンドごとの設定来の最高値を取って比べます")
                 } else {
                     Text(
                         // 実額では額と%、%表示では%だけ(含み益と同じ出し方)

@@ -57,6 +57,15 @@ class FundNowTest {
     }
 
     @Test
+    fun `ファンドごとの最高値は点の無いファンドを入れない`() {
+        val histories = mapOf(
+            "NISA|A" to listOf(nav("2026-01-05", 10_000), nav("2026-06-01", 12_000), nav("2026-09-25", 11_000)),
+            "NISA|B" to emptyList(),
+        )
+        assertEquals(mapOf("NISA|A" to nav("2026-06-01", 12_000)), FundNow.peaks(histories))
+    }
+
+    @Test
     fun `最高値のときの評価額は今の見積もりの口数に最高値を掛ける`() {
         val now = nav("2026-09-25", 13_500)
         val e = FundNow.estimate(snap(100_000, 80_000, 12_000), now)!!

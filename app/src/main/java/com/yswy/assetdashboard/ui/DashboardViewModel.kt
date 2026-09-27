@@ -9,7 +9,6 @@ import com.yswy.assetdashboard.data.AutoSyncPrefs
 import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.BudgetStore
 import com.yswy.assetdashboard.data.FundHoldings
-import com.yswy.assetdashboard.data.FundNow
 import com.yswy.assetdashboard.data.FundLocalStore
 import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
@@ -373,19 +372,16 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     /** 取れた最新の基準価額(E05-09)。端末の控え。 */
     fun navs(): Map<String, Nav> = fundStore.navs()
 
-    /** 設定来の最高値(E05-12)。「今すぐ基準価額を取る」で取ったもの。端末に残さない(見るときに取る) */
-    private var navPeaks: Map<String, Nav> = emptyMap()
-
-    fun navPeaks(): Map<String, Nav> = navPeaks
+    /** 設定来の最高値(E05-12)。端末の控え(E05-13。朝の確認と「今すぐ基準価額を取る」で更新)。 */
+    fun navPeaks(): Map<String, Nav> = fundStore.peaks()
 
     /**
      * 今すぐ基準価額を取る(E05-09)。通知はしない。取れた本数を返す。
-     * 設定来の推移を取って、最新の点を控え、最高値を覚えておく(E05-12。最新の1点を取るのと同じCSV)。
+     * 設定来の推移を取って、最新の点と最高値を控える(E05-12・E05-13。最新の1点を取るのと同じCSV)。
      */
     suspend fun refreshNavs(): Int {
         val histories = NavFetcher.fetchAllHistory(fundStore.sources())
-        fundStore.saveNavs(fundStore.navs() + histories.mapValues { it.value.last() })
-        navPeaks = navPeaks + histories.mapNotNull { (k, v) -> FundNow.peak(v)?.let { k to it } }
+        fundStore.saveFromHistories(histories)
         return histories.size
     }
 

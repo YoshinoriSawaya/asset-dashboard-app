@@ -100,9 +100,10 @@ object DailyCheck {
         val local = FundLocalStore(context)
         val sources = local.sources()
         if (sources.isEmpty()) return NavAlert.Result(emptyList(), emptyList())
-        val fetched = NavFetcher.fetchAll(sources)
-        val navs = local.navs() + fetched
-        local.saveNavs(navs)
+        // 設定来の推移を取り、最新の点と最高値(E05-13)を控える。最新の1点だけを取るのと同じCSV
+        val histories = NavFetcher.fetchAllHistory(sources)
+        val fetched = histories.mapValues { it.value.last() }
+        local.saveFromHistories(histories)
         Log.i(TAG, "基準価額 ${fetched.size}/${sources.size}本")
         val holdings = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX))
         // 今朝取れなかったファンドは、前に取れた値では判定しない(古い値で知らせない)
