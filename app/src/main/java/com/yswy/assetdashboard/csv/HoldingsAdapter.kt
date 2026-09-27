@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard.csv
 
+import com.yswy.assetdashboard.data.FundHoldings
 import java.time.LocalDate
 
 /**
@@ -19,6 +20,10 @@ import java.time.LocalDate
  * 投資信託（金額/特定預り）
  * ファンド名,買付日,...
  * ```
+ *
+ * ## ファンドごとの取得額と評価額も持つ(E01-17)
+ * 区分の合計とは別に、ファンドごとの評価額・取得額(評価額 − 損益)・取得単価・現在値を `#保有|…` の系列にする
+ * ([FundHoldings])。一覧には出さない。
  *
  * ## 区分ごとの評価額の合計を1つのMetricにする(本人が選んだ)
  * 系列名は区分の見出しそのまま(`投資信託→NISA` のような対応付けはしない。CLAUDE.md)。
@@ -42,15 +47,29 @@ object HoldingsAdapter : CsvAdapter {
     /** 文字の行から日付を探す。`2026/09/25 15:00現在` `2026年9月25日` など。 */
     private val DATE_IN_TEXT = Regex("""(\d{4})[/\-年](\d{1,2})[/\-月](\d{1,2})""")
 
-    /** 見出しの列の並び: 名前の列と評価額の列の位置。 */
-    private data class Columns(val name: Int, val value: Int, val size: Int)
+    /**
+     * 見出しの列の並び: 名前の列と評価額の列の位置。損益・取得単価・現在値は、あれば(E01-17)。
+     */
+    private data class Columns(
+        val name: Int,
+        val value: Int,
+        val size: Int,
+        val profit: Int? = null,
+        val unitCost: Int? = null,
+        val price: Int? = null,
+    )
 
     private fun columnsOf(row: List<String>): Columns? {
         val normalized = row.map { it.normalizeHeader() }
         val name = normalized.indexOfFirst { it in NAME_COLUMNS || it.startsWith("銘柄") }
         val value = normalized.indexOf(VALUE_COLUMN)
+        fun indexOf(vararg names: String) = normalized.indexOfFirst { it in names }.takeIf { it >= 0 }
         // 区分の合計の「評価額,損益,損益（％）」は名前の列が無いので当たらない
-        return if (name >= 0 && value >= 0) Columns(name, value, row.size) else null
+        return if (name >= 0 && value >= 0) {
+            Columns(name, value, row.size, indexOf("損益", "評価損益"), indexOf("取得単価", "平均取得単価"), indexOf("現在値", "基準価額"))
+        } else {
+            null
+        }
     }
 
     /** 見出しは1行目ではないので、1行目だけでは判定しない。 */
@@ -64,6 +83,8 @@ object HoldingsAdapter : CsvAdapter {
     override fun parseRows(rows: List<List<String>>, fileDate: LocalDate): ParseResult {
         val date = dateInText(rows) ?: fileDate
         val totals = LinkedHashMap<String, Long>()
+        // ファンドごとの値(E01-17)。名前は FundHoldings.key
+        val funds = LinkedHashMap<String, Long>()
         val skipped = mutableListOf<SkippedRow>()
 
         var section: String? = null
@@ -101,9 +122,22 @@ object HoldingsAdapter : CsvAdapter {
             }
             val key = section ?: DEFAULT_SECTION
             totals[key] = (totals[key] ?: 0L) + value
+
+            // ファンドごと(E01-17)。同じファンドが同じ区分に2行あれば、評価額と取得額は足し、単価は後の行
+            val name = cells[current.name]
+            fun cell(i: Int?) = i?.let { FieldParsers.parseAmount(cells.getOrNull(it).orEmpty()) }
+            fun add(field: String, yen: Long) {
+                val k = FundHoldings.key(key, name, field)
+                funds[k] = (funds[k] ?: 0L) + yen
+            }
+            add(FundHoldings.VALUE, value)
+            cell(current.profit)?.let { add(FundHoldings.COST, value - it) }
+            cell(current.unitCost)?.let { funds[FundHoldings.key(key, name, FundHoldings.UNIT_COST)] = it }
+            cell(current.price)?.let { funds[FundHoldings.key(key, name, FundHoldings.PRICE)] = it }
         }
 
-        val points = totals.map { (key, yen) -> MetricPoint(key, date, yen) }
+        val points = totals.map { (key, yen) -> MetricPoint(key, date, yen) } +
+            funds.map { (key, yen) -> MetricPoint(key, date, yen) }
         return ParseResult(id, ParsedData.Metrics(points), skipped)
     }
 

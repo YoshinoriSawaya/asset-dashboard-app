@@ -8,6 +8,7 @@ import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
 import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.BudgetStore
+import com.yswy.assetdashboard.data.FundHoldings
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
@@ -346,6 +347,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 手元の明細の全部。カテゴリ別の支出(E07-25)に使う。 */
     suspend fun transactions(): List<BankTransactionEntity> = db.bankTransactionDao().all()
+
+    /** ファンドごとの取得額と評価額(E01-17)。 */
+    suspend fun fundHoldings(): FundHoldings = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX))
 
     /** 純資産の将来の見通し(E09-06)。純資産に数える系列が無い・明細が無ければnull。 */
     suspend fun netWorthOutlook(): NetWorthOutlook? {

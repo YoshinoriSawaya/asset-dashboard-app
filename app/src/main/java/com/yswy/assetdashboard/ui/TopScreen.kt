@@ -81,6 +81,8 @@ fun TopScreen(
     onOpenFixedCosts: () -> Unit = {},
     /** 前の月の振り返り(E03-10) */
     onOpenReview: () -> Unit = {},
+    /** 投資信託の損益(E01-17) */
+    onOpenFunds: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -197,6 +199,7 @@ fun TopScreen(
                         "積立投資の目安" to onOpenInvest,
                         "余剰資金の配分" to onOpenSurplus,
                         "大型出費の予定" to onOpenCalendar,
+                        "投資信託の損益" to onOpenFunds,
                     ),
                 )
                 MenuGroup(

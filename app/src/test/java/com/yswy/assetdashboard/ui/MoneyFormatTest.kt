@@ -7,6 +7,19 @@ import org.junit.Test
 
 class MoneyFormatTest {
 
+    @Test
+    fun `投資信託の含み益は実額で額と割合、%で割合だけ、マスクで伏せる。単価は実額のときだけ`() {
+        val real = MoneyFormat(PrivacyMode.REAL)
+        val pct = MoneyFormat(PrivacyMode.PERCENT)
+        val mask = MoneyFormat(PrivacyMode.MASK)
+        assertEquals("+26,000円(+25.0%)", gainText(real, 26_000, 104_000))
+        assertEquals("+25.0%", gainText(pct, 26_000, 104_000))
+        assertEquals(MoneyFormat.HIDDEN, gainText(mask, 26_000, 104_000))
+        assertEquals("+25.0%", ratioText(real, 2_500, 10_000))
+        assertEquals("12,500", real.unit(12_500))
+        assertEquals(MoneyFormat.HIDDEN_SHORT, pct.unit(12_500))
+    }
+
     private val real = MoneyFormat(PrivacyMode.REAL)
     private val percent = MoneyFormat(PrivacyMode.PERCENT)
     private val mask = MoneyFormat(PrivacyMode.MASK)

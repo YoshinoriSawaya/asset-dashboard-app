@@ -106,6 +106,17 @@ class CacheSyncTest {
     }
 
     @Test
+    fun `「#」で始まる系列(ファンドごとの値)は一覧の項目にしないが、点は残す`() {
+        val snapshot = CacheSync.build(
+            listOf(metrics("f", MetricPoint("投資信託", day, 1), MetricPoint("#保有|区分|ファンドA|評価額", day, 2))),
+            corrections = emptyList(),
+            settings = emptyList(),
+        )
+        assertEquals(listOf("metric:投資信託"), snapshot.items.map { it.id })
+        assertEquals(setOf("投資信託", "#保有|区分|ファンドA|評価額"), snapshot.points.map { it.metricKey }.toSet())
+    }
+
+    @Test
     fun `何も無ければ空`() {
         val snapshot = CacheSync.build(emptyList(), emptyList(), emptyList())
         assertEquals(0, snapshot.items.size + snapshot.points.size + snapshot.transactions.size)

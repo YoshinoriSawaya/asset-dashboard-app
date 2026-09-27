@@ -1,5 +1,7 @@
 package com.yswy.assetdashboard.csv
 
+import com.yswy.assetdashboard.data.FundHoldings
+import com.yswy.assetdashboard.data.MetricPointEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -44,7 +46,7 @@ class HoldingsAdapterTest {
     @Test
     fun `区分ごとに評価額を足し、系列名は区分の見出しそのまま`() {
         val result = HoldingsAdapter.parseRows(portfolio, fileDate)
-        val points = (result.data as ParsedData.Metrics).points
+        val points = (result.data as ParsedData.Metrics).points.filterNot { it.metricKey.startsWith("#") }
         assertEquals(
             listOf(
                 MetricPoint("投資信託（金額/NISA預り（つみたて投資枠））", LocalDate.of(2026, 9, 25), 1_750),
@@ -57,12 +59,56 @@ class HoldingsAdapterTest {
     }
 
     @Test
+    fun `ファンドごとに評価額・取得額(評価額−損益)・取得単価・現在値を持つ`() {
+        val points = (HoldingsAdapter.parseRows(portfolio, fileDate).data as ParsedData.Metrics).points
+        val funds = FundHoldings.of(points.map { MetricPointEntity.from(it) })
+        assertEquals(listOf("見本ファンドA", "見本ファンドB", "見本ファンドC"), funds.funds.map { it.name })
+        val a = funds.funds.first()
+        assertEquals("投資信託（金額/NISA預り（つみたて投資枠））", a.section)
+        // 評価額1,200・損益200 → 取得額1,000。取得単価10,000・現在値12,000
+        assertEquals(FundHoldings.Snapshot(LocalDate.of(2026, 9, 25), 1_200, 1_000, 10_000, 12_000), a.latest)
+        assertEquals(200L, a.latest.gainYen)
+        assertEquals(0.2, a.latest.gainRatio!!, 1e-9)
+        // 損失のファンド: 評価額270・損益-30 → 取得額300
+        assertEquals(-30L, funds.funds.last().latest.gainYen)
+    }
+
+    @Test
+    fun `損益の列が無ければ取得額は無く、評価額だけ`() {
+        val noProfit = rows(
+            "投資信託（金額/特定預り）,",
+            "ファンド名,数量,評価額,",
+            "見本ファンドA,1000,1200,",
+        )
+        val fund = FundHoldings.of((HoldingsAdapter.parseRows(noProfit, fileDate).data as ParsedData.Metrics).points.map { MetricPointEntity.from(it) }).funds.single()
+        assertEquals(1_200L, fund.latest.valueYen)
+        assertNull(fund.latest.costYen)
+        assertNull(fund.latest.gainYen)
+    }
+
+    @Test
+    fun `取り込むたびに推移が1点ずつ増え、新しい日が先頭`() {
+        val day1 = (HoldingsAdapter.parseRows(portfolio, fileDate).data as ParsedData.Metrics).points
+        val later = portfolio.map { r -> r.map { it.replace("2026/09/25", "2026/10/25").replace("1200", "1300") } }
+        val day2 = (HoldingsAdapter.parseRows(later, fileDate).data as ParsedData.Metrics).points
+        val a = FundHoldings.of((day1 + day2).map { MetricPointEntity.from(it) }).funds.first { it.name == "見本ファンドA" }
+        assertEquals(listOf(LocalDate.of(2026, 10, 25), LocalDate.of(2026, 9, 25)), a.history.map { it.date })
+        assertEquals(1_300L, a.latest.valueYen)
+    }
+
+    @Test
+    fun `ファンド名に区切りの文字が入っていても分けられる`() {
+        assertEquals(Triple("区分", "A|B", "評価額"), FundHoldings.parseKey(FundHoldings.key("区分", "A|B", "評価額")))
+        assertNull(FundHoldings.parseKey("投資信託"))
+    }
+
+    @Test
     fun `日付が無ければファイルの日付、区分の見出しが無ければ既定の名前`() {
         val bare = rows(
             "ファンド名,買付日,数量,取得単価,現在値,前日比,前日比（％）,損益,損益（％）,評価額,",
             "見本ファンドA,----/--/--,1000,10000,12000,10,0.08,200,20.00,1200,",
         )
-        val points = (HoldingsAdapter.parseRows(bare, fileDate).data as ParsedData.Metrics).points
+        val points = (HoldingsAdapter.parseRows(bare, fileDate).data as ParsedData.Metrics).points.filterNot { it.metricKey.startsWith("#") }
         assertEquals(listOf(MetricPoint(HoldingsAdapter.DEFAULT_SECTION, fileDate, 1_200)), points)
     }
 
@@ -76,6 +122,6 @@ class HoldingsAdapterTest {
         )
         val result = HoldingsAdapter.parseRows(broken, fileDate)
         assertEquals(1, result.skipped.size)
-        assertEquals(550L, (result.data as ParsedData.Metrics).points.single().valueYen)
+        assertEquals(550L, (result.data as ParsedData.Metrics).points.filterNot { it.metricKey.startsWith("#") }.single().valueYen)
     }
 }

@@ -308,6 +308,8 @@ object CacheSync {
     private fun withAutoMetrics(settings: List<ItemEntity>, metricKeys: List<String>): List<ItemEntity> {
         val ids = settings.map { it.id }.toSet()
         val auto = metricKeys.distinct().sorted()
+            // 「#」で始まる系列(ファンドごとの値。E01-17)は一覧の項目にしない
+            .filterNot { it.startsWith("#") }
             .filter { Item.metricId(it) !in ids }
             .map { ItemEntity(id = Item.metricId(it), type = ItemType.METRIC, name = it, metricKey = it) }
         return settings + auto

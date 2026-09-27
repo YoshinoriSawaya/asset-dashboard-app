@@ -58,6 +58,10 @@ interface MetricPointDao {
     @Query("SELECT DISTINCT metricKey FROM metric_point ORDER BY metricKey")
     suspend fun keys(): List<String>
 
+    /** 名前が[prefix]で始まる系列の点(E01-17。ファンドごとの値)。[prefix]に % や _ を含めない。 */
+    @Query("SELECT * FROM metric_point WHERE metricKey LIKE :prefix || '%' ORDER BY date")
+    suspend fun withPrefix(prefix: String): List<MetricPointEntity>
+
     @Query("DELETE FROM metric_point WHERE metricKey = :metricKey AND date = :date")
     suspend fun delete(metricKey: String, date: LocalDate)
 

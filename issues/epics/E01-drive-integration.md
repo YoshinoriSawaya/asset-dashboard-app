@@ -22,6 +22,7 @@ inboxフォルダに置かれたCSVを検知・取得し、パースしてロー
 - [x] [E01-14: クレジットカード利用明細CSVの対応](../tasks/E01-14-credit-card-csv.md)
 - [x] [E01-15: 証券口座の保有商品一覧CSVの対応](../tasks/E01-15-securities-holdings-csv.md)
 - [x] [E01-16: 同じ名前のCSVでbackupが上書きされる不具合](../tasks/E01-16-backup-name-collision.md)
+- [x] [E01-17: 投資信託のファンドごとの取得額と評価額](../tasks/E01-17-fund-cost-basis.md)
 
 ## 完了条件
 CSVをinboxに置いてアプリを起動すると、自動でパース・バリデーションが走り、

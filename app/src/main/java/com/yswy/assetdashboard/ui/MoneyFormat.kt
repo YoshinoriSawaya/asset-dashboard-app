@@ -42,6 +42,16 @@ class MoneyFormat(val mode: PrivacyMode) {
         PrivacyMode.MASK -> HIDDEN
     }
 
+    /**
+     * 単価(E01-17。投資信託の取得単価・現在値)。1万口あたりの値などで円の金額ではないので「円」を付けない。
+     * 取得額が分かる手がかりになるので、実額のときだけ出す。
+     */
+    fun unit(value: Long): String = when (mode) {
+        PrivacyMode.REAL -> "%,d".format(value)
+        PrivacyMode.PERCENT -> HIDDEN_SHORT
+        PrivacyMode.MASK -> HIDDEN
+    }
+
     /** 進捗などの割合。%のときもそのまま出す。 */
     fun percent(ratio: Double): String = when (mode) {
         PrivacyMode.MASK -> HIDDEN

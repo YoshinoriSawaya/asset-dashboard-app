@@ -55,6 +55,7 @@ object Routes {
     const val CATEGORY_SPENDING = "category_spending"
     const val FIXED_COSTS = "fixed_costs"
     const val REVIEW = "review"
+    const val FUNDS = "funds"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -288,6 +289,11 @@ private fun Screens(
             onSaveBudget = viewModel::saveBudget,
             saving = state.syncing,
         )
+        route == Routes.FUNDS -> FundHoldingsScreen(
+            load = viewModel::fundHoldings,
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.REVIEW -> MonthlyReviewScreen(
             load = viewModel::monthlyReview,
             onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
@@ -390,6 +396,7 @@ private fun Screens(
             onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
             onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
             onOpenReview = { stack.add(Routes.REVIEW) },
+            onOpenFunds = { stack.add(Routes.FUNDS) },
             modifier = modifier,
         )
     }
