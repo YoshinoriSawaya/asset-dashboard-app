@@ -1,6 +1,7 @@
 package com.yswy.assetdashboard.data
 
 import com.yswy.assetdashboard.csv.CardStatementAdapter
+import com.yswy.assetdashboard.ui.FixedCostsText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -67,6 +68,31 @@ class FixedCostsTest {
         val costs = FixedCosts.of(rows, today)!!
         assertEquals(80_140L / 6, costs.consumptionYen)
         assertEquals(11_490.0 / (80_140L / 6), costs.consumptionShare!!, 1e-9)
+    }
+
+    private fun item(vararg byMonth: Long) =
+        FixedCosts.Item("支払い", null, null, byMonth.toList(), today)
+
+    @Test
+    fun `前の月まで定額だった支払いが、いちばん新しい月に5%を超えて上がったら値上がり`() {
+        assertEquals(990L to 1_290L, item(990, 990, 990, 990, 990, 1_290).priceIncrease)
+        // 出ていない月があっても、出ていた月で見る
+        assertEquals(990L to 1_290L, item(990, 0, 990, 990, 0, 1_290).priceIncrease)
+        // 5%以内は値上がりにしない
+        assertNull(item(1_000, 1_000, 1_000, 1_000, 1_000, 1_040).priceIncrease)
+        // もともと変動(電気代など)は見ない
+        assertNull(item(8_000, 12_000, 10_000, 10_000, 10_000, 15_000).priceIncrease)
+        // 前の月までに2か月以上出ていなければ見ない / 下がった / 先月は無し
+        assertNull(item(0, 0, 0, 0, 990, 1_290).priceIncrease)
+        assertNull(item(990, 990, 990, 990, 990, 790).priceIncrease)
+        assertNull(item(990, 990, 990, 990, 990, 0).priceIncrease)
+    }
+
+    @Test
+    fun `値上がりした支払いは「定額(値上がり)」と見せる`() {
+        assertEquals("定額(値上がり)", FixedCostsText.amountKind(item(990, 990, 990, 990, 990, 1_290)))
+        assertEquals("定額", FixedCostsText.amountKind(item(990, 990, 990, 990, 990, 990)))
+        assertEquals("変動", FixedCostsText.amountKind(item(8_000, 12_000, 10_000, 10_000, 10_000, 15_000)))
     }
 
     @Test

@@ -194,6 +194,42 @@ class NotificationRulesTest {
         assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf(notice.key to today), august).isEmpty())
     }
 
+    // E07-28: 固定費の値上がりの通知
+    private fun card(date: String, desc: String, yen: Long) = BankTransactionEntity(
+        "k${n++}", LocalDate.parse(date), desc, yen, null, null, null, CardStatementAdapter.LABEL, "f",
+    )
+
+    /** 3〜8月に毎月出る支払い。動画・音楽・家賃振込は8月に値上がり、電話は据え置き。 */
+    private fun fixedRows(withThisMonth: Boolean) = buildList {
+        listOf("03", "04", "05", "06", "07", "08").forEach { m ->
+            val up = m == "08"
+            add(card("2026-$m-05", "動画サブスク", if (up) 1_290 else 990))
+            add(card("2026-$m-06", "音楽サブスク", if (up) 1_180 else 980))
+            add(card("2026-$m-07", "振込 ﾀﾅｶ ﾀﾛｳ", if (up) 60_000 else 50_000))
+            add(card("2026-$m-08", "電話", 2_000))
+        }
+        if (withThisMonth) add(card("2026-09-02", "コンビニ", 500))
+    }
+
+    @Test
+    fun `前の月に値上がりした固定費があれば、その月につき1度、名前だけで知らせる`() {
+        val costs = NotificationRules.lastMonthFixedCosts(fixedRows(withThisMonth = true), today)!!
+        val notice = NotificationRules.evaluate(today, fresh, emptyList(), emptyMap(), fixedCosts = costs).single()
+        assertEquals("priceup:2026-08", notice.key)
+        assertEquals("固定費が値上がりしました", notice.title)
+        // 額の多い順に2つまで。振込の相手は伏せる。3つ目からは「など」
+        assertEquals("振込(相手は伏せる)・動画サブスクなど。アプリの「固定費・サブスク」で確認してください。", notice.text)
+        assertFalse(notice.text.contains("ﾀﾅｶ"))
+        assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf(notice.key to today), fixedCosts = costs).isEmpty())
+    }
+
+    @Test
+    fun `前の月が締まっていなければ固定費の値上がりは知らせない`() {
+        assertNull(NotificationRules.lastMonthFixedCosts(fixedRows(withThisMonth = false), today))
+        // 10月に見ると、見た月の最後(9月)に明細が無いので、古い月の値上がりで知らせない
+        assertNull(NotificationRules.lastMonthFixedCosts(fixedRows(withThisMonth = false) + card("2026-10-01", "コンビニ", 500), LocalDate.of(2026, 10, 3)))
+    }
+
     @Test
     fun `今月の明細がまだ無ければ、前の月は締まっていないとみて知らせない`() {
         assertNull(NotificationRules.lastMonthSpending(spendingRows(withThisMonth = false), today))

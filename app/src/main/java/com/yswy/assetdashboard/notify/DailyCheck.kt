@@ -63,12 +63,14 @@ object DailyCheck {
     suspend fun run(context: Context, today: LocalDate = LocalDate.now()): Int {
         val db = AppDatabase.get(context)
         val store = NotifyStore(context)
+        val transactions = db.bankTransactionDao().all()
         val notices = NotificationRules.evaluate(
             today = today,
             sync = SyncStatus.load(db, today),
             overviews = ItemOverview.load(db, today),
             lastNotified = store.load(),
-            lastMonth = NotificationRules.lastMonthSpending(db.bankTransactionDao().all(), today),
+            lastMonth = NotificationRules.lastMonthSpending(transactions, today),
+            fixedCosts = NotificationRules.lastMonthFixedCosts(transactions, today),
         )
         if (!canNotify(context)) {
             // 許可が無ければ出せない。記録もしない(許可されたら出せるように)

@@ -105,7 +105,7 @@ object AiExport {
             for (item in fixedCosts.items) {
                 appendLine(
                     "| ${maskedName(item.description)} | ${item.category ?: "カテゴリなし"} | ${yen(item.monthlyYen)} | ${yen(item.yearlyYen)} | " +
-                        "${if (item.fixedAmount) "定額" else "変動"} | ${item.hitMonths}/$n${if (item.missingLastMonth) "(先月は無し)" else ""} |",
+                        "${FixedCostsText.amountKind(item)} | ${item.hitMonths}/$n${if (item.missingLastMonth) "(先月は無し)" else ""} |",
                 )
             }
             appendLine()

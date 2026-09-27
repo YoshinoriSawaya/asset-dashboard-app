@@ -49,7 +49,25 @@ data class FixedCosts(
 
         /** 前の月までは出ていたのに、いちばん新しい月に出ていない(解約済みかもしれない)。 */
         val missingLastMonth: Boolean get() = byMonth.lastOrNull() == 0L
+
+        /**
+         * 値上がり(E07-28)。前の月まで定額だった支払い(2か月以上出ていて、額の幅が5%以内)が、いちばん新しい月に
+         * それまでの最大額より5%を超えて高くなったら、(前の額, 新しい額)。そうでなければnull。
+         */
+        val priceIncrease: Pair<Long, Long>?
+            get() {
+                val last = byMonth.lastOrNull()?.takeIf { it != 0L } ?: return null
+                val before = byMonth.dropLast(1).filter { it != 0L }
+                if (before.size < 2) return null
+                val avg = before.sum() / before.size
+                if (before.max() - before.min() > abs(avg) * FIXED_TOLERANCE) return null
+                val old = before.max()
+                return if (last > old + abs(old) * FIXED_TOLERANCE) old to last else null
+            }
     }
+
+    /** いちばん新しい月に値上がりした支払い(E07-28)。 */
+    val increased: List<Item> get() = items.filter { it.priceIncrease != null }
 
     val monthlyTotalYen: Long get() = items.sumOf { it.monthlyYen }
     val yearlyTotalYen: Long get() = monthlyTotalYen * 12

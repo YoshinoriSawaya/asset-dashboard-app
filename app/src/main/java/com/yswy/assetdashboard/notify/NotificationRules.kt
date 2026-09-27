@@ -3,6 +3,8 @@ package com.yswy.assetdashboard.notify
 import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.CategorySpending
 import com.yswy.assetdashboard.data.Drawdown
+import com.yswy.assetdashboard.data.FixedCosts
+import com.yswy.assetdashboard.ui.AiExport
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.RampUp
@@ -57,6 +59,8 @@ object NotificationRules {
         lastNotified: Map<String, LocalDate>,
         /** 前の月のカテゴリ別の支出(E05-08)。その月の明細が出そろっていなければnull([lastMonthSpending]) */
         lastMonth: CategorySpending? = null,
+        /** 前の月までの固定費(E07-28)。前の月が締まっていなければnull([lastMonthFixedCosts]) */
+        fixedCosts: FixedCosts? = null,
     ): List<Notice> {
         val notices = mutableListOf<Notice>()
 
@@ -171,7 +175,26 @@ object NotificationRules {
                 )
             }
         }
+        // E07-28: 前の月に値上がりした固定費があれば、その月につき1度。金額は出さず名前だけ(振込の相手は伏せる)
+        fixedCosts?.let { costs ->
+            val names = costs.increased.map { AiExport.maskedName(it.description) }.distinct()
+            val key = "priceup:${costs.months.last()}"
+            if (names.isNotEmpty() && key !in lastNotified) {
+                val shown = names.take(2).joinToString("・") + if (names.size > 2) "など" else ""
+                notices += Notice(key, "固定費が値上がりしました", "$shown。アプリの「固定費・サブスク」で確認してください。")
+            }
+        }
         return notices
+    }
+
+    /**
+     * 通知に使う固定費(E07-28)。見た月の最後が前の月で、前の月が締まっている(今月の明細がある)ときだけ。
+     * 前の月の明細が無い(同期していない)まま古い月で判定しないように。
+     */
+    fun lastMonthFixedCosts(transactions: List<BankTransactionEntity>, today: LocalDate): FixedCosts? {
+        val thisMonth = YearMonth.from(today)
+        if (transactions.none { YearMonth.from(it.date) == thisMonth }) return null
+        return FixedCosts.of(transactions, today)?.takeIf { it.months.last() == thisMonth.minusMonths(1) }
     }
 
     /**

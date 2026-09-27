@@ -83,10 +83,18 @@ fun FixedCostsScreen(
                         Text(item.description, style = MaterialTheme.typography.bodyLarge)
                         Text(
                             "${item.category ?: "カテゴリなし"} ・ ${item.hitMonths}/${costs.months.size}か月 ・ " +
-                                (if (item.fixedAmount) "定額" else "変動") + " ・ 最後 ${item.lastDate}",
+                                FixedCostsText.amountKind(item) + " ・ 最後 ${item.lastDate}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // 値上がり(E07-28)。%は前の額に対する増え方(金額を隠す表示でも見える)
+                        item.priceIncrease?.let { (old, new) ->
+                            Text(
+                                "値上がり(${money.change(new - old, old)})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                         if (item.missingLastMonth) {
                             Text(
                                 "先月は無し(解約済み?)",
@@ -119,6 +127,16 @@ fun FixedCostsScreen(
         item {
             TextButton(onClick = onOpenCategories, modifier = Modifier.padding(top = 8.dp)) { Text("明細のカテゴリを見直す") }
         }
+    }
+}
+
+/** 固定費の見せ方の言葉(E07-26・E07-28)。画面とAI用の書き出しで同じにする。 */
+object FixedCostsText {
+    /** 定額か変動か。値上がりした支払いは額の幅が広がって変動に見えるので「定額(値上がり)」にする。 */
+    fun amountKind(item: FixedCosts.Item): String = when {
+        item.priceIncrease != null -> "定額(値上がり)"
+        item.fixedAmount -> "定額"
+        else -> "変動"
     }
 }
 
