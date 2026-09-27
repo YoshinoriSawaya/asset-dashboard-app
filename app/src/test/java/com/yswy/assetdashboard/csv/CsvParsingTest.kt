@@ -36,6 +36,11 @@ class CsvParsingTest {
         // 小数は円に丸める。数字だけを拾うと100倍になっていた(E01-15)
         assertEquals(1_234_568L, FieldParsers.parseAmount("1,234,567.50"))
         assertEquals(1_234_567L, FieldParsers.parseAmount("1234567.00"))
+        // 「+」の付いた小数(証券の損益。E01-18)。外さないと小数として読めず100倍になった
+        assertEquals(1_235L, FieldParsers.parseAmount("+1,234.56"))
+        assertEquals(1_235L, FieldParsers.parseAmount("＋1234.56"))
+        assertEquals(-1_235L, FieldParsers.parseAmount("-1,234.56"))
+        assertEquals(500L, FieldParsers.parseAmount("+500"))
         assertEquals(-1_235L, FieldParsers.parseAmount("-1,234.9"))
         assertEquals(12L, FieldParsers.parseAmount("１２．３"))
     }

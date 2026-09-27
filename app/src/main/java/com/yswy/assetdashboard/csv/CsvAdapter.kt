@@ -209,9 +209,10 @@ internal object FieldParsers {
         val negative = text.startsWith("-") || text.startsWith("△") || text.startsWith("▲")
 
         // 小数のある額(証券の評価額など。E01-15)は円に丸める。数字だけを拾うと
-        // 小数点が消えて「1234567.00」が100倍になる(実物で踏んだ)
+        // 小数点が消えて「1234567.00」が100倍になる(実物で踏んだ)。
+        // 損益の「+1234.56」のように「+」が付いていても外す(E01-18。外さないと小数として読めず100倍になった)
         val plain = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC)
-            .removePrefix("-").removePrefix("△").removePrefix("▲")
+            .removePrefix("-").removePrefix("+").removePrefix("△").removePrefix("▲")
             .replace(",", "").removeSuffix("円").trim()
         DECIMAL.matchEntire(plain)?.let {
             val magnitude = java.math.BigDecimal(plain).setScale(0, java.math.RoundingMode.HALF_UP).toLong()

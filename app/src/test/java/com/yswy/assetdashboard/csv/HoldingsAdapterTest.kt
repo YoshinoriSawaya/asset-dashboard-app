@@ -74,6 +74,18 @@ class HoldingsAdapterTest {
     }
 
     @Test
+    fun `損益に「+」と小数が付いていても取得額が合う`() {
+        val signed = rows(
+            "投資信託（金額/特定預り）,",
+            "ファンド名,買付日,数量,取得単価,現在値,前日比,前日比（％）,損益,損益（％）,評価額,",
+            "見本ファンドA,----/--/--,1000,10000,12000,+10,+0.08,+200.40,+20.04,1200.40,",
+        )
+        val fund = FundHoldings.of((HoldingsAdapter.parseRows(signed, fileDate).data as ParsedData.Metrics).points.map { MetricPointEntity.from(it) }).funds.single()
+        // 評価額1,200(1200.40を丸め) − 損益200(+200.40を丸め) = 1,000
+        assertEquals(1_000L, fund.latest.costYen)
+    }
+
+    @Test
     fun `損益の列が無ければ取得額は無く、評価額だけ`() {
         val noProfit = rows(
             "投資信託（金額/特定預り）,",
