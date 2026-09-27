@@ -234,6 +234,30 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 
 「最後に出した日」の記録は `shared_prefs/notify.xml`。消すと同じ通知がもう一度出る。
 
+## 確認用の一時データを入れる
+
+本人のデータに無い状態(値上がりした支払い、予算を超えた月など)を確かめるときは、**エミュレータのローカルにだけ**
+一時データを入れ、最後に必ず元に戻す。Driveには書かない(画面から保存するとDriveに書かれるので、保存は押さない)。
+
+```powershell
+& $adb -s emulator-5554 root
+$app = "/data/data/com.yswy.assetdashboard"
+# 1. 通知の記録を控える
+& $adb -s emulator-5554 shell cp $app/shared_prefs/notify.xml /data/local/tmp/notify.xml.bak
+# 2. 明細などの行を足す。日本語を含むSQLはファイルに書いて流す(引数に入れると化ける)
+Get-Content -Raw -Encoding UTF8 tmp.sql | & $adb -s emulator-5554 shell sqlite3 $app/databases/asset-dashboard.db
+# 3. 端末の控え(予算 budgets.xml・取り先 funds.xml など)は、XMLを置いて持ち主をアプリにそろえる
+& $adb -s emulator-5554 push budgets.xml $app/shared_prefs/budgets.xml
+& $adb -s emulator-5554 shell ls -ld $app                         # 持ち主(u0_aNNN)を見る
+& $adb -s emulator-5554 shell chown u0_aNNN:u0_aNNN $app/shared_prefs/budgets.xml
+& $adb -s emulator-5554 shell chmod 660 $app/shared_prefs/budgets.xml
+```
+
+片付け: 足した行を消す(`sourceFileId = 'tmp'` のように目印を付けておく)、置いたXMLを消す、控えた `notify.xml` を戻す、
+金額の表示を「実額」に戻す(戻したあと数秒待ってからアプリを閉じる。すぐ閉じると保存されない)。
+
+画面の数字は、DBから別に計算した値とスクリプトの中で突き合わせ、会話には「一致/不一致」と割合だけを出す(金額は出さない)。
+
 ## 踏んだ落とし穴
 
 | 症状 | 原因 |
@@ -262,3 +286,7 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 | リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |
 | adbのスワイプで、入力欄に「to to to…」と文字が入る | 入力欄にフォーカスが残ってソフトキーボードが開いたまま、スワイプがジェスチャー入力になった。文字を打ったあとは `input keyevent 4` でキーボードを閉じ、`dumpsys input_method` の `mInputShown=false` を見てからスクロールする([E07-23](../issues/tasks/E07-23-uncategorized-review.md)) |
 | エミュレータの入力欄に日本語を入れたい | `input text` は英数字だけ。Windowsで `Set-Clipboard` してから入力欄をタップし、`input keyevent 279`(貼り付け)。エミュレータとクリップボードが共有される |
+| git worktree でビルドすると SDK が見つからない | `local.properties` はgitに入らないので worktree に無い。元のチェックアウトから写す。リリースのビルドは `keystore.properties` も写し、終わったら消す |
+| worktree を消そうとしても、フォルダが残る | Gradleのデーモンがフォルダの中をつかんでいる。先に `gradlew --stop` |
+| Git Bash から adb で sqlite にDBのパスを渡すとエラー(`C:/Program`) | Git Bash が `/data/...` をWindowsのパスに書き換える。sqlite はPowerShellから流す |
+| 画面の自動操作で、似た名前の文字を取り違える | 見出しと同じ文字のボタン、欄に入っている文字などを拾う。探す範囲(見出しより下など)を絞る。大量の付け直しの自動操作は遅く壊れやすい(E07-24で中止した)ので、CSVのまとめ取り込みか手作業にする |
