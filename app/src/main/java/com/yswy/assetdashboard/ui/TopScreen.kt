@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -178,29 +180,43 @@ fun TopScreen(
             }
         }
 
+        // 入口(E03-11)。まとまりごとに見出しを付け、2列のボタンに並べる(本人が選んだ)
         item {
-            TextButton(onClick = onAddGoal, modifier = Modifier.padding(top = 8.dp)) {
-                Text("+ 目標を追加")
-            }
-            TextButton(onClick = onAddReminder) { Text("+ リマインダーを追加(点検・保険の更新など)") }
-            TextButton(onClick = onOpenCalendar) { Text("大型出費の予定(向こう3年)") }
-            TextButton(onClick = onOpenReview) { Text("前の月の振り返り") }
-            TextButton(onClick = onOpenCategorySpending) { Text("カテゴリ別の支出(月ごと)") }
-            TextButton(onClick = onOpenFixedCosts) { Text("固定費・サブスク(毎月の支払い)") }
-            TextButton(onClick = onOpenInvest) { Text("積立投資の目安") }
-            TextButton(onClick = onOpenSurplus) { Text("余剰資金の配分案(ボーナスなど)") }
-            TextButton(onClick = onOpenCategories) { Text("明細のカテゴリ(生活費・遊び代・振替など)") }
-            TextButton(onClick = onOpenPlanImport) { Text("大型出費の予定をまとめて取り込む") }
-            TextButton(onClick = onAddManual) {
-                Text("+ 手入力の系列を追加(現金など)")
-            }
-            TextButton(onClick = onOpenExport) { Text("AI相談用にコピー") }
-            // まだ置いていなければ、ウィジェットを置く入口を出す(E04-01)
-            val context = LocalContext.current
-            if (!SyncStatusWidget.isPlaced(context)) {
-                TextButton(onClick = { SyncStatusWidget.requestPin(context) }) {
-                    Text("ホーム画面にウィジェットを置く")
-                }
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+                MenuGroup(
+                    "振り返る",
+                    listOf(
+                        "前の月の振り返り" to onOpenReview,
+                        "カテゴリ別の支出" to onOpenCategorySpending,
+                        "固定費・サブスク" to onOpenFixedCosts,
+                    ),
+                )
+                MenuGroup(
+                    "貯める・備える",
+                    listOf(
+                        "積立投資の目安" to onOpenInvest,
+                        "余剰資金の配分" to onOpenSurplus,
+                        "大型出費の予定" to onOpenCalendar,
+                    ),
+                )
+                MenuGroup(
+                    "追加する",
+                    listOf(
+                        "+ 目標" to onAddGoal,
+                        "+ リマインダー" to onAddReminder,
+                        "+ 手入力の系列" to onAddManual,
+                    ),
+                )
+                MenuGroup(
+                    "設定・取り込み",
+                    buildList {
+                        add("明細のカテゴリ" to onOpenCategories)
+                        add("予定の取り込み" to onOpenPlanImport)
+                        add("AI相談用にコピー" to onOpenExport)
+                        // まだ置いていなければ、ウィジェットを置く入口を出す(E04-01)
+                        if (!SyncStatusWidget.isPlaced(context)) add("ウィジェットを置く" to { SyncStatusWidget.requestPin(context) })
+                    },
+                )
             }
         }
 
@@ -237,6 +253,31 @@ fun TopScreen(
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = 16.dp),
             )
+        }
+    }
+}
+
+/**
+ * 入口のまとまり(E03-11)。見出しと、2列に並べたボタン。奇数なら最後の段は左だけ。
+ * 入口が増えて縦に長くなったので、まとまりごとに分けて短い名前にした。
+ */
+@Composable
+private fun MenuGroup(title: String, entries: List<Pair<String, () -> Unit>>) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+    )
+    entries.chunked(2).forEach { pair ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            pair.forEach { (label, onClick) ->
+                FilledTonalButton(onClick = onClick, modifier = Modifier.weight(1f)) {
+                    Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            // 奇数のとき、右を空けて左のボタンの幅をそろえる
+            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
