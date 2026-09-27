@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.OutlinedTextField
 import com.yswy.assetdashboard.data.FundHoldings
+import com.yswy.assetdashboard.data.FundNow
 import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
 import com.yswy.assetdashboard.data.NavHistory
@@ -50,6 +51,8 @@ fun FundHoldingsScreen(
     /** 基準価額の取り先と取れた基準価額(E05-09)。端末の控え */
     loadSources: () -> List<FundSource> = { emptyList() },
     loadNavs: () -> Map<String, Nav> = { emptyMap() },
+    /** 設定来の最高値(E05-12)。「今すぐ基準価額を取る」で取ったもの */
+    loadPeaks: () -> Map<String, Nav> = { emptyMap() },
     /** 取り先を保存する。(区分, ファンド名, ISIN, 協会コード, 結果) */
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
     /** 今すぐ基準価額を取る。取れた本数 */
@@ -67,6 +70,9 @@ fun FundHoldingsScreen(
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     var sources by remember { mutableStateOf(loadSources()) }
     var navs by remember { mutableStateOf(loadNavs()) }
+    var peaks by remember { mutableStateOf(loadPeaks()) }
+    // 何と比べるか(E05-12)。本人が「最高値を基準にする」切り替えを求めた
+    var base by rememberSaveable { mutableStateOf(NavBase.COST) }
     var navMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -113,11 +119,18 @@ fun FundHoldingsScreen(
                     scope.launch {
                         val n = onRefreshNavs()
                         navs = loadNavs()
+                        peaks = loadPeaks()
                         navMessage = "${sources.size}本のうち${n}本取れました"
                     }
                 }) { Text("今すぐ基準価額を取る") }
             }
             navMessage?.let { Label(it) }
+            if (sources.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NavBase.entries.forEach { b -> FilterChip(base == b, onClick = { base = b }, label = { Text(b.label) }) }
+                }
+                NowSummary(h.held, navs, peaks, base)
+            }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
         items(h.held, key = { it.section + "|" + it.name }) { fund ->
@@ -127,6 +140,8 @@ fun FundHoldingsScreen(
                 onToggle = { key -> open = if (open == key) null else key },
                 sources = sources,
                 navs = navs,
+                peak = peaks[fund.section + "|" + fund.name],
+                base = base,
                 saving = saving,
                 onSearch = onSearch,
                 onLoadHistory = onLoadHistory,
@@ -152,6 +167,8 @@ fun FundHoldingsScreen(
                     onToggle = { key -> open = if (open == key) null else key },
                     sources = sources,
                     navs = navs,
+                    peak = peaks[fund.section + "|" + fund.name],
+                    base = base,
                     saving = saving,
                     onSearch = onSearch,
                     onLoadHistory = onLoadHistory,
@@ -175,6 +192,8 @@ private fun FundRow(
     onToggle: (String) -> Unit,
     sources: List<FundSource>,
     navs: Map<String, Nav>,
+    peak: Nav?,
+    base: NavBase,
     saving: Boolean,
     onSearch: suspend (String) -> List<FundSearch.Candidate>?,
     onLoadHistory: suspend (FundSource) -> List<Nav>?,
@@ -211,12 +230,44 @@ private fun FundRow(
                 // 毎朝取った基準価額(E05-09)と、平均取得単価に対する増減。10%以上なら目立たせる
                 // 売り切ったファンドは平均取得単価と比べない(もう持っていない。売った値との比べは上の行)
                 if (!sold) navs[key]?.let { nav ->
-                    val g = NavAlert.gain(s.unitCost, nav)
-                    Text(
-                        "基準価額 ${money.unit(nav.yen)}(${nav.date})" + (g?.let { " ・ 平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}" } ?: ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (g != null && g >= NavAlert.THRESHOLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    val estimate = FundNow.estimate(s, nav)
+                    when (base) {
+                        NavBase.COST -> {
+                            val g = NavAlert.gain(s.unitCost, nav)
+                            Text(
+                                "基準価額 ${money.unit(nav.yen)}(${nav.date})" + (g?.let { " ・ 平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}" } ?: ""),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (g != null && g >= NavAlert.THRESHOLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            // 今の基準価額で見直した評価額と含み益(E05-12)。取り込み時の口数のまま
+                            estimate?.let { e ->
+                                Text(
+                                    "今なら 評価額 ${money.amount(e.valueYen)}" +
+                                        (e.gainYen?.let { " ・ 含み益 ${gainText(money, it, e.costYen)}" } ?: "") +
+                                        "(取り込み時から ${signedRatio(money, e.sinceImport)})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if ((e.gainYen ?: 0) < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                        NavBase.PEAK -> {
+                            val d = FundNow.fromPeak(nav, peak)
+                            if (peak == null || d == null) {
+                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は「今すぐ基準価額を取る」で取ります")
+                            } else {
+                                Text(
+                                    "基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値 ${money.unit(peak.yen)}(${peak.date})より ${signedRatio(money, d)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (d < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                )
+                                val atPeak = estimate?.let { FundNow.valueAtPeak(it, nav, peak) }
+                                // 割合は上の行と同じなので、額が出せる実額のときだけ
+                                if (estimate != null && atPeak != null && money.showsAmounts) {
+                                    Label("最高値のときなら評価額 ${money.amount(atPeak)}(今との差 ${money.change(estimate.valueYen - atPeak, atPeak)})")
+                                }
+                            }
+                        }
+                    }
                 }
                 if (open) {
                     sources.firstOrNull { it.fundKey == key }?.let { source ->
@@ -273,6 +324,63 @@ private fun SalesText(fund: FundHoldings.Fund, nav: Nav?, hasSource: Boolean) {
         )
     }
 }
+
+/** 何と比べるか(E05-12)。 */
+internal enum class NavBase(val label: String) {
+    COST("平均取得単価と比べる"),
+    PEAK("最高値と比べる"),
+}
+
+/**
+ * 今の基準価額で見直した合計(E05-12)。平均取得単価と比べるときは含み益の合計、最高値と比べるときは最高値のときとの差。
+ * どちらも取り込み時の口数のままの見積もり。
+ */
+@Composable
+private fun NowSummary(held: List<FundHoldings.Fund>, navs: Map<String, Nav>, peaks: Map<String, Nav>, base: NavBase) {
+    val money = LocalMoney.current
+    Column(modifier = Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        when (base) {
+            NavBase.COST -> {
+                val t = FundNow.total(held, navs)
+                if (t.refreshed == 0) {
+                    Label(
+                        if (held.any { navs.containsKey(FundSource.keyOf(it.section, it.name)) }) {
+                            "取れた基準価額は取り込みより前のものなので、取り込み時の値のままです"
+                        } else {
+                            "「今すぐ基準価額を取る」を押すと、今の基準価額で評価額と含み益を見直します"
+                        },
+                    )
+                } else {
+                    Text(
+                        "今なら 評価額 ${money.amount(t.valueYen)} ・ 含み益 ${gainText(money, t.gainYen, t.costYen)}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (t.gainYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Label("${t.count}本のうち${t.refreshed}本を今の基準価額で見直し、残りは取り込み時の値。取り込み時の口数のままの見積もりです(あとで積み立てた・売った分は入りません)。")
+                }
+            }
+            NavBase.PEAK -> {
+                val t = FundNow.peakTotal(held, navs, peaks)
+                val r = t.ratio
+                if (t.count == 0 || r == null) {
+                    Label("「今すぐ基準価額を取る」を押すと、ファンドごとの設定来の最高値を取って比べます")
+                } else {
+                    Text(
+                        // 実額では額と%、%表示では%だけ(含み益と同じ出し方)
+                        "最高値のときより ${gainText(money, t.diffYen, t.atPeakYen)}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (t.diffYen < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Label("${held.size}本のうち${t.count}本の合計。ファンドごとの設定来の最高値(基準価額)のときの評価額と、取り込み時の口数のままで比べています。分配金は入れていません。")
+                }
+            }
+        }
+    }
+}
+
+/** 割合の増減。割合は金額ではないので、マスクのときだけ伏せる。 */
+private fun signedRatio(money: MoneyFormat, ratio: Double): String =
+    if (money.mode == PrivacyMode.MASK) MoneyFormat.HIDDEN else MoneyFormat.signedPercent(ratio)
 
 /** 減った口数の割合(E01-19)。割合なのでマスクのときだけ伏せる。 */
 private fun shareText(money: MoneyFormat, share: Double): String =

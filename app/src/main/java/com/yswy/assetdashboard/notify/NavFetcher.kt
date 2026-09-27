@@ -36,6 +36,12 @@ object NavFetcher {
 
     suspend fun fetch(source: FundSource): Nav? = download(source)?.let { parseLatest(it) }
 
+    /** ファンドごとの設定来の推移を同時に取る(E05-12)。取れて1点以上あるものだけ返す(鍵は [FundSource.fundKey])。 */
+    suspend fun fetchAllHistory(sources: List<FundSource>): Map<String, List<Nav>> = coroutineScope {
+        sources.map { s -> async { fetchHistory(s)?.takeIf { it.isNotEmpty() }?.let { s.fundKey to it } } }
+            .awaitAll().filterNotNull().toMap()
+    }
+
     /** 設定来の基準価額の推移(E05-11)。見るときに取る(本人が選んだ。端末には残さない)。取れなければnull。 */
     suspend fun fetchHistory(source: FundSource): List<Nav>? = download(source)?.let { parseAll(it) }
 
