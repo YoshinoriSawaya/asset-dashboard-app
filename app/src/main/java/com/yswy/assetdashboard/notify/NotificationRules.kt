@@ -32,7 +32,12 @@ object NotificationRules {
         val key: String,
         val title: String,
         val text: String,
+        /** 押したときに開く画面(E03-10)。nullならトップ。 */
+        val screen: String? = null,
     )
+
+    /** 前の月の振り返りの画面(E03-10)。AppRootの Routes.REVIEW と同じ文字。 */
+    const val SCREEN_REVIEW = "review"
 
     /** CSVの催促をもう一度出すまでの日数(E05-03)。 */
     const val SYNC_REPEAT_DAYS = 3L
@@ -173,7 +178,8 @@ object NotificationRules {
                 notices += Notice(
                     key,
                     "${spending.month.monthValue}月は${names.joinToString("・")}がいつもより多め",
-                    "アプリの「カテゴリ別の支出」で中身を確認してください。",
+                    "押すと${spending.month.monthValue}月の振り返りを開きます。",
+                    SCREEN_REVIEW,
                 )
             }
         }
@@ -185,7 +191,8 @@ object NotificationRules {
                 notices += Notice(
                     key,
                     "${spending.month.monthValue}月は${over.joinToString("・")}が予算を超えました",
-                    "アプリの「カテゴリ別の支出」で中身を確認してください。",
+                    "押すと${spending.month.monthValue}月の振り返りを開きます。",
+                    SCREEN_REVIEW,
                 )
             }
         }
@@ -196,7 +203,7 @@ object NotificationRules {
             val key = "priceup:${costs.months.last()}"
             if (names.isNotEmpty() && key !in lastNotified) {
                 val shown = names.take(2).joinToString("・") + if (names.size > 2) "など" else ""
-                notices += Notice(key, "固定費が値上がりしました", "$shown。アプリの「固定費・サブスク」で確認してください。")
+                notices += Notice(key, "固定費が値上がりしました", "$shown。押すと振り返りを開きます。", SCREEN_REVIEW)
             }
         }
         return notices

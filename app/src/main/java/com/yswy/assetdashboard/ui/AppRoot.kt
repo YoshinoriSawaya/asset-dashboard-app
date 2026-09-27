@@ -54,6 +54,7 @@ object Routes {
     const val CATEGORY_IMPORT = "category_import"
     const val CATEGORY_SPENDING = "category_spending"
     const val FIXED_COSTS = "fixed_costs"
+    const val REVIEW = "review"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -96,7 +97,13 @@ object Routes {
 }
 
 @Composable
-fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewModel()) {
+fun AppRoot(
+    modifier: Modifier = Modifier,
+    viewModel: DashboardViewModel = viewModel(),
+    /** 通知から開く画面(E03-10)。今は前の月の振り返りだけを受け付ける */
+    openRoute: String? = null,
+    onRouteOpened: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     // 金額の見せ方(E06-04)。端末に覚えておき、全画面に効かせる
@@ -104,7 +111,7 @@ fun AppRoot(modifier: Modifier = Modifier, viewModel: DashboardViewModel = viewM
     var privacy by remember { mutableStateOf(privacyPrefs.mode) }
     // 系列の色(E03-08)も全画面に配る
     CompositionLocalProvider(LocalMoney provides MoneyFormat(privacy), LocalSeriesColors provides state.seriesColors) {
-        Screens(state, viewModel, modifier) { privacy = it; privacyPrefs.mode = it }
+        Screens(state, viewModel, modifier, openRoute, onRouteOpened) { privacy = it; privacyPrefs.mode = it }
     }
 }
 
@@ -113,10 +120,18 @@ private fun Screens(
     state: DashboardViewModel.UiState,
     viewModel: DashboardViewModel,
     modifier: Modifier,
+    openRoute: String?,
+    onRouteOpened: () -> Unit,
     onPrivacyChange: (PrivacyMode) -> Unit,
 ) {
 
     val stack = rememberSaveable(saver = routeStackSaver) { mutableStateListOf(Routes.TOP) }
+    // 通知から開く画面(E03-10)。知らない画面は無視する
+    LaunchedEffect(openRoute) {
+        if (openRoute == null) return@LaunchedEffect
+        if (openRoute == Routes.REVIEW && stack.lastOrNull() != Routes.REVIEW) stack.add(Routes.REVIEW)
+        onRouteOpened()
+    }
     BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
 
     // 同意画面はActivityからしか出せないので、ViewModelの依頼をここで受ける。
@@ -273,6 +288,14 @@ private fun Screens(
             onSaveBudget = viewModel::saveBudget,
             saving = state.syncing,
         )
+        route == Routes.REVIEW -> MonthlyReviewScreen(
+            load = viewModel::monthlyReview,
+            onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
+            onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
+            onOpenNetWorth = { stack.add(Routes.NET_WORTH) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.FIXED_COSTS -> FixedCostsScreen(
             load = viewModel::transactions,
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
@@ -366,6 +389,7 @@ private fun Screens(
             onOpenInvest = { stack.add(Routes.INVEST) },
             onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
             onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
+            onOpenReview = { stack.add(Routes.REVIEW) },
             modifier = modifier,
         )
     }

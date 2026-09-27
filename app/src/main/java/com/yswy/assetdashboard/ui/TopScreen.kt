@@ -77,6 +77,8 @@ fun TopScreen(
     onOpenCategorySpending: () -> Unit = {},
     /** 固定費・サブスクの一覧(E07-26) */
     onOpenFixedCosts: () -> Unit = {},
+    /** 前の月の振り返り(E03-10) */
+    onOpenReview: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // 通知の許可(E05)。Android 13以降は、許可が無いと催促もリマインダーも出せない
@@ -182,6 +184,7 @@ fun TopScreen(
             }
             TextButton(onClick = onAddReminder) { Text("+ リマインダーを追加(点検・保険の更新など)") }
             TextButton(onClick = onOpenCalendar) { Text("大型出費の予定(向こう3年)") }
+            TextButton(onClick = onOpenReview) { Text("前の月の振り返り") }
             TextButton(onClick = onOpenCategorySpending) { Text("カテゴリ別の支出(月ごと)") }
             TextButton(onClick = onOpenFixedCosts) { Text("固定費・サブスク(毎月の支払い)") }
             TextButton(onClick = onOpenInvest) { Text("積立投資の目安") }

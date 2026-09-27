@@ -1,5 +1,6 @@
 package com.yswy.assetdashboard
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -35,8 +36,13 @@ class MainActivity : FragmentActivity() {
     /** ロックで中身を隠しているか。 */
     private var locked by mutableStateOf(true)
 
+    /** 通知から開く画面(E03-10)。開いたら消す。 */
+    private var openRoute by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 画面の回転などで作り直したときは、もう開いたので使わない
+        if (savedInstanceState == null) openRoute = intent?.getStringExtra(EXTRA_OPEN)
         enableEdgeToEdge()
         // 最近使ったアプリの一覧に、画面の中身(金額)のサムネイルを出さない
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(false)
@@ -47,11 +53,21 @@ class MainActivity : FragmentActivity() {
                     if (locked) {
                         LockedScreen(onUnlock = ::requestUnlock, modifier = Modifier.padding(innerPadding))
                     } else {
-                        AppRoot(modifier = Modifier.padding(innerPadding))
+                        AppRoot(
+                            modifier = Modifier.padding(innerPadding),
+                            openRoute = openRoute,
+                            onRouteOpened = { openRoute = null },
+                        )
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // アプリを開いたまま通知を押したとき(E03-10)
+        intent.getStringExtra(EXTRA_OPEN)?.let { openRoute = it }
     }
 
     override fun onStart() {
@@ -72,6 +88,11 @@ class MainActivity : FragmentActivity() {
 
     private fun requestUnlock() {
         AppLock.prompt(this) { locked = false }
+    }
+
+    companion object {
+        /** 通知から開く画面を渡すextraの名前(E03-10)。 */
+        const val EXTRA_OPEN = "open"
     }
 }
 

@@ -102,8 +102,15 @@ object DailyCheck {
     }
 
     private fun post(context: Context, notice: NotificationRules.Notice) {
+        // 開く画面(E03-10)があれば伝える。画面ごとに別のPendingIntentにする(extrasが上書きされないように)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            notice.screen?.let {
+                putExtra(MainActivity.EXTRA_OPEN, it)
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        }
         val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java),
+            context, notice.screen?.hashCode() ?: 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)

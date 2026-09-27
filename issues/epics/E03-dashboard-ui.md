@@ -15,6 +15,7 @@
 - [x] [E03-07: AI解析用データ出力機能](../tasks/E03-07-ai-export-prompt.md)
 - [x] [E03-08: 系列ごとの色](../tasks/E03-08-series-colors.md)
 - [x] [E03-09: AI相談用の書き出しに支出を入れる](../tasks/E03-09-ai-export-spending.md)
+- [x] [E03-10: 前の月の振り返り](../tasks/E03-10-monthly-review.md)
 - ~~E03-08: 口座残高の積み上げ色分けグラフ~~ → [E07-13](../tasks/E07-13-stacked-account-graph.md)へ移動(E07-10が前提のため)
 
 ## 完了条件

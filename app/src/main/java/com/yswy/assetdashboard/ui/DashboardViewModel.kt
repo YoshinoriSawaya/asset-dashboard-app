@@ -19,6 +19,7 @@ import com.yswy.assetdashboard.data.FixedCosts
 import com.yswy.assetdashboard.data.InvestPlan
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.Summary
+import com.yswy.assetdashboard.data.MonthlyReview
 import com.yswy.assetdashboard.data.NetWorth
 import com.yswy.assetdashboard.data.NetWorthOutlook
 import com.yswy.assetdashboard.data.PeriodSummary
@@ -334,6 +335,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             .mapNotNull { it.category }
             .distinct()
             .sorted()
+
+    /** 前の月の振り返り(E03-10)。手元のキャッシュと端末の予算の控えから作る。 */
+    suspend fun monthlyReview(): MonthlyReview? = MonthlyReview.of(
+        transactions = db.bankTransactionDao().all(),
+        today = LocalDate.now(),
+        budgets = budgetStore.load(),
+        netWorthSeries = _state.value.netWorth?.series.orEmpty(),
+    )
 
     /** 手元の明細の全部。カテゴリ別の支出(E07-25)に使う。 */
     suspend fun transactions(): List<BankTransactionEntity> = db.bankTransactionDao().all()

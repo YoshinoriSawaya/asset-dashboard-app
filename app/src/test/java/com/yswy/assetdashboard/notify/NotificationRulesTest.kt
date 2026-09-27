@@ -29,6 +29,11 @@ class NotificationRulesTest {
         NotificationRules.evaluate(on, sync, items, last).map { it.key }
 
     @Test
+    fun `振り返り以外の通知は押してもトップを開く`() {
+        assertEquals(null, NotificationRules.evaluate(today, due, emptyList(), emptyMap()).single().screen)
+    }
+
+    @Test
     fun `同期が必要なら催促し、3日空くまで繰り返さない`() {
         assertEquals(listOf("sync"), keys(sync = due))
         assertEquals(emptyList<String>(), keys(sync = due, last = mapOf("sync" to today.minusDays(2))))
@@ -190,6 +195,7 @@ class NotificationRulesTest {
         assertEquals("highspend:2026-08", notice.key)
         // 大型出費(家具・家電)は ▲ でも知らせない
         assertEquals("8月は外食がいつもより多め", notice.title)
+        assertEquals(NotificationRules.SCREEN_REVIEW, notice.screen)
         assertFalse((notice.title + notice.text).contains("円"))
         assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf(notice.key to today), august).isEmpty())
     }
@@ -218,7 +224,9 @@ class NotificationRulesTest {
         assertEquals("priceup:2026-08", notice.key)
         assertEquals("固定費が値上がりしました", notice.title)
         // 額の多い順に2つまで。振込の相手は伏せる。3つ目からは「など」
-        assertEquals("振込(相手は伏せる)・動画サブスクなど。アプリの「固定費・サブスク」で確認してください。", notice.text)
+        assertEquals("振込(相手は伏せる)・動画サブスクなど。押すと振り返りを開きます。", notice.text)
+        // 押すと前の月の振り返りを開く(E03-10)
+        assertEquals(NotificationRules.SCREEN_REVIEW, notice.screen)
         assertFalse(notice.text.contains("ﾀﾅｶ"))
         assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf(notice.key to today), fixedCosts = costs).isEmpty())
     }
