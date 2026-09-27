@@ -1,5 +1,7 @@
 package com.yswy.assetdashboard.notify
 
+import com.yswy.assetdashboard.data.BankTransactionEntity
+import com.yswy.assetdashboard.data.CategorySpending
 import com.yswy.assetdashboard.data.Drawdown
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
@@ -7,6 +9,7 @@ import com.yswy.assetdashboard.data.RampUp
 import com.yswy.assetdashboard.data.SyncStatus
 import java.time.LocalDate
 import java.time.Month
+import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 
 /**
@@ -52,6 +55,8 @@ object NotificationRules {
         sync: SyncStatus,
         overviews: List<ItemOverview>,
         lastNotified: Map<String, LocalDate>,
+        /** 前の月のカテゴリ別の支出(E05-08)。その月の明細が出そろっていなければnull([lastMonthSpending]) */
+        lastMonth: CategorySpending? = null,
     ): List<Notice> {
         val notices = mutableListOf<Notice>()
 
@@ -153,7 +158,38 @@ object NotificationRules {
                 is ItemOverview.Metric -> Unit
             }
         }
+
+        // E05-08: 前の月に、いつもよりはっきり多い消費のカテゴリがあれば、その月につき1度。金額は出さずカテゴリ名だけ
+        lastMonth?.let { spending ->
+            val names = highConsumption(spending)
+            val key = "highspend:${spending.month}"
+            if (names.isNotEmpty() && key !in lastNotified) {
+                notices += Notice(
+                    key,
+                    "${spending.month.monthValue}月は${names.joinToString("・")}がいつもより多め",
+                    "アプリの「カテゴリ別の支出」で中身を確認してください。",
+                )
+            }
+        }
         return notices
+    }
+
+    /**
+     * いつもより多い(E07-25の ▲)消費のカテゴリの名前(E05-08)。額の多い順。
+     * 大型出費・積立投資は積立や計画で準備しているので、▲でも知らせない(画面の ▲ はそのまま)。
+     */
+    fun highConsumption(spending: CategorySpending): List<String> =
+        spending.rows.filter { it.high && (it.kind?.isConsumption ?: true) }.map { it.category ?: "カテゴリなし" }
+
+    /**
+     * 通知に使う前の月のカテゴリ別の支出(E05-08)。前の月の明細が出そろっていなければnull。
+     * 今月の日付の明細が1件でもあれば、前の月は締まったとみる(明細は同期したときにしか入らない)。
+     */
+    fun lastMonthSpending(transactions: List<BankTransactionEntity>, today: LocalDate): CategorySpending? {
+        val thisMonth = YearMonth.from(today)
+        if (transactions.none { YearMonth.from(it.date) == thisMonth }) return null
+        val spending = CategorySpending.of(transactions, thisMonth.minusMonths(1))
+        return spending.takeIf { it.averageMonths > 0 }
     }
 
     const val KEY_SYNC = "sync"

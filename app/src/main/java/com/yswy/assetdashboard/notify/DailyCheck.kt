@@ -68,6 +68,7 @@ object DailyCheck {
             sync = SyncStatus.load(db, today),
             overviews = ItemOverview.load(db, today),
             lastNotified = store.load(),
+            lastMonth = NotificationRules.lastMonthSpending(db.bankTransactionDao().all(), today),
         )
         if (!canNotify(context)) {
             // 許可が無ければ出せない。記録もしない(許可されたら出せるように)

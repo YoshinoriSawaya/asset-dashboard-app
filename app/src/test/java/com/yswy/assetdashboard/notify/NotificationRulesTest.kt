@@ -1,7 +1,10 @@
 package com.yswy.assetdashboard.notify
 
+import com.yswy.assetdashboard.csv.CardStatementAdapter
 import com.yswy.assetdashboard.data.AutoTarget
 import com.yswy.assetdashboard.data.AutoTargets
+import com.yswy.assetdashboard.data.BankTransactionEntity
+import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.Repeat
@@ -163,5 +166,38 @@ class NotificationRulesTest {
         val key = "rampup:c:$dueDate:overdue"
         assertEquals(listOf(key), keys(items = car))
         assertEquals(emptyList<String>(), keys(items = car, last = mapOf(key to today.minusDays(100))))
+    }
+
+    // E05-08: いつもより多い月の通知
+    private var n = 0
+    private fun tx(date: String, yen: Long, category: String?, kind: CategoryKind?) = BankTransactionEntity(
+        "k${n++}", LocalDate.parse(date), "店", yen, null, null, null, CardStatementAdapter.LABEL, "f",
+        category = category, categoryKind = kind,
+    )
+
+    /** 7月は外食1万・家電0、8月は外食5万・家電30万。9月の明細が1件あるかで、8月が締まったかが変わる。 */
+    private fun spendingRows(withThisMonth: Boolean) = buildList {
+        add(tx("2026-07-10", 10_000, "外食", CategoryKind.DISCRETIONARY))
+        add(tx("2026-08-10", 50_000, "外食", CategoryKind.DISCRETIONARY))
+        add(tx("2026-08-20", 300_000, "家具・家電", CategoryKind.PLANNED))
+        if (withThisMonth) add(tx("2026-09-02", 1_000, "食費", CategoryKind.LIVING))
+    }
+
+    @Test
+    fun `前の月にいつもより多い消費のカテゴリがあれば、その月につき1度、カテゴリ名だけで知らせる`() {
+        val august = NotificationRules.lastMonthSpending(spendingRows(withThisMonth = true), today)!!
+        val notice = NotificationRules.evaluate(today, fresh, emptyList(), emptyMap(), august).single()
+        assertEquals("highspend:2026-08", notice.key)
+        // 大型出費(家具・家電)は ▲ でも知らせない
+        assertEquals("8月は外食がいつもより多め", notice.title)
+        assertFalse((notice.title + notice.text).contains("円"))
+        assertTrue(NotificationRules.evaluate(today, fresh, emptyList(), mapOf(notice.key to today), august).isEmpty())
+    }
+
+    @Test
+    fun `今月の明細がまだ無ければ、前の月は締まっていないとみて知らせない`() {
+        assertNull(NotificationRules.lastMonthSpending(spendingRows(withThisMonth = false), today))
+        // 比べる前の月が無ければ知らせない
+        assertNull(NotificationRules.lastMonthSpending(listOf(tx("2026-08-10", 50_000, "外食", CategoryKind.DISCRETIONARY), tx("2026-09-01", 1, null, null)), today))
     }
 }

@@ -13,6 +13,7 @@
 - [x] [E05-05: 車メンテ年1点検リマインダー通知](../tasks/E05-05-car-maintenance-reminder.md)
 - [x] [E05-06: 保険・税金の更新リマインダー](../tasks/E05-06-insurance-tax-reminder.md)
 - [x] [E05-07: リマインダーをトップから一覧画面へ](../tasks/E05-07-reminder-list.md)
+- [x] [E05-08: いつもより多い月の通知](../tasks/E05-08-high-spending-notice.md)
 
 ## 通知の経路の決定(2026-09-26、本人が決めた)
 **通知はすべて端末の中で出す。** サーバーもFCMも使わない。
