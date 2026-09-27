@@ -44,6 +44,42 @@ class NetWorthOutlookTest {
     }
 
     @Test
+    fun `大型出費の予定はその月に引き、引く前の額も持つ`() {
+        // 今月(0か月後)に10万、13か月後に50万、期間(30年)の外に100万
+        val plans = listOf(0L to 100_000L, 13L to 500_000L, 360L to 1_000_000L)
+        val o = NetWorthOutlook.of(listOf(cash), incomeYen = 300_000, consumptionYen = 200_000, plans = plans)!!
+        assertEquals(NetWorthOutlook.Point(0, 1_000_000, 0, 1_000_000), o.at(0))
+        // 1年後: 引く前 1,000,000 + 100,000×12 = 2,200,000。今月の10万だけ引く
+        assertEquals(NetWorthOutlook.Point(1, 2_100_000, 0, 2_200_000), o.at(1))
+        // 2年後: 13か月後の50万も引く
+        assertEquals(NetWorthOutlook.Point(2, 3_400_000 - 600_000, 0, 3_400_000), o.at(2))
+        assertEquals(600_000L, o.plannedTotalYen)
+    }
+
+    @Test
+    fun `予定はリマインダーの何年ごとと期日のある目標から作る`() {
+        val today = java.time.LocalDate.of(2026, 9, 27)
+        val items = listOf(
+            Item.Reminder("r", "車検", java.time.LocalDate.of(2027, 3, 1), Repeat.YEARLY, amountYen = 100_000, repeatYears = 2),
+            Item.Goal("g", "車の購入", 2_000_000, dueDate = java.time.LocalDate.of(2030, 4, 1)),
+        )
+        val netWorth = NetWorth.of(
+            listOf(Item.Metric(Item.metricId("預金"), "預金", "預金", inNetWorth = true)),
+            mapOf("預金" to listOf(MetricPointEntity("預金", today, 1_000_000, MetricOrigin.CSV))),
+            today,
+        )!!
+        val tx = listOf(
+            BankTransactionEntity("a", java.time.LocalDate.of(2026, 8, 25), "給与", null, 300_000, null, null, null, "f"),
+            BankTransactionEntity("b", java.time.LocalDate.of(2026, 8, 10), "電気代", 200_000, null, null, null, null, "f"),
+        )
+        val o = NetWorthOutlook.build(netWorth, tx, today, items)!!
+        // 車検は2027-03から2年ごとに30年で15回、車の購入は1回
+        assertEquals(100_000L * 15 + 2_000_000L, o.plannedTotalYen)
+        // 5年後(60か月後)までに: 車検 2027-03・2029-03・2031-03 と車の購入
+        assertEquals(o.at(5)!!.withoutPlansYen - (300_000L + 2_000_000L), o.at(5)!!.totalYen)
+    }
+
+    @Test
     fun `系列が無ければ出さない`() {
         assertNull(NetWorthOutlook.of(emptyList(), 300_000, 200_000))
     }

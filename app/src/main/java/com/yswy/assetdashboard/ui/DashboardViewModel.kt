@@ -320,7 +320,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     /** 純資産の将来の見通し(E09-06)。純資産に数える系列が無い・明細が無ければnull。 */
     suspend fun netWorthOutlook(): NetWorthOutlook? {
         val netWorth = _state.value.netWorth ?: return null
-        return NetWorthOutlook.build(netWorth, db.bankTransactionDao().all(), LocalDate.now())
+        // 大型出費の予定(E09-07)は、隠しているリマインダーも数える(隠しても予定のうち。E09-04と同じ)
+        val items = db.itemDao().getAll().mapNotNull { it.toItem() }
+        return NetWorthOutlook.build(netWorth, db.bankTransactionDao().all(), LocalDate.now(), items)
     }
 
     suspend fun investPlan(): InvestPlan? {

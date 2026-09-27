@@ -144,16 +144,24 @@ private fun OutlookContent(load: suspend () -> NetWorthOutlook?) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     if (o.investments.isNotEmpty()) Label("うち投資 約${money.amount(p.investedYen)}")
+                    // 大型出費の予定(E09-07)を引く前の額
+                    if (p.withoutPlansYen != p.totalYen) Label("予定を引く前 約${money.amount(p.withoutPlansYen)}")
                 }
             }
+        }
+        if (o.plannedTotalYen > 0) {
+            Label(
+                "大型出費の予定(見込み額のあるリマインダーと期日のある目標)を、その月に引いています。" +
+                    "${NetWorthOutlook.MAX_YEARS}年で約${money.amount(o.plannedTotalYen)}",
+            )
         }
         Label("毎月の残り 月${money.amount(o.monthlyCashYen)}(収入 − 消費 − 投資の系列への積立。直近の月の平均)")
         if (o.monthlyCashYen < 0) Label("残りがマイナスなので、預金などが減っていく前提です")
         o.investments.forEach { (name, bp) -> Label("投資の系列: $name 年${MetricForm.rateText(bp)}%") }
         if (o.investments.isNotEmpty()) Label("投資の系列への積立 月${money.amount(o.monthlyInvestYen)}")
         Label(
-            "利回りを決めていない系列(預金・年金など)は増やしません。家電や車などの大型出費は引いていないので、" +
-                "実際はこれより少なくなります。目安であり、先のことを保証するものではありません",
+            "利回りを決めていない系列(預金・年金など)は増やしません。予定に入れていない出費は引いていないので、" +
+                "実際はこれより少なくなることがあります。目安であり、先のことを保証するものではありません",
         )
     }
 }
