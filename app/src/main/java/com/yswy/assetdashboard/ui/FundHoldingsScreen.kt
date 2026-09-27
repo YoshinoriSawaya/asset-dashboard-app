@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import com.yswy.assetdashboard.data.FundHoldings
 import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.notify.FundSearch
 import com.yswy.assetdashboard.notify.NavAlert
 import kotlinx.coroutines.launch
 
@@ -48,6 +49,10 @@ fun FundHoldingsScreen(
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
     /** 今すぐ基準価額を取る。取れた本数 */
     onRefreshNavs: suspend () -> Int = { 0 },
+    /** 取り先の無いファンドをまとめて名前で探して保存する(E05-10)。結果の一言 */
+    onFindMissing: suspend () -> String = { "" },
+    /** ファンド名で取り先の候補を探す(E05-10)。探せなければnull */
+    onSearch: suspend (String) -> List<FundSearch.Candidate>? = { null },
     saving: Boolean = false,
 ) {
     val holdings by produceState<FundHoldings?>(null) { value = load() }
@@ -82,6 +87,19 @@ fun FundHoldingsScreen(
             Label("${latest}時点の保有商品一覧から。含み益の%は取得額に対する割合です。")
             // 基準価額(E05-09)。取り先を決めたファンドは毎朝取り、平均取得単価より10%以上上がったら知らせる
             Label("取り先(ISIN・協会コード)を決めたファンドは、毎朝基準価額を投資信託協会から取り、平均取得単価より10%以上上がったら知らせます。")
+            // 取り先の無いファンドは、名前で探して書き方まで同じものが1本だけなら保存する(E05-10)
+            val known = sources.map { it.fundKey }.toSet()
+            val missing = h.funds.count { (it.section + "|" + it.name) !in known }
+            if (missing > 0) {
+                TextButton(enabled = !saving, onClick = {
+                    navMessage = "探しています..."
+                    scope.launch {
+                        navMessage = onFindMissing()
+                        sources = loadSources()
+                        navs = loadNavs()
+                    }
+                }) { Text("取り先を名前で探す(${missing}本)") }
+            }
             if (sources.isNotEmpty()) {
                 TextButton(enabled = !saving, onClick = {
                     navMessage = "取得中..."
@@ -91,8 +109,8 @@ fun FundHoldingsScreen(
                         navMessage = "${sources.size}本のうち${n}本取れました"
                     }
                 }) { Text("今すぐ基準価額を取る") }
-                navMessage?.let { Label(it) }
             }
+            navMessage?.let { Label(it) }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
         items(h.funds, key = { it.section + "|" + it.name }) { fund ->
@@ -131,8 +149,10 @@ fun FundHoldingsScreen(
                 }
                 if (open == key) {
                     SourceEditor(
+                        fundName = fund.name,
                         current = sources.firstOrNull { it.fundKey == key },
                         saving = saving,
+                        onSearch = onSearch,
                         onSave = { isin, code, done ->
                             onSaveSource(fund.section, fund.name, isin, code) { error ->
                                 if (error == null) sources = loadSources()
@@ -160,15 +180,56 @@ fun FundHoldingsScreen(
     }
 }
 
-/** 基準価額の取り先の入力(E05-09)。ISINと協会コードを入れて保存。両方空にするとやめる。 */
+/**
+ * 基準価額の取り先の入力(E05-09)。ISINと協会コードを入れて保存。両方空にするとやめる。
+ * 名前で探して候補を押すと、コードが入る(E05-10)。保存は人が押す。
+ */
 @Composable
-private fun SourceEditor(current: FundSource?, saving: Boolean, onSave: (String, String, (String?) -> Unit) -> Unit) {
+private fun SourceEditor(
+    fundName: String,
+    current: FundSource?,
+    saving: Boolean,
+    onSearch: suspend (String) -> List<FundSearch.Candidate>?,
+    onSave: (String, String, (String?) -> Unit) -> Unit,
+) {
     var isin by remember(current) { mutableStateOf(current?.isin.orEmpty()) }
     var code by remember(current) { mutableStateOf(current?.code.orEmpty()) }
     var message by remember { mutableStateOf<String?>(null) }
+    var keyword by remember(fundName) { mutableStateOf(fundName) }
+    var candidates by remember { mutableStateOf<List<FundSearch.Candidate>?>(null) }
+    var searchMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("基準価額の取り先", style = MaterialTheme.typography.titleSmall)
-        Label("投資信託協会の「投信総合検索ライブラリー」でファンド名を探すと、ISINコードと協会コードが出ます。")
+        Label("投資信託協会の「投信総合検索ライブラリー」をファンド名で探します。当たらなければ、語を減らして(空白で区切ると全部含むもの)探し直してください。")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(keyword, { keyword = it }, label = { Text("ファンド名") }, singleLine = true, modifier = Modifier.weight(1f))
+            TextButton(onClick = {
+                searchMessage = "探しています..."
+                candidates = null
+                scope.launch {
+                    val found = onSearch(keyword)
+                    candidates = found
+                    searchMessage = when {
+                        found == null -> "投資信託協会につながらないので探せませんでした"
+                        found.isEmpty() -> "見つかりませんでした"
+                        else -> null
+                    }
+                }
+            }) { Text("名前で探す") }
+        }
+        searchMessage?.let { Label(it) }
+        candidates?.let { list ->
+            val exact = FundSearch.exactMatch(fundName, list)
+            // 書き方まで同じものを先頭に
+            (listOfNotNull(exact) + list.filterNot { it == exact }).forEach { c ->
+                Column(modifier = Modifier.fillMaxWidth().clickable { isin = c.isin; code = c.code; message = "コードを入れました。保存を押すと決まります" }.padding(vertical = 4.dp)) {
+                    Text((if (c == exact) "◎ " else "") + c.name, style = MaterialTheme.typography.bodyMedium)
+                    Label("${c.company} ・ ${c.isin} / ${c.code}")
+                }
+            }
+            if (list.size >= 20) Label("20件より多いので先頭だけ出しています。語を足して絞ってください")
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(isin, { isin = it }, label = { Text("ISIN(12文字)") }, singleLine = true, modifier = Modifier.weight(1f))
             OutlinedTextField(code, { code = it }, label = { Text("協会コード(8文字)") }, singleLine = true, modifier = Modifier.weight(1f))

@@ -51,4 +51,10 @@ object FundSourceStore {
     /** 同じファンドの取り先を置き換える。コードが空ならその取り先をやめる。 */
     fun upsert(sources: List<FundSource>, source: FundSource, remove: Boolean = false): List<FundSource> =
         sources.filterNot { it.fundKey == source.fundKey } + if (remove) emptyList() else listOf(source)
+
+    /** 名前で探して見つけた取り先をまとめて足す(E05-10)。すでに取り先のあるファンドは変えない(人が入れたものを上書きしない)。 */
+    fun addMissing(sources: List<FundSource>, found: List<FundSource>): List<FundSource> {
+        val known = sources.map { it.fundKey }.toSet()
+        return sources + found.filterNot { it.fundKey in known }.distinctBy { it.fundKey }
+    }
 }

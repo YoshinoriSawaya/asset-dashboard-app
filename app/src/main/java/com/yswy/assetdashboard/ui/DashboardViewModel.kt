@@ -14,6 +14,7 @@ import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.Nav
 import com.yswy.assetdashboard.drive.FundSourceStore
 import com.yswy.assetdashboard.notify.NavFetcher
+import com.yswy.assetdashboard.notify.FundSearch
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
@@ -392,6 +393,36 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 },
             )
         }
+    }
+
+    /** 基準価額の取り先をファンド名で探す(E05-10)。探せなければnull。 */
+    suspend fun searchFunds(keyword: String): List<FundSearch.Candidate>? = FundSearch.search(keyword)
+
+    /**
+     * 取り先の無いファンドをまとめて名前で探し、書き方まで同じ候補がちょうど1本のものだけDriveに保存する(E05-10)。
+     * 保存できたら、そのまま基準価額も取る。結果の一言を返す。
+     */
+    suspend fun findMissingSources(): String {
+        val known = fundStore.sources().map { it.fundKey }.toSet()
+        val missing = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX)).funds
+            .filterNot { FundSource.keyOf(it.section, it.name) in known }
+        if (missing.isEmpty()) return "取り先の無いファンドはありません"
+        // 同じファンドを別の区分で持っていることがあるので、名前ごとに1回だけ探す
+        val results = missing.map { it.name }.distinct().associateWith { FundSearch.search(it) }
+        if (results.values.all { it == null }) return "投資信託協会につながらないので探せませんでした"
+        val found = missing.mapNotNull { f ->
+            results[f.name]?.let { FundSearch.exactMatch(f.name, it) }?.let { FundSource(f.section, f.name, it.isin, it.code) }
+        }
+        val rest = missing.size - found.size
+        val restText = if (rest > 0) "。${rest}本は決められないので、行を開いて探してください" else ""
+        if (found.isEmpty()) return "${missing.size}本とも決められませんでした。行を開いて探してください"
+        val error = editOnDrive { api, folders ->
+            val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
+            if (FundSourceStore.save(api, folders, FundSourceStore.addMissing(current, found))) null else "Driveに書けないので保存しない"
+        }
+        if (error != null) return error
+        val navs = refreshNavs()
+        return "${missing.size}本のうち${found.size}本の取り先を保存し、基準価額を${navs}本取りました$restText"
     }
 
     /** 純資産の将来の見通し(E09-06)。純資産に数える系列が無い・明細が無ければnull。 */
