@@ -88,6 +88,8 @@ object CacheSync {
          * 毎朝の確認は同期しないので、Driveの categories.json を読めないため
          */
         val budgets: Map<String, Long> = emptyMap(),
+        /** 基準価額の取り先(E05-09)。funds.json を読めなければnull(端末の控えを書き換えない)。 */
+        val fundSources: List<com.yswy.assetdashboard.data.FundSource>? = null,
     ) {
         /**
          * 中身の指紋(E06-03)。同じDriveの中身から作れば、いつ・どの端末で作っても
@@ -193,7 +195,10 @@ object CacheSync {
         val categories = CategoryStore.load(api, folders)
             ?: return Outcome.Kept("明細のカテゴリを読めない")
 
-        val snapshot = build(latest, corrections, settings, categories)
+        // 基準価額の取り先(E05-09)。読めなくても作り直しは止めない(取り先が無いだけ。端末の控えは前のまま残す)
+        val fundSources = FundSourceStore.load(api, folders)
+
+        val snapshot = build(latest, corrections, settings, categories).copy(fundSources = fundSources)
 
         db.withTransaction {
             db.itemDao().deleteAll()

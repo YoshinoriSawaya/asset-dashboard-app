@@ -21,6 +21,12 @@ class NotifyStore(context: Context) {
         prefs.edit().putString(KEY, render(updated)).apply()
     }
 
+    /** 記録を消す(E05-09)。条件を外れたら、また満たしたときに知らせられるように。 */
+    fun forget(keys: List<String>) {
+        if (keys.isEmpty()) return
+        prefs.edit().putString(KEY, render(load() - keys.toSet())).apply()
+    }
+
     companion object {
         private const val KEY = "last_notified"
 

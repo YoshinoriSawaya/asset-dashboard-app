@@ -130,7 +130,7 @@ private fun Screens(
     // 通知から開く画面(E03-10)。知らない画面は無視する
     LaunchedEffect(openRoute) {
         if (openRoute == null) return@LaunchedEffect
-        if (openRoute == Routes.REVIEW && stack.lastOrNull() != Routes.REVIEW) stack.add(Routes.REVIEW)
+        if (openRoute in listOf(Routes.REVIEW, Routes.FUNDS) && stack.lastOrNull() != openRoute) stack.add(openRoute!!)
         onRouteOpened()
     }
     BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
@@ -293,6 +293,11 @@ private fun Screens(
             load = viewModel::fundHoldings,
             onBack = { close(route) },
             modifier = modifier,
+            loadSources = viewModel::fundSources,
+            loadNavs = viewModel::navs,
+            onSaveSource = viewModel::saveFundSource,
+            onRefreshNavs = viewModel::refreshNavs,
+            saving = state.syncing,
         )
         route == Routes.REVIEW -> MonthlyReviewScreen(
             load = viewModel::monthlyReview,

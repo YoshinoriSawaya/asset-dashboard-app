@@ -9,6 +9,11 @@ import com.yswy.assetdashboard.data.AutoSyncPrefs
 import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.BudgetStore
 import com.yswy.assetdashboard.data.FundHoldings
+import com.yswy.assetdashboard.data.FundLocalStore
+import com.yswy.assetdashboard.data.FundSource
+import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.drive.FundSourceStore
+import com.yswy.assetdashboard.notify.NavFetcher
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
@@ -84,6 +89,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
     private val lastSyncStore = LastSyncStore(app)
     private val budgetStore = BudgetStore(app)
+    private val fundStore = FundLocalStore(app)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -351,6 +357,43 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     /** ファンドごとの取得額と評価額(E01-17)。 */
     suspend fun fundHoldings(): FundHoldings = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX))
 
+    /** 基準価額の取り先(E05-09)。端末の控え。 */
+    fun fundSources(): List<FundSource> = fundStore.sources()
+
+    /** 取れた最新の基準価額(E05-09)。端末の控え。 */
+    fun navs(): Map<String, Nav> = fundStore.navs()
+
+    /** 今すぐ基準価額を取る(E05-09)。通知はしない。取れた本数を返す。 */
+    suspend fun refreshNavs(): Int {
+        val sources = fundStore.sources()
+        val fetched = NavFetcher.fetchAll(sources)
+        fundStore.saveNavs(fundStore.navs() + fetched)
+        return fetched.size
+    }
+
+    /**
+     * ファンドの基準価額の取り先を保存する(E05-09)。Driveの funds.json を読み直して、そのファンドだけ変える。
+     * ISINと協会コードが空ならやめる。形が合わなければ保存しない。
+     */
+    fun saveFundSource(section: String, name: String, isin: String, code: String, onResult: (String?) -> Unit) {
+        val i = isin.trim().uppercase()
+        val c = code.trim().uppercase()
+        val remove = i.isEmpty() && c.isEmpty()
+        if (!remove && (!FundSource.isValidIsin(i) || !FundSource.isValidCode(c))) {
+            onResult("ISINは英数字12文字(例: JP90C000H1T1)、協会コードは英数字8文字(例: 0331418A)で入れてください")
+            return
+        }
+        viewModelScope.launch {
+            onResult(
+                editOnDrive { api, folders ->
+                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
+                    val updated = FundSourceStore.upsert(current, FundSource(section, name, i, c), remove)
+                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
+                },
+            )
+        }
+    }
+
     /** 純資産の将来の見通し(E09-06)。純資産に数える系列が無い・明細が無ければnull。 */
     suspend fun netWorthOutlook(): NetWorthOutlook? {
         val netWorth = _state.value.netWorth ?: return null
@@ -417,6 +460,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             when (val cache = CacheSync.rebuild(api, folders, db)) {
                 is CacheSync.Outcome.Rebuilt -> {
                     budgetStore.save(cache.snapshot.budgets)
+                    cache.snapshot.fundSources?.let { fundStore.saveSources(it) }
                     null
                 }
                 is CacheSync.Outcome.Kept -> "Driveには保存したが、画面の更新に失敗: ${cache.reason}(次の同期で反映)"
@@ -461,7 +505,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         // 同期を試し終えたものだけ記録する。同意待ちは試し終えていないので残さない。
         // カテゴリの予算(E07-29)を端末に控える。毎朝の確認はDriveを読まないため
         ((outcome as? DriveSession.Outcome.Success)?.value?.cache as? CacheSync.Outcome.Rebuilt)
-            ?.let { budgetStore.save(it.snapshot.budgets) }
+            ?.let {
+                budgetStore.save(it.snapshot.budgets)
+                // 基準価額の取り先(E05-09)も端末に控える。読めなかったときは前のまま
+                it.snapshot.fundSources?.let { s -> fundStore.saveSources(s) }
+            }
         val last = when (outcome) {
             is DriveSession.Outcome.Success -> LastSync.of(outcome.value, now)
             is DriveSession.Outcome.Offline -> LastSync.notSynced("オフラインでスキップ", now, isProblem = false)

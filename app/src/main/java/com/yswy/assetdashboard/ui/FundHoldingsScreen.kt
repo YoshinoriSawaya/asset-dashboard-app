@@ -18,12 +18,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedTextField
 import com.yswy.assetdashboard.data.FundHoldings
+import com.yswy.assetdashboard.data.FundSource
+import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.notify.NavAlert
+import kotlinx.coroutines.launch
 
 /**
  * 投資信託の損益(E01-17)。ファンドごとの評価額・取得額・含み益と、平均取得単価・現在値(本人が選んだ: ファンドごとだけ)。
@@ -34,10 +41,22 @@ fun FundHoldingsScreen(
     load: suspend () -> FundHoldings,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 基準価額の取り先と取れた基準価額(E05-09)。端末の控え */
+    loadSources: () -> List<FundSource> = { emptyList() },
+    loadNavs: () -> Map<String, Nav> = { emptyMap() },
+    /** 取り先を保存する。(区分, ファンド名, ISIN, 協会コード, 結果) */
+    onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
+    /** 今すぐ基準価額を取る。取れた本数 */
+    onRefreshNavs: suspend () -> Int = { 0 },
+    saving: Boolean = false,
 ) {
     val holdings by produceState<FundHoldings?>(null) { value = load() }
     val money = LocalMoney.current
     var open by rememberSaveable { mutableStateOf<String?>(null) }
+    var sources by remember { mutableStateOf(loadSources()) }
+    var navs by remember { mutableStateOf(loadNavs()) }
+    var navMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
@@ -61,6 +80,19 @@ fun FundHoldingsScreen(
         item {
             val latest = h.funds.maxOf { it.latest.date }
             Label("${latest}時点の保有商品一覧から。含み益の%は取得額に対する割合です。")
+            // 基準価額(E05-09)。取り先を決めたファンドは毎朝取り、平均取得単価より10%以上上がったら知らせる
+            Label("取り先(ISIN・協会コード)を決めたファンドは、毎朝基準価額を投資信託協会から取り、平均取得単価より10%以上上がったら知らせます。")
+            if (sources.isNotEmpty()) {
+                TextButton(enabled = !saving, onClick = {
+                    navMessage = "取得中..."
+                    scope.launch {
+                        val n = onRefreshNavs()
+                        navs = loadNavs()
+                        navMessage = "${sources.size}本のうち${n}本取れました"
+                    }
+                }) { Text("今すぐ基準価額を取る") }
+                navMessage?.let { Label(it) }
+            }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
         items(h.funds, key = { it.section + "|" + it.name }) { fund ->
@@ -88,7 +120,26 @@ fun FundHoldingsScreen(
                     // 単価の差は円ではないので、割合で出す
                     Label("平均取得単価 ${money.unit(s.unitCost)} → 現在値 ${money.unit(s.price)}(${ratioText(money, s.price - s.unitCost, s.unitCost)})")
                 }
+                // 毎朝取った基準価額(E05-09)と、平均取得単価に対する増減。10%以上なら目立たせる
+                navs[key]?.let { nav ->
+                    val g = NavAlert.gain(s.unitCost, nav)
+                    Text(
+                        "基準価額 ${money.unit(nav.yen)}(${nav.date})" + (g?.let { " ・ 平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}" } ?: ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (g != null && g >= NavAlert.THRESHOLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (open == key) {
+                    SourceEditor(
+                        current = sources.firstOrNull { it.fundKey == key },
+                        saving = saving,
+                        onSave = { isin, code, done ->
+                            onSaveSource(fund.section, fund.name, isin, code) { error ->
+                                if (error == null) sources = loadSources()
+                                done(error)
+                            }
+                        },
+                    )
                     Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         fund.history.forEach { past ->
                             Row(modifier = Modifier.fillMaxWidth()) {
@@ -105,6 +156,29 @@ fun FundHoldingsScreen(
                 }
             }
             HorizontalDivider()
+        }
+    }
+}
+
+/** 基準価額の取り先の入力(E05-09)。ISINと協会コードを入れて保存。両方空にするとやめる。 */
+@Composable
+private fun SourceEditor(current: FundSource?, saving: Boolean, onSave: (String, String, (String?) -> Unit) -> Unit) {
+    var isin by remember(current) { mutableStateOf(current?.isin.orEmpty()) }
+    var code by remember(current) { mutableStateOf(current?.code.orEmpty()) }
+    var message by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("基準価額の取り先", style = MaterialTheme.typography.titleSmall)
+        Label("投資信託協会の「投信総合検索ライブラリー」でファンド名を探すと、ISINコードと協会コードが出ます。")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(isin, { isin = it }, label = { Text("ISIN(12文字)") }, singleLine = true, modifier = Modifier.weight(1f))
+            OutlinedTextField(code, { code = it }, label = { Text("協会コード(8文字)") }, singleLine = true, modifier = Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(enabled = !saving, onClick = {
+                message = "保存中..."
+                onSave(isin, code) { error -> message = error ?: "保存しました(Driveの settings)" }
+            }) { Text(if (current == null) "保存" else "変更を保存") }
+            message?.let { Label(it) }
         }
     }
 }

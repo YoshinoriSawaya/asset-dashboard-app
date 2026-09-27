@@ -18,6 +18,8 @@ import com.yswy.assetdashboard.MainActivity
 import com.yswy.assetdashboard.R
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.BudgetStore
+import com.yswy.assetdashboard.data.FundHoldings
+import com.yswy.assetdashboard.data.FundLocalStore
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.SyncStatus
 import kotlinx.coroutines.CoroutineScope
@@ -74,16 +76,37 @@ object DailyCheck {
             fixedCosts = NotificationRules.lastMonthFixedCosts(transactions, today),
             budgets = BudgetStore(context).load(),
         )
+        // 基準価額(E05-09)。取り先を決めたファンドだけ、公開データから取る。取れなくても、ほかの通知は出す
+        val nav = navAlert(context, db, store.load())
+        val all = notices + nav.notices
         if (!canNotify(context)) {
             // 許可が無ければ出せない。記録もしない(許可されたら出せるように)
-            Log.i(TAG, "通知の許可が無いので出さない(${notices.size}件)")
+            Log.i(TAG, "通知の許可が無いので出さない(${all.size}件)")
             return 0
         }
         ensureChannel(context)
-        notices.forEach { post(context, it) }
-        store.markNotified(notices.map { it.key }, today)
-        Log.i(TAG, "通知 ${notices.size}件")
-        return notices.size
+        all.forEach { post(context, it) }
+        store.markNotified(all.map { it.key }, today)
+        store.forget(nav.forget)
+        Log.i(TAG, "通知 ${all.size}件")
+        return all.size
+    }
+
+    /**
+     * 基準価額を取って端末に控え、平均取得単価より10%以上上がったファンドを知らせる(E05-09)。
+     * 朝の確認で通信するのはこれだけ(ほかはDBを読むだけ)。本人が「端末が公開データから取る」を選んだ。
+     */
+    private suspend fun navAlert(context: Context, db: AppDatabase, lastNotified: Map<String, LocalDate>): NavAlert.Result {
+        val local = FundLocalStore(context)
+        val sources = local.sources()
+        if (sources.isEmpty()) return NavAlert.Result(emptyList(), emptyList())
+        val fetched = NavFetcher.fetchAll(sources)
+        val navs = local.navs() + fetched
+        local.saveNavs(navs)
+        Log.i(TAG, "基準価額 ${fetched.size}/${sources.size}本")
+        val holdings = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX))
+        // 今朝取れなかったファンドは、前に取れた値では判定しない(古い値で知らせない)
+        return NavAlert.evaluate(holdings, fetched, lastNotified)
     }
 
     fun canNotify(context: Context): Boolean =

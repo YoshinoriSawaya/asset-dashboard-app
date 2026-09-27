@@ -39,6 +39,9 @@ object NotificationRules {
     /** 前の月の振り返りの画面(E03-10)。AppRootの Routes.REVIEW と同じ文字。 */
     const val SCREEN_REVIEW = "review"
 
+    /** 投資信託の損益の画面(E05-09)。AppRootの Routes.FUNDS と同じ文字。 */
+    const val SCREEN_FUNDS = "funds"
+
     /** CSVの催促をもう一度出すまでの日数(E05-03)。 */
     const val SYNC_REPEAT_DAYS = 3L
 
