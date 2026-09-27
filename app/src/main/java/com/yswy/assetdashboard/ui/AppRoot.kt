@@ -53,6 +53,7 @@ object Routes {
     const val INVEST = "invest"
     const val CATEGORY_IMPORT = "category_import"
     const val CATEGORY_SPENDING = "category_spending"
+    const val FIXED_COSTS = "fixed_costs"
     private const val ITEM = "item/"
 
     fun item(id: String) = ITEM + id
@@ -268,6 +269,12 @@ private fun Screens(
             onBack = { close(route) },
             modifier = modifier,
         )
+        route == Routes.FIXED_COSTS -> FixedCostsScreen(
+            load = viewModel::transactions,
+            onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
+            onBack = { close(route) },
+            modifier = modifier,
+        )
         route == Routes.INVEST -> InvestPlanScreen(
             load = viewModel::investPlan,
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
@@ -354,6 +361,7 @@ private fun Screens(
             onOpenCategories = { stack.add(Routes.SPENDING_RULES) },
             onOpenInvest = { stack.add(Routes.INVEST) },
             onOpenCategorySpending = { stack.add(Routes.CATEGORY_SPENDING) },
+            onOpenFixedCosts = { stack.add(Routes.FIXED_COSTS) },
             modifier = modifier,
         )
     }

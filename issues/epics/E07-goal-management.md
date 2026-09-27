@@ -31,6 +31,7 @@
 - [x] [E07-23: カテゴリの無い明細を見直しやすくする](../tasks/E07-23-uncategorized-review.md)
 - [x] [E07-24: カテゴリの画面には直近1年半の摘要だけを出す](../tasks/E07-24-recent-descriptions-only.md)
 - [x] [E07-25: カテゴリ別の支出](../tasks/E07-25-category-spending.md)
+- [x] [E07-26: 固定費・サブスクの一覧](../tasks/E07-26-fixed-costs.md)
 
 ## 完了条件
 「車購入用にX万円」「PC買い替え用にX万円」のようなGoalを自分で
