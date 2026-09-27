@@ -1,5 +1,7 @@
 package com.yswy.assetdashboard.ui
 
+import com.yswy.assetdashboard.data.CategorySpending
+import com.yswy.assetdashboard.data.FixedCosts
 import com.yswy.assetdashboard.data.FundOutlook
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.PeriodSummary
@@ -12,7 +14,9 @@ import java.time.LocalDate
  *
  * ## 入れないもの
  * - **明細の摘要**: 振込相手の氏名などが入る(`振込 ﾀﾅｶ ﾀﾛｳ` のような形)。
- *   入出金は月ごとの合計だけにする
+ *   入出金は月ごとの合計、支出はカテゴリごとの合計(E03-09)だけにする。
+ *   例外は毎月の支払い(固定費・サブスク)の名前で、無いと相談の役に立たないので出す(本人が決めた)。
+ *   ただし「振込」を含む摘要は相手の氏名が入るので伏せる([maskedName])
  * - 口座番号・銀行名: そもそもキャッシュに持っていない
  *
  * 金額・系列名・推移だけを整形する。どこかへ自動で送ることはせず、
@@ -28,6 +32,10 @@ object AiExport {
         latestDataDate: LocalDate?,
         months: List<PeriodSummary>,
         goals: List<ItemOverview.Goal>,
+        /** カテゴリ別の支出(E03-09)。最後のまるまる1か月。無ければ出さない */
+        spending: CategorySpending? = null,
+        /** 毎月の支払い(E03-09)。無ければ出さない */
+        fixedCosts: FixedCosts? = null,
     ): String = buildString {
         appendLine("# 資産の状況(${today}時点)")
         appendLine()
@@ -62,6 +70,43 @@ object AiExport {
                 val c = month.cashflow ?: continue
                 val coverage = month.cashflowCoverage?.let { "${it.start}〜${it.endInclusive}" } ?: ""
                 appendLine("| ${month.label} | ${yen(c.incomeYen)} | ${yen(c.spendingYen)} | ${signed(c.netYen)} | ${c.count} | $coverage |")
+            }
+            appendLine()
+        }
+
+        if (spending != null && spending.rows.isNotEmpty()) {
+            val m = spending.month
+            appendLine("## カテゴリ別の支出(${m.year}年${m.monthValue}月。振替を除く)")
+            appendLine()
+            appendLine("使った額 ${yen(spending.totalYen)}(うち消費 ${yen(spending.consumptionYen)})。")
+            if (spending.averageMonths > 0) appendLine("平均は前の${spending.averageMonths}か月(使わなかった月は0として数える)。")
+            appendLine()
+            appendLine("| カテゴリ | 種類 | 額 | 件数 | 平均 | いつもより多い |")
+            appendLine("|---|---|---:|---:|---:|---|")
+            for (row in spending.rows) {
+                appendLine(
+                    "| ${row.category ?: "カテゴリなし"} | ${row.kind?.label ?: "生活費"} | ${yen(row.yen)} | ${row.count} | " +
+                        "${row.averageYen?.let(::yen) ?: "-"} | ${if (row.high) "多い" else ""} |",
+                )
+            }
+            appendLine()
+        }
+
+        if (fixedCosts != null && fixedCosts.items.isNotEmpty()) {
+            val n = fixedCosts.months.size
+            appendLine("## 毎月の支払い(固定費・サブスク。直近${n}か月のうち${FixedCosts.minMonths(n)}か月以上出ている支払い)")
+            appendLine()
+            append("合計 月${yen(fixedCosts.monthlyTotalYen)} / 年の見込み${yen(fixedCosts.yearlyTotalYen)}")
+            fixedCosts.consumptionShare?.let { append("。消費の${(it * 100).toInt()}%") }
+            appendLine("。")
+            appendLine()
+            appendLine("| 支払い | カテゴリ | 月の平均 | 年の見込み | 定額/変動 | 出た月 |")
+            appendLine("|---|---|---:|---:|---|---|")
+            for (item in fixedCosts.items) {
+                appendLine(
+                    "| ${maskedName(item.description)} | ${item.category ?: "カテゴリなし"} | ${yen(item.monthlyYen)} | ${yen(item.yearlyYen)} | " +
+                        "${if (item.fixedAmount) "定額" else "変動"} | ${item.hitMonths}/$n${if (item.missingLastMonth) "(先月は無し)" else ""} |",
+                )
             }
             appendLine()
         }
@@ -110,7 +155,13 @@ object AiExport {
         appendLine("- 系列は資産推移CSVの列そのまま。「合計」のような列は他の列の合計なので、系列同士を足すと二重に数えることになる")
         appendLine("- 支出には自分の口座間の振替やカードの引き落としも含まれる")
         appendLine("- 入出金は銀行から取得した期間の分しか無い(明細の期間を参照)")
+        if (spending != null || fixedCosts != null) {
+            appendLine("- カテゴリの無い明細は生活費として数えている。毎月の支払いには、年に1回の支払い(年会費など)は入らない")
+        }
     }
+
+    /** 摘要に「振込」を含むものは、相手の氏名が入るので伏せる(E03-09)。 */
+    fun maskedName(description: String): String = if (description.contains("振込")) "振込(相手は伏せる)" else description
 
     private fun yen(v: Long) = Formatters.yen(v)
     private fun signed(v: Long) = Formatters.yenChange(v)

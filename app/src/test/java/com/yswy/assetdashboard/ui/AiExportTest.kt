@@ -1,16 +1,22 @@
 package com.yswy.assetdashboard.ui
 
+import com.yswy.assetdashboard.csv.CardStatementAdapter
 import com.yswy.assetdashboard.data.BankTransactionEntity
+import com.yswy.assetdashboard.data.CategoryKind
+import com.yswy.assetdashboard.data.CategorySpending
+import com.yswy.assetdashboard.data.FixedCosts
 import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.PeriodUnit
 import com.yswy.assetdashboard.data.SummaryBoard
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
+import java.time.YearMonth
 
 class AiExportTest {
 
@@ -33,6 +39,44 @@ class AiExportTest {
         months = SummaryBoard.build(PeriodUnit.MONTH, listOf(total), mapOf("合計" to points), transactions, today),
         goals = goals,
     )
+
+    @Test
+    fun `カテゴリ別の支出と毎月の支払いを出し、振込の相手とほかの摘要とメモは出さない`() {
+        fun card(date: String, desc: String, yen: Long, category: String? = null, kind: CategoryKind? = null) =
+            BankTransactionEntity("$date|$desc|$yen", LocalDate.parse(date), desc, yen, null, null, "メモ欄の中身",
+                CardStatementAdapter.LABEL, "f", category = category, categoryKind = kind)
+        val txs = buildList {
+            listOf("04", "05", "06", "07", "08").forEach { m ->
+                add(card("2026-$m-15", "動画サブスク", 990, "遊び代", CategoryKind.DISCRETIONARY))
+                add(tx("2026-$m-27", "振込 ﾀﾅｶ ﾀﾛｳ", withdrawal = 20_000))
+                repeat(3) { add(card("2026-$m-0${it + 1}", "コンビニB", 500, "外食", CategoryKind.DISCRETIONARY)) }
+            }
+        }
+        val text = AiExport.build(
+            today = today,
+            latestDataDate = LocalDate.of(2026, 9, 20),
+            months = emptyList(),
+            goals = emptyList(),
+            spending = CategorySpending.of(txs, YearMonth.of(2026, 8)),
+            fixedCosts = FixedCosts.of(txs, today),
+        )
+        assertTrue(text.contains("## カテゴリ別の支出(2026年8月。振替を除く)"))
+        assertTrue(text.contains("| 外食 | 遊び代 | 1,500円 | 3 |"))
+        assertTrue(text.contains("## 毎月の支払い"))
+        assertTrue(text.contains("| 動画サブスク | 遊び代 | 990円 | 11,880円 | 定額 | 5/5 |"))
+        assertTrue(text.contains("| 振込(相手は伏せる) |"))
+        assertFalse(text.contains("ﾀﾅｶ"))
+        // 毎月の支払いでない摘要とメモは出さない
+        assertFalse(text.contains("コンビニB"))
+        assertFalse(text.contains("メモ欄の中身"))
+        assertTrue(text.contains("年に1回の支払い(年会費など)は入らない"))
+    }
+
+    @Test
+    fun `振込を含む摘要だけを伏せる`() {
+        assertEquals("振込(相手は伏せる)", AiExport.maskedName("パソコン振込 ﾀﾅｶ ﾀﾛｳ"))
+        assertEquals("電気　東電料金等", AiExport.maskedName("電気　東電料金等"))
+    }
 
     @Test
     fun `系列の月ごとの値と増減を表で出す`() {

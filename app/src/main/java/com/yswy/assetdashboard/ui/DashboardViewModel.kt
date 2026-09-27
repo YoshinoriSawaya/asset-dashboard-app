@@ -13,6 +13,8 @@ import com.yswy.assetdashboard.data.Item
 import com.yswy.assetdashboard.data.ItemDetail
 import com.yswy.assetdashboard.data.ItemEntity
 import com.yswy.assetdashboard.data.CategorySettings
+import com.yswy.assetdashboard.data.CategorySpending
+import com.yswy.assetdashboard.data.FixedCosts
 import com.yswy.assetdashboard.data.InvestPlan
 import com.yswy.assetdashboard.data.ItemOverview
 import com.yswy.assetdashboard.data.Summary
@@ -41,6 +43,7 @@ import com.yswy.assetdashboard.ui.chart.SeriesColors
 import com.yswy.assetdashboard.widget.SyncStatusWidget
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -389,11 +392,16 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     /** AI相談用の書き出し(E03-07)。 */
     suspend fun aiExport(): String {
         val today = LocalDate.now()
+        val transactions = db.bankTransactionDao().all()
+        // カテゴリ別の支出は、最後のまるまる1か月(今月は途中なので使わない。E03-09)
+        val lastFullMonth = CategorySpending.months(transactions).firstOrNull { it < YearMonth.from(today) }
         return AiExport.build(
             today = today,
             latestDataDate = SyncStatus.load(db, today).latestDataDate,
             months = SummaryBoard.load(db, PeriodUnit.MONTH, today),
             goals = ItemOverview.load(db, today).filterIsInstance<ItemOverview.Goal>(),
+            spending = lastFullMonth?.let { CategorySpending.of(transactions, it) },
+            fixedCosts = FixedCosts.of(transactions, today),
         )
     }
 
