@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.AutoSyncPrefs
+import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.CategoryKind
 import com.yswy.assetdashboard.data.GoalOrder
 import com.yswy.assetdashboard.data.Item
@@ -308,6 +309,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             .mapNotNull { it.category }
             .distinct()
             .sorted()
+
+    /** 手元の明細の全部。カテゴリ別の支出(E07-25)に使う。 */
+    suspend fun transactions(): List<BankTransactionEntity> = db.bankTransactionDao().all()
 
     suspend fun investPlan(): InvestPlan? {
         val monthly = Summary.monthlyCashflow(db.bankTransactionDao().all())

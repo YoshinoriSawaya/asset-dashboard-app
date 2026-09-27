@@ -97,8 +97,13 @@ object Summary {
         used(transactions.filter { it.date in period && it.category == category })
 
     /** 使った額。カードの返品(入金として持つ)は引く。カードの引き落としの行は内訳がカードの明細にあるので数えない */
-    private fun used(rows: List<BankTransactionEntity>): Long = rows.filterNot { it.cardPayment }.sumOf {
-        if (it.label == CardStatementAdapter.LABEL) (it.withdrawal ?: 0L) - (it.deposit ?: 0L) else it.withdrawal ?: 0L
+    private fun used(rows: List<BankTransactionEntity>): Long = rows.sumOf { usedYen(it) }
+
+    /** 明細1行の使った額([used]の1行分。E07-25)。銀行の入金・カードの引き落としの行は0。 */
+    fun usedYen(t: BankTransactionEntity): Long = when {
+        t.cardPayment -> 0L
+        t.label == CardStatementAdapter.LABEL -> (t.withdrawal ?: 0L) - (t.deposit ?: 0L)
+        else -> t.withdrawal ?: 0L
     }
 
     /** データのある最初の月から最後の月まで、抜けた月も含めて並べる。 */
