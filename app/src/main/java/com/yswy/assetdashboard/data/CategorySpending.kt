@@ -38,8 +38,47 @@ data class CategorySpending(
     /** 消費(生活費 + 遊び代 + カテゴリなし)。積立投資の目安で収入から引くもの。 */
     val consumptionYen: Long get() = rows.filter { it.kind?.isConsumption ?: true }.sumOf { it.yen }
 
+    /**
+     * カテゴリの推移(E07-27)。月ごと・カテゴリごとの額。積み上げ棒グラフに使う。
+     * [categories]は期間の合計の多い順に上位だけ。残りは「その他」にまとめ、[values]の各月の最後に置く。
+     */
+    data class Trend(
+        /** 古い月が先頭。 */
+        val months: List<YearMonth>,
+        /** 色を付けるカテゴリ。nullはカテゴリなし。 */
+        val categories: List<String?>,
+        /** 月ごとに、[categories]の順の額と、最後に「その他」の額。 */
+        val values: List<List<Long>>,
+    ) {
+        /** 「その他」に何か入っているか(凡例に出すか)。 */
+        val hasOthers: Boolean get() = values.any { it.last() != 0L }
+    }
+
     companion object {
         const val AVERAGE_MONTHS = 6
+        const val TREND_MONTHS = 12
+        const val TREND_TOP = 6
+
+        /**
+         * 直近[months]か月(明細のある月、[last]まで)の推移。
+         * 上位[top]カテゴリに色を付け、残りは「その他」。振替は入れない(額の数え方は[of]と同じ)。
+         */
+        fun trend(transactions: List<BankTransactionEntity>, last: YearMonth, months: Int = TREND_MONTHS, top: Int = TREND_TOP): Trend {
+            val counted = transactions.filter { it.categoryKind != CategoryKind.TRANSFER && Summary.usedYen(it) != 0L }
+            val window = transactions.map { YearMonth.from(it.date) }.distinct().filter { it <= last }.sorted().takeLast(months)
+            val inWindow = counted.filter { YearMonth.from(it.date) in window }
+            val ranked = inWindow.groupBy { it.category }
+                .mapValues { (_, rows) -> rows.sumOf { Summary.usedYen(it) } }
+                .entries.sortedByDescending { it.value }.map { it.key }
+            val shown = ranked.take(top)
+            val values = window.map { m ->
+                val rows = inWindow.filter { YearMonth.from(it.date) == m }
+                val byCategory = rows.groupBy { it.category }.mapValues { (_, r) -> r.sumOf { Summary.usedYen(it) } }
+                shown.map { byCategory[it] ?: 0L } + byCategory.filterKeys { it !in shown }.values.sum()
+            }
+            return Trend(window, shown, values)
+        }
+
         const val HIGH_RATIO = 1.3
         const val HIGH_MIN_YEN = 5_000L
 

@@ -3,6 +3,8 @@ package com.yswy.assetdashboard.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,19 +24,25 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yswy.assetdashboard.data.BankTransactionEntity
 import com.yswy.assetdashboard.data.CategorySpending
 import com.yswy.assetdashboard.data.Summary
+import com.yswy.assetdashboard.ui.chart.ColorDot
+import com.yswy.assetdashboard.ui.chart.GoalColors
+import com.yswy.assetdashboard.ui.chart.StackedBarChart
 import java.time.YearMonth
 
 /**
  * カテゴリ別の支出(E07-25)。月ごとに、カテゴリごとに使った額・その月の中の割合・直近の平均との差を並べる。
  * 平均よりはっきり多いカテゴリには印を付ける。行を押すと、その月・そのカテゴリの明細が開く。
+ * 上に直近12か月の推移を積み上げ棒で出す(E07-27)。棒を押すとその月に切り替わる。
  *
  * 摘要はこの端末の画面に出すだけで、どこにも書き出さない。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CategorySpendingScreen(
     load: suspend () -> List<BankTransactionEntity>,
@@ -66,6 +74,26 @@ fun CategorySpendingScreen(
         }
         val month = months[index.coerceIn(months.indices)]
         val spending = CategorySpending.of(all, month)
+
+        // 直近12か月の推移(E07-27)。期間は最新の月までで固定し、選んでいる月の棒を囲む。棒を押すとその月へ
+        item {
+            val trend = CategorySpending.trend(all, months.first())
+            val palette = trend.categories.indices.map { GoalColors.of(it) } + GoalColors.of(null)
+            StackedBarChart(
+                labels = trend.months.map { "${it.monthValue}月" },
+                stacks = trend.values,
+                colors = palette,
+                selected = trend.months.indexOf(month).takeIf { it >= 0 },
+                onSelect = { i -> index = months.indexOf(trend.months[i]); open = null },
+                axisLabel = money::barAxis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                trend.categories.forEachIndexed { i, c -> Legend(palette[i], c ?: "カテゴリなし") }
+                if (trend.hasOthers) Legend(palette.last(), "その他")
+            }
+            Label("棒を押すとその月に切り替わります")
+        }
 
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -136,6 +164,14 @@ fun CategorySpendingScreen(
         item {
             TextButton(onClick = onOpenCategories, modifier = Modifier.padding(top = 8.dp)) { Text("明細のカテゴリを見直す") }
         }
+    }
+}
+
+@Composable
+private fun Legend(color: Color, name: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ColorDot(color, size = 10.dp)
+        Text(name, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
     }
 }
 

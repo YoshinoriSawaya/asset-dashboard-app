@@ -85,6 +85,31 @@ class CategorySpendingTest {
     }
 
     @Test
+    fun `推移は古い月から、期間の合計の多いカテゴリに色を付け、残りはその他にまとめる`() {
+        val trend = CategorySpending.trend(rows, YearMonth.of(2026, 8), top = 2)
+        assertEquals(listOf(YearMonth.of(2026, 6), YearMonth.of(2026, 7), YearMonth.of(2026, 8)), trend.months)
+        // 期間の合計: 食費58,000、カテゴリなし(電気代)30,000、家具・家電30,000、外食20,000。同じ額なら先に出てきたほう
+        assertEquals(listOf("食費", null), trend.categories)
+        assertEquals(
+            listOf(
+                listOf(0L, 10_000L, 0L),
+                listOf(20_000L, 10_000L, 0L),
+                listOf(38_000L, 10_000L, 50_000L), // その他 = 家具・家電 + 外食。振替は入らない
+            ),
+            trend.values,
+        )
+        assertTrue(trend.hasOthers)
+    }
+
+    @Test
+    fun `推移の期間は指定した月まで、指定した月数だけ`() {
+        val trend = CategorySpending.trend(rows, YearMonth.of(2026, 7), months = 1)
+        assertEquals(listOf(YearMonth.of(2026, 7)), trend.months)
+        assertEquals(listOf("食費", null), trend.categories)
+        assertFalse(trend.hasOthers)
+    }
+
+    @Test
     fun `明細のある月は新しい順、カテゴリの明細はその月のそのカテゴリだけ`() {
         assertEquals(listOf(YearMonth.of(2026, 8), YearMonth.of(2026, 7), YearMonth.of(2026, 6)), CategorySpending.months(rows))
         val food = CategorySpending.transactions(rows, YearMonth.of(2026, 8), "食費")
