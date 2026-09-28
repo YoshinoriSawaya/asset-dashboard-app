@@ -58,6 +58,8 @@ fun FundHoldingsScreen(
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit = { _, _, _, _, _ -> },
     /** 比べる基準を保存する(E05-14)。(区分, ファンド名, 基準, 結果) */
     onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
+    /** 基準より10%以上上がったら知らせるかを保存する(E05-15)。(区分, ファンド名, 知らせるか, 結果) */
+    onSaveNotify: (String, String, Boolean, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
     /** 今すぐ基準価額を取る。取れた本数 */
     onRefreshNavs: suspend () -> Int = { 0 },
     /** そのファンドだけ今すぐ基準価額を取る(E05-16)。取れたらtrue */
@@ -110,8 +112,8 @@ fun FundHoldingsScreen(
         item {
             val latest = h.funds.maxOf { it.latest.date }
             Label("${latest}時点の保有商品一覧から。含み益の%は取得額に対する割合です。")
-            // 基準価額(E05-09)。取り先を決めたファンドは毎朝取り、平均取得単価より10%以上上がったら知らせる
-            Label("取り先(ISIN・協会コード)を決めたファンドは、毎朝基準価額を投資信託協会から取り、平均取得単価より10%以上上がったら知らせます。")
+            // 基準価額(E05-09)。取り先を決めたファンドは毎朝取り、選んだ基準より10%以上上がったら知らせる(E05-15)
+            Label("取り先(ISIN・協会コード)を決めたファンドは、毎朝基準価額を投資信託協会から取り、比べる基準(平均取得単価か、決めた最高値)より10%以上上がったら知らせます。下がったときは知らせません。")
             // 取り先の無いファンドは、名前で探して書き方まで同じものが1本だけなら保存する(E05-10)
             val known = sources.map { it.fundKey }.toSet()
             val missing = h.funds.count { (it.section + "|" + it.name) !in known }
@@ -150,6 +152,17 @@ fun FundHoldingsScreen(
                 peak = peaks[fund.section + "|" + fund.name],
                 onSaveBase = { section, name, b, done ->
                     onSaveBase(section, name, b) { error ->
+                        if (error == null) {
+                            sources = loadSources()
+                            // 最高値を選ぶと、そのファンドの基準価額を取り直している(E05-15)
+                            navs = loadNavs()
+                            peaks = loadPeaks()
+                        }
+                        done(error)
+                    }
+                },
+                onSaveNotify = { section, name, n, done ->
+                    onSaveNotify(section, name, n) { error ->
                         if (error == null) sources = loadSources()
                         done(error)
                     }
@@ -212,6 +225,7 @@ private fun FundRow(
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit,
     onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
     onRefreshNav: suspend (FundSource) -> Boolean = { false },
+    onSaveNotify: (String, String, Boolean, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
 ) {
     val money = LocalMoney.current
     val key = fund.section + "|" + fund.name
@@ -243,53 +257,65 @@ private fun FundRow(
                     // 単価の差は円ではないので、割合で出す
                     Label("平均取得単価 ${money.unit(s.unitCost)} → 現在値 ${money.unit(s.price)}(${ratioText(money, s.price - s.unitCost, s.unitCost)})")
                 }
-                // 毎朝取った基準価額(E05-09)と、平均取得単価に対する増減。10%以上なら目立たせる
-                // 売り切ったファンドは平均取得単価と比べない(もう持っていない。売った値との比べは上の行)
+                // 毎朝取った基準価額(E05-09)。平均取得単価との比べと最高値との比べは、選んだ基準によらず両方出す(E05-15)。
+                // 選んだ基準の行だけ目立たせ、10%以上上がっていれば色を付ける(通知と同じ条件)
+                // 売り切ったファンドは比べない(もう持っていない。売った値との比べは上の行)
                 if (!sold) navs[key]?.let { nav ->
+                    val source = sources.firstOrNull { it.fundKey == key }
+                    val mark = if (source?.notify == false) "(基準・知らせない)" else "(基準)"
                     val estimate = FundNow.estimate(s, nav)
-                    when (base) {
-                        NavBase.COST -> {
-                            val g = NavAlert.gain(s.unitCost, nav)
-                            Text(
-                                "基準価額 ${money.unit(nav.yen)}(${nav.date})" + (g?.let { " ・ 平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}" } ?: ""),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (g != null && g >= NavAlert.THRESHOLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            // 今の基準価額で見直した評価額と含み益(E05-12)。取り込み時の口数のまま
-                            estimate?.let { e ->
-                                Text(
-                                    "今なら 評価額 ${money.amount(e.valueYen)}" +
-                                        (e.gainYen?.let { " ・ 含み益 ${gainText(money, it, e.costYen)}" } ?: "") +
-                                        "(取り込み時から ${signedRatio(money, e.sinceImport)})",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if ((e.gainYen ?: 0) < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
+                    Label("基準価額 ${money.unit(nav.yen)}(${nav.date})")
+                    NavAlert.gain(s.unitCost, nav)?.let { g ->
+                        CompareLine("平均取得単価より ${ratioText(money, nav.yen - s.unitCost!!, s.unitCost)}", base == NavBase.COST, g >= NavAlert.THRESHOLD, mark)
+                    }
+                    val d = FundNow.fromPeak(nav, peak)
+                    if (peak != null && d != null) {
+                        Text(
+                            "設定来の最高値 ${money.unit(peak.yen)}(${peak.date})より ${signedRatio(money, d)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (d < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Label("設定来の最高値は、行を開いて「このファンドの基準価額を取る」か「今すぐ基準価額を取る」を押すか、次の朝の確認で取ります")
+                    }
+                    if (base == NavBase.PEAK) {
+                        val pb = source?.peakBase
+                        val gp = NavAlert.gainFromPeak(pb, nav)
+                        if (pb != null && gp != null) {
+                            CompareLine("決めた最高値 ${money.unit(pb.yen)}(${pb.date})より ${signedRatio(money, gp)}", true, gp >= NavAlert.THRESHOLD, mark)
+                        } else {
+                            // E05-14で最高値を選んだファンドは、基準の値をまだ固定していない
+                            Label("基準にする最高値がまだ決まっていません。行を開いて「最高値と比べる」を選び直すと、今の最高値で決めます")
                         }
-                        NavBase.PEAK -> {
-                            val d = FundNow.fromPeak(nav, peak)
-                            if (peak == null || d == null) {
-                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は、行を開いて「このファンドの基準価額を取る」か「今すぐ基準価額を取る」を押すか、次の朝の確認で取ります")
-                            } else {
-                                Text(
-                                    "基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値 ${money.unit(peak.yen)}(${peak.date})より ${signedRatio(money, d)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (d < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                )
-                                val atPeak = estimate?.let { FundNow.valueAtPeak(it, nav, peak) }
-                                // 割合は上の行と同じなので、額が出せる実額のときだけ
-                                if (estimate != null && atPeak != null && money.showsAmounts) {
-                                    Label("最高値のときなら評価額 ${money.amount(atPeak)}(今との差 ${money.change(estimate.valueYen - atPeak, atPeak)})")
-                                }
-                            }
-                        }
+                    }
+                    // 今の基準価額で見直した評価額と含み益(E05-12)。取り込み時の口数のまま
+                    estimate?.let { e ->
+                        Text(
+                            "今なら 評価額 ${money.amount(e.valueYen)}" +
+                                (e.gainYen?.let { " ・ 含み益 ${gainText(money, it, e.costYen)}" } ?: "") +
+                                "(取り込み時から ${signedRatio(money, e.sinceImport)})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if ((e.gainYen ?: 0) < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    val atPeak = if (estimate != null && peak != null) FundNow.valueAtPeak(estimate, nav, peak) else null
+                    // 割合は最高値の行と同じなので、額が出せる実額のときだけ
+                    if (estimate != null && atPeak != null && money.showsAmounts) {
+                        Label("最高値のときなら評価額 ${money.amount(atPeak)}(今との差 ${money.change(estimate.valueYen - atPeak, atPeak)})")
                     }
                 }
                 if (open) {
                     sources.firstOrNull { it.fundKey == key }?.let { source ->
                         NavRefreshButton(source, onRefreshNav)
                         NavHistorySection(source, if (sold) null else s.unitCost, fund.sales, onLoadHistory)
-                        if (!sold) BaseEditor(source.base, saving) { b, done -> onSaveBase(fund.section, fund.name, b, done) }
+                        if (!sold) {
+                            BaseEditor(
+                                source = source,
+                                saving = saving,
+                                onSave = { b, done -> onSaveBase(fund.section, fund.name, b, done) },
+                                onSaveNotify = { n, done -> onSaveNotify(fund.section, fund.name, n, done) },
+                            )
+                        }
                     }
                     SourceEditor(
                         fundName = fund.name,
@@ -369,24 +395,58 @@ private fun NavRefreshButton(source: FundSource, onRefresh: suspend (FundSource)
     }
 }
 
-/** 比べる基準を選んで保存する(E05-14)。押すとすぐDriveの funds.json に書く。 */
+/**
+ * 比べる基準と、10%上がったら知らせるかを選んで保存する(E05-14・E05-15)。押すとすぐDriveの funds.json に書く。
+ * 最高値を選ぶと、そのときの設定来の最高値を基準の値として決める。最高値を押し直すと、今の最高値で決め直す。
+ */
 @Composable
-private fun BaseEditor(current: NavBase, saving: Boolean, onSave: (NavBase, (String?) -> Unit) -> Unit) {
+private fun BaseEditor(
+    source: FundSource,
+    saving: Boolean,
+    onSave: (NavBase, (String?) -> Unit) -> Unit,
+    onSaveNotify: (Boolean, (String?) -> Unit) -> Unit,
+) {
+    val money = LocalMoney.current
     var message by remember { mutableStateOf<String?>(null) }
     Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("比べる基準", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NavBase.entries.forEach { b ->
-                FilterChip(current == b, enabled = !saving, onClick = {
-                    if (b != current) {
-                        message = "保存中..."
+                FilterChip(source.base == b, enabled = !saving, onClick = {
+                    // 平均取得単価は選び直しても変わらない。最高値は押し直すと決め直す
+                    if (b != source.base || b == NavBase.PEAK) {
+                        message = if (b == NavBase.PEAK) "最高値を取っています..." else "保存中..."
                         onSave(b) { error -> message = error ?: "保存しました(Driveの settings)" }
                     }
                 }, label = { Text(b.label) })
             }
         }
+        if (source.base == NavBase.PEAK) {
+            Label(
+                source.peakBase?.let { "決めた最高値 ${money.unit(it.yen)}(${it.date})。「最高値と比べる」を押し直すと、今の最高値で決め直します" }
+                    ?: "最高値がまだ決まっていません。「最高値と比べる」を押し直すと、今の最高値で決めます",
+            )
+        }
+        FilterChip(source.notify, enabled = !saving, onClick = {
+            message = "保存中..."
+            onSaveNotify(!source.notify) { error -> message = error ?: "保存しました(Driveの settings)" }
+        }, label = { Text("基準より10%上がったら知らせる") })
         message?.let { Label(it) }
     }
+}
+
+/** 基準価額の比べの1行(E05-15)。選んだ基準の行だけ目立たせ、10%以上上がっていれば色を付ける(通知と同じ条件)。 */
+@Composable
+private fun CompareLine(text: String, chosen: Boolean, hit: Boolean, mark: String) {
+    Text(
+        if (chosen) "$text $mark" else text,
+        style = if (chosen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+        color = when {
+            chosen && hit -> MaterialTheme.colorScheme.primary
+            chosen -> MaterialTheme.colorScheme.onSurface
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+    )
 }
 
 /**

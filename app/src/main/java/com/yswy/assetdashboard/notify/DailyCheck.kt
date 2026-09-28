@@ -93,7 +93,7 @@ object DailyCheck {
     }
 
     /**
-     * 基準価額を取って端末に控え、平均取得単価より10%以上上がったファンドを知らせる(E05-09)。
+     * 基準価額を取って端末に控え、選んだ基準より10%以上上がったファンドを知らせる(E05-09・E05-15)。
      * 朝の確認で通信するのはこれだけ(ほかはDBを読むだけ)。本人が「端末が公開データから取る」を選んだ。
      */
     private suspend fun navAlert(context: Context, db: AppDatabase, lastNotified: Map<String, LocalDate>): NavAlert.Result {
@@ -107,7 +107,8 @@ object DailyCheck {
         Log.i(TAG, "基準価額 ${fetched.size}/${sources.size}本")
         val holdings = FundHoldings.of(db.metricPointDao().withPrefix(FundHoldings.PREFIX))
         // 今朝取れなかったファンドは、前に取れた値では判定しない(古い値で知らせない)
-        return NavAlert.evaluate(holdings, fetched, lastNotified)
+        // ファンドごとの基準(平均取得単価/固定した最高値)と、知らせる/知らせない(E05-15)
+        return NavAlert.evaluate(holdings, fetched, lastNotified, sources)
     }
 
     fun canNotify(context: Context): Boolean =

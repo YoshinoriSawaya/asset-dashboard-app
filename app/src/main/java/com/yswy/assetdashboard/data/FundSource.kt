@@ -16,6 +16,10 @@ data class FundSource(
     val code: String,
     /** 比べる基準(E05-14)。本人がファンドごとに決めて保存する */
     val base: NavBase = NavBase.COST,
+    /** 最高値と比べるときの基準の値(E05-15)。最高値を選んだときの設定来の最高値を固定したもの。平均取得単価と比べるときはnull */
+    val peakBase: Nav? = null,
+    /** 基準より10%以上上がったら知らせるか(E05-15)。ファンドごとに選ぶ。無ければ知らせる(E05-15より前と同じ) */
+    val notify: Boolean = true,
 ) {
     val fundKey: String get() = keyOf(section, name)
 
@@ -72,7 +76,13 @@ class FundLocalStore(context: Context) {
         private const val PEAKS = "peaks"
 
         fun encodeSources(sources: List<FundSource>): String = JSONArray().apply {
-            sources.forEach { put(JSONObject().put("section", it.section).put("name", it.name).put("isin", it.isin).put("code", it.code).put("base", it.base.key)) }
+            sources.forEach { s ->
+                put(
+                    JSONObject().put("section", s.section).put("name", s.name).put("isin", s.isin).put("code", s.code).put("base", s.base.key)
+                        .put("notify", s.notify)
+                        .apply { s.peakBase?.let { put("peakBase", JSONObject().put("date", it.date.toString()).put("yen", it.yen)) } },
+                )
+            }
         }.toString()
 
         /** 読めない行は落とす(落ちるよりスキップ)。 */
@@ -83,6 +93,9 @@ class FundLocalStore(context: Context) {
                 val s = FundSource(
                     o.optString("section"), o.optString("name"), o.optString("isin"), o.optString("code"),
                     NavBase.of(o.optString("base").ifEmpty { null }),
+                    // 読めなければ固定していないのと同じ(最高値と比べても知らせない。選び直せば固定し直す)
+                    o.optJSONObject("peakBase")?.let { n -> runCatching { Nav(LocalDate.parse(n.getString("date")), n.getLong("yen")) }.getOrNull() },
+                    o.optBoolean("notify", true),
                 )
                 s.takeIf { it.name.isNotBlank() && FundSource.isValidIsin(it.isin) && FundSource.isValidCode(it.code) }
             }

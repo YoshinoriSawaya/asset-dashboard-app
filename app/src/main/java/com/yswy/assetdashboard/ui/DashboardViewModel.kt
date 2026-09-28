@@ -419,13 +419,42 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** ファンドの比べる基準を保存する(E05-14)。Driveの funds.json を読み直して、そのファンドだけ変える。 */
+    /**
+     * ファンドの比べる基準を保存する(E05-14)。Driveの funds.json を読み直して、そのファンドだけ変える。
+     * 最高値なら、そのファンドの基準価額を取り直し、その時点の設定来の最高値を基準の値として固定する(E05-15)。
+     * 取れなければ、古い最高値で固定しないように保存しない。同じ最高値を選び直すと固定し直す。
+     */
     fun saveFundBase(section: String, name: String, base: NavBase, onResult: (String?) -> Unit) {
+        val key = FundSource.keyOf(section, name)
+        viewModelScope.launch {
+            val peakBase = if (base == NavBase.PEAK) {
+                val source = fundStore.sources().firstOrNull { it.fundKey == key }
+                if (source == null || !refreshNav(source)) {
+                    onResult("基準価額を取れないので、最高値を決められません(通信できないか、取り先が違います)")
+                    return@launch
+                }
+                fundStore.peaks()[key]
+            } else {
+                null
+            }
+            onResult(
+                editOnDrive { api, folders ->
+                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
+                    val updated = FundSourceStore.setBase(current, key, base, peakBase)
+                        ?: return@editOnDrive "取り先が無いので保存しない"
+                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
+                },
+            )
+        }
+    }
+
+    /** 基準より10%以上上がったら知らせるかを保存する(E05-15)。Driveの funds.json を読み直して、そのファンドだけ変える。 */
+    fun saveFundNotify(section: String, name: String, notify: Boolean, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             onResult(
                 editOnDrive { api, folders ->
                     val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
-                    val updated = FundSourceStore.setBase(current, FundSource.keyOf(section, name), base)
+                    val updated = FundSourceStore.setNotify(current, FundSource.keyOf(section, name), notify)
                         ?: return@editOnDrive "取り先が無いので保存しない"
                     if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
                 },

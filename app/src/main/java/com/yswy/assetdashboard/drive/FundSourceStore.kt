@@ -3,6 +3,7 @@ package com.yswy.assetdashboard.drive
 import android.util.Log
 import com.yswy.assetdashboard.data.FundLocalStore
 import com.yswy.assetdashboard.data.FundSource
+import com.yswy.assetdashboard.data.Nav
 import com.yswy.assetdashboard.data.NavBase
 import org.json.JSONObject
 
@@ -49,16 +50,30 @@ object FundSourceStore {
     fun parse(json: String): List<FundSource> =
         FundLocalStore.decodeSources(JSONObject(json).optJSONArray("funds")?.toString())
 
-    /** 同じファンドの取り先を置き換える。コードが空ならその取り先をやめる。決めてあった比べる基準(E05-14)は残す。 */
+    /**
+     * 同じファンドの取り先を置き換える。コードが空ならその取り先をやめる。
+     * 決めてあった比べる基準(E05-14)・固定した最高値と通知する/しない(E05-15)は残す。
+     */
     fun upsert(sources: List<FundSource>, source: FundSource, remove: Boolean = false): List<FundSource> {
-        val base = sources.firstOrNull { it.fundKey == source.fundKey }?.base ?: source.base
-        return sources.filterNot { it.fundKey == source.fundKey } + if (remove) emptyList() else listOf(source.copy(base = base))
+        val kept = sources.firstOrNull { it.fundKey == source.fundKey }
+            ?.let { source.copy(base = it.base, peakBase = it.peakBase, notify = it.notify) } ?: source
+        return sources.filterNot { it.fundKey == source.fundKey } + if (remove) emptyList() else listOf(kept)
     }
 
-    /** そのファンドの比べる基準を変える(E05-14)。取り先の無いファンドならnull(基準価額が取れないので決められない)。 */
-    fun setBase(sources: List<FundSource>, fundKey: String, base: NavBase): List<FundSource>? {
+    /**
+     * そのファンドの比べる基準を変える(E05-14)。取り先の無いファンドならnull(基準価額が取れないので決められない)。
+     * 最高値なら、その時点の最高値を基準の値として固定する(E05-15)。平均取得単価に戻すと固定した値は消す。
+     */
+    fun setBase(sources: List<FundSource>, fundKey: String, base: NavBase, peakBase: Nav? = null): List<FundSource>? {
         if (sources.none { it.fundKey == fundKey }) return null
-        return sources.map { if (it.fundKey == fundKey) it.copy(base = base) else it }
+        val fixed = if (base == NavBase.PEAK) peakBase else null
+        return sources.map { if (it.fundKey == fundKey) it.copy(base = base, peakBase = fixed) else it }
+    }
+
+    /** 通知する/しないを変える(E05-15)。取り先の無いファンドならnull。 */
+    fun setNotify(sources: List<FundSource>, fundKey: String, notify: Boolean): List<FundSource>? {
+        if (sources.none { it.fundKey == fundKey }) return null
+        return sources.map { if (it.fundKey == fundKey) it.copy(notify = notify) else it }
     }
 
     /** 名前で探して見つけた取り先をまとめて足す(E05-10)。すでに取り先のあるファンドは変えない(人が入れたものを上書きしない)。 */

@@ -6,6 +6,7 @@ import com.yswy.assetdashboard.data.FundSource
 import com.yswy.assetdashboard.data.MetricOrigin
 import com.yswy.assetdashboard.data.MetricPointEntity
 import com.yswy.assetdashboard.data.Nav
+import com.yswy.assetdashboard.data.NavBase
 import com.yswy.assetdashboard.drive.FundSourceStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -68,6 +69,54 @@ class NavAlertTest {
         val notices = NavAlert.evaluate(h, mapOf("区分|A" to nav(12_000), "区分|B" to nav(12_000)), emptyMap<String, LocalDate>()).notices
         // DailyCheck.post は鍵の最後の「:」より前から通知の番号を作る
         assertEquals(2, notices.map { it.key.substringBeforeLast(':') }.toSet().size)
+    }
+
+    private fun source(name: String, base: NavBase = NavBase.COST, peakBase: Long? = null, notify: Boolean = true) =
+        FundSource("区分", name, "JP90C000H1T1", "0331418A", base, peakBase?.let { Nav(day.minusDays(30), it) }, notify)
+
+    @Test
+    fun `最高値と比べるファンドは、決めた最高値より10%以上上がったら知らせ、平均取得単価では見ない`() {
+        // 平均取得単価からは+50%だが、決めた最高値からは+5%: 最高値と比べるなら知らせない
+        val h = holdings("A" to 10_000)
+        val navs = mapOf("区分|A" to nav(15_000))
+        assertTrue(NavAlert.evaluate(h, navs, emptyMap<String, LocalDate>(), listOf(source("A", NavBase.PEAK, 14_286))).notices.isEmpty())
+        // 同じ値でも平均取得単価と比べるなら知らせる
+        assertEquals(1, NavAlert.evaluate(h, navs, emptyMap<String, LocalDate>(), listOf(source("A"))).notices.size)
+        // 決めた最高値から+10%
+        val up = NavAlert.evaluate(h, mapOf("区分|A" to nav(15_400)), emptyMap<String, LocalDate>(), listOf(source("A", NavBase.PEAK, 14_000)))
+        assertEquals(listOf("navpeak:区分|A:up"), up.notices.map { it.key })
+        assertEquals("Aが決めた最高値より10%以上上がりました", up.notices.single().title)
+        assertFalse((up.notices.single().title + up.notices.single().text).contains("円"))
+    }
+
+    @Test
+    fun `下がったときは知らせない`() {
+        val h = holdings("A" to 10_000)
+        // 決めた最高値から-47.5%、平均取得単価からも-47.5%
+        val navs = mapOf("区分|A" to nav(5_250))
+        assertTrue(NavAlert.evaluate(h, navs, emptyMap<String, LocalDate>(), listOf(source("A", NavBase.PEAK, 10_000))).notices.isEmpty())
+        assertTrue(NavAlert.evaluate(h, navs, emptyMap<String, LocalDate>(), listOf(source("A"))).notices.isEmpty())
+    }
+
+    @Test
+    fun `最高値をまだ決めていないファンドは知らせない`() {
+        val h = holdings("A" to 10_000)
+        assertTrue(NavAlert.evaluate(h, mapOf("区分|A" to nav(20_000)), emptyMap<String, LocalDate>(), listOf(source("A", NavBase.PEAK))).notices.isEmpty())
+    }
+
+    @Test
+    fun `知らせないにしたファンドは出さず、記録も消す`() {
+        val h = holdings("A" to 10_000)
+        val r = NavAlert.evaluate(h, mapOf("区分|A" to nav(12_000)), mapOf("navup:区分|A:up" to day), listOf(source("A", notify = false)))
+        assertTrue(r.notices.isEmpty())
+        assertEquals(listOf("navup:区分|A:up"), r.forget)
+    }
+
+    @Test
+    fun `基準を変えたら、使っていないほうの記録を消す`() {
+        val h = holdings("A" to 10_000)
+        val r = NavAlert.evaluate(h, mapOf("区分|A" to nav(12_000)), mapOf("navup:区分|A:up" to day), listOf(source("A", NavBase.PEAK, 11_500)))
+        assertEquals(listOf("navup:区分|A:up"), r.forget)
     }
 
     @Test
