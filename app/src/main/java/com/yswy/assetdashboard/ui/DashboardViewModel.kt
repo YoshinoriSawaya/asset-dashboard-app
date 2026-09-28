@@ -408,15 +408,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             onResult("ISINは英数字12文字(例: JP90C000H1T1)、協会コードは英数字8文字(例: 0331418A)で入れてください")
             return
         }
-        viewModelScope.launch {
-            onResult(
-                editOnDrive { api, folders ->
-                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
-                    val updated = FundSourceStore.upsert(current, FundSource(section, name, i, c), remove)
-                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
-                },
-            )
-        }
+        viewModelScope.launch { onResult(editFunds { FundSourceStore.upsert(it, FundSource(section, name, i, c), remove) }) }
     }
 
     /**
@@ -437,29 +429,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 null
             }
-            onResult(
-                editOnDrive { api, folders ->
-                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
-                    val updated = FundSourceStore.setBase(current, key, base, peakBase)
-                        ?: return@editOnDrive "取り先が無いので保存しない"
-                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
-                },
-            )
+            onResult(editFunds { FundSourceStore.setBase(it, key, base, peakBase) })
         }
     }
 
     /** 基準より10%以上上がったら知らせるかを保存する(E05-15)。Driveの funds.json を読み直して、そのファンドだけ変える。 */
     fun saveFundNotify(section: String, name: String, notify: Boolean, onResult: (String?) -> Unit) {
-        viewModelScope.launch {
-            onResult(
-                editOnDrive { api, folders ->
-                    val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
-                    val updated = FundSourceStore.setNotify(current, FundSource.keyOf(section, name), notify)
-                        ?: return@editOnDrive "取り先が無いので保存しない"
-                    if (FundSourceStore.save(api, folders, updated)) null else "Driveに書けないので保存しない"
-                },
-            )
-        }
+        viewModelScope.launch { onResult(editFunds { FundSourceStore.setNotify(it, FundSource.keyOf(section, name), notify) }) }
     }
 
     /** 基準価額の推移(E05-11)。見るときに取り、端末には残さない。取れなければnull。 */
@@ -486,10 +462,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val rest = missing.size - found.size
         val restText = if (rest > 0) "。${rest}本は決められないので、行を開いて探してください" else ""
         if (found.isEmpty()) return "${missing.size}本とも決められませんでした。行を開いて探してください"
-        val error = editOnDrive { api, folders ->
-            val current = FundSourceStore.load(api, folders) ?: return@editOnDrive "基準価額の取り先を読めないので保存しない"
-            if (FundSourceStore.save(api, folders, FundSourceStore.addMissing(current, found))) null else "Driveに書けないので保存しない"
-        }
+        val error = editFunds { FundSourceStore.addMissing(it, found) }
         if (error != null) return error
         val navs = refreshNavs()
         return "${missing.size}本のうち${found.size}本の取り先を保存し、基準価額を${navs}本取りました$restText"
@@ -569,7 +542,32 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.update { it.copy(syncing = false) }
         refresh()
-        return when (outcome) {
+        return outcomeText(outcome)
+    }
+
+    /**
+     * Driveの funds.json(基準価額の取り先・比べる基準・知らせるか)を読み直して書き換え、書けたら同じ内容を端末に控える(E05-17)。
+     * キャッシュは作り直さない: funds.json はDBの中身に関係せず、作り直しで使うのは端末に書き写すところだけ。
+     * 作り直すと、保存のたびにbackupを全部落とし直すことになり、遅い。
+     * **Driveに書けなければ端末の控えも変えない**(editOnDriveと同じ)。
+     * @param change 書き換える。取り先の無いファンドを変えようとしたらnull
+     */
+    private suspend fun editFunds(change: (List<FundSource>) -> List<FundSource>?): String? {
+        _state.update { it.copy(syncing = true) }
+        val outcome = DriveSession.withDrive(getApplication()) { api ->
+            val folders = DriveFolderSetup.ensure(api).folders
+            val current = FundSourceStore.load(api, folders) ?: return@withDrive "基準価額の取り先を読めないので保存しない"
+            val updated = change(current) ?: return@withDrive "取り先が無いので保存しない"
+            if (!FundSourceStore.save(api, folders, updated)) return@withDrive "Driveに書けないので保存しない"
+            fundStore.saveSources(updated)
+            null
+        }
+        _state.update { it.copy(syncing = false) }
+        return outcomeText(outcome)
+    }
+
+    private fun outcomeText(outcome: DriveSession.Outcome<String?>): String? =
+        when (outcome) {
             is DriveSession.Outcome.Success -> outcome.value
             is DriveSession.Outcome.Offline -> "オフラインなので保存しない(Driveに置くため)"
             is DriveSession.Outcome.Failed -> "失敗: ${outcome.message}"
@@ -578,7 +576,6 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 "Googleの同意が必要。同意してからもう一度保存してください"
             }
         }
-    }
 
     /** AI相談用の書き出し(E03-07)。 */
     suspend fun aiExport(): String {

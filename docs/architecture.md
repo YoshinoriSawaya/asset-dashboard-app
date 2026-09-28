@@ -94,7 +94,9 @@ Roomにだけ書いてよいものは無い。項目の定義もアプリで入�
 (`BudgetStore`・`FundLocalStore`)。正はあくまでDriveで、控えは失っても次の同期で戻る。
 画面から保存するときは、Driveの今のファイルを読み直してから、そのものだけを変えて書く
 (画面が古い内容を持ったまま、ほかの決まりを上書きしないように)。
-詳細は [E07-29](../issues/tasks/E07-29-category-budgets.md)・[E05-09](../issues/tasks/E05-09-nav-alert.md)。
+ただし `funds.json` はDBの中身に関係しないので、画面から保存したときはキャッシュを作り直さず、
+Driveに書けた内容をそのまま控えに書く(作り直しはbackupを全部落とし直すので、保存のたびに待たされる)。
+詳細は [E07-29](../issues/tasks/E07-29-category-budgets.md)・[E05-09](../issues/tasks/E05-09-nav-alert.md)・[E05-17](../issues/tasks/E05-17-faster-fund-save.md)。
 
 ### 項目にしない系列は `#` で始める
 資産推移の点(`metric_point`)には、一覧の項目にしない系列もある: 純資産の合算(`#純資産`。画面の中だけ)、

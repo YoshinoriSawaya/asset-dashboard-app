@@ -1,5 +1,9 @@
 package com.yswy.assetdashboard.drive
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+
 /**
  * アプリが使うDrive上のフォルダ群のID。
  *
@@ -51,20 +55,20 @@ object DriveFolderSetup {
         val root = api.ensureFolder(ROOT_NAME, DRIVE_ROOT)
         if (root.created) created += ROOT_NAME
 
-        suspend fun child(name: String): String {
-            val folder = api.ensureFolder(name, root.id)
-            if (folder.created) created += name
-            return folder.id
-        }
+        // ルートの下の6つは互いに関係しないので、並べて探す(順に探すと保存のたびに6往復待つ。E05-17)
+        val names = listOf(INBOX, PROCESSED, BACKUP, CORRECTIONS, SETTINGS, LOGS)
+        val children = coroutineScope { names.map { async { api.ensureFolder(it, root.id) } }.awaitAll() }
+        names.zip(children).forEach { (name, folder) -> if (folder.created) created += name }
+        val ids = names.zip(children.map { it.id }).toMap()
 
         val folders = AppFolders(
             root = root.id,
-            inbox = child(INBOX),
-            processed = child(PROCESSED),
-            backup = child(BACKUP),
-            corrections = child(CORRECTIONS),
-            settings = child(SETTINGS),
-            logs = child(LOGS),
+            inbox = ids.getValue(INBOX),
+            processed = ids.getValue(PROCESSED),
+            backup = ids.getValue(BACKUP),
+            corrections = ids.getValue(CORRECTIONS),
+            settings = ids.getValue(SETTINGS),
+            logs = ids.getValue(LOGS),
         )
         return Outcome(folders, created)
     }
