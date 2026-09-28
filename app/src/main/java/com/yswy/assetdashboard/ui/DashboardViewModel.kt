@@ -39,6 +39,7 @@ import com.yswy.assetdashboard.data.SyncStatus
 import com.yswy.assetdashboard.data.toEntity
 import com.yswy.assetdashboard.data.toItem
 import com.yswy.assetdashboard.drive.AppFolders
+import com.yswy.assetdashboard.drive.BackupCopies
 import com.yswy.assetdashboard.drive.CacheSync
 import com.yswy.assetdashboard.drive.CategoryStore
 import com.yswy.assetdashboard.drive.Corrections
@@ -93,6 +94,16 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val lastSyncStore = LastSyncStore(app)
     private val budgetStore = BudgetStore(app)
     private val fundStore = FundLocalStore(app)
+
+    /** 落としたbackupの写し(E02-08)。変わっていないものは同期で落とし直さない。 */
+    private val backupCopies = BackupCopies(
+        java.io.File(app.filesDir, "backup-copies"),
+        // 入れ直すたびに変わる印(E02-09)。版を上げ忘れたデバッグ版でも、入れたら次の同期で作り直す
+        appStamp = runCatching {
+            val info = app.packageManager.getPackageInfo(app.packageName, 0)
+            "${info.versionName}|${info.lastUpdateTime}"
+        }.getOrDefault(""),
+    )
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -531,13 +542,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val outcome = DriveSession.withDrive(getApplication()) { api ->
             val folders = DriveFolderSetup.ensure(api).folders
             write(api, folders)?.let { return@withDrive it }
-            when (val cache = CacheSync.rebuild(api, folders, db)) {
+            when (val cache = CacheSync.rebuild(api, folders, db, backupCopies)) {
                 is CacheSync.Outcome.Rebuilt -> {
                     budgetStore.save(cache.snapshot.budgets)
                     cache.snapshot.fundSources?.let { fundStore.saveSources(it) }
                     null
                 }
                 is CacheSync.Outcome.Kept -> "Driveには保存したが、画面の更新に失敗: ${cache.reason}(次の同期で反映)"
+                // 書いたのに入力が同じなのは、同じ内容で書いたとき。キャッシュはそのままでよい(E02-09)
+                is CacheSync.Outcome.Unchanged -> null
             }
         }
         _state.update { it.copy(syncing = false) }
@@ -598,7 +611,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun runSync(askConsent: Boolean) {
         _state.update { it.copy(syncing = true, message = "同期中...") }
-        val outcome = DriveSession.withDrive(getApplication()) { FullSync.run(it, db) }
+        val outcome = DriveSession.withDrive(getApplication()) { FullSync.run(it, db, backupCopies) }
         val now = Instant.now()
         // 同期を試し終えたものだけ記録する。同意待ちは試し終えていないので残さない。
         // カテゴリの予算(E07-29)を端末に控える。毎朝の確認はDriveを読まないため

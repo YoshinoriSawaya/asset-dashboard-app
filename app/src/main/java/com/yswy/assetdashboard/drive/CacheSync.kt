@@ -2,8 +2,14 @@ package com.yswy.assetdashboard.drive
 
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 import androidx.room.withTransaction
 import com.yswy.assetdashboard.data.AppDatabase
 import com.yswy.assetdashboard.data.BankTransactionEntity
@@ -30,9 +36,14 @@ import com.yswy.assetdashboard.csv.ParsedData
  * - 入れ直し(E06-02)と同じ道を通るので、「Driveから再構築できる」が
  *   毎回の同期で確かめられている
  *
- * 代わりに、同期のたびにbackupを全部落とす。ファイル数は月に数件なので
- * 当面は問題にならない。遅くなったら、modifiedTimeで変わったものだけ
- * 落とすようにする。
+ * 代わりに、同期のたびにbackupを全部読む。落とすのは中身が変わったものだけで、
+ * ほかは端末の写しから読む([BackupCopies]。中身のmd5をDriveの一覧と比べる。E02-08)。
+ * 作り直すときは写しからでも丸ごとなので、上の性質は変わらない。
+ *
+ * ## 何も変わっていなければ作り直さない(E02-09)
+ * backup・corrections・settingsの一覧(中身のmd5)とアプリの入れ物(版・入れた日時)が、前に作り直したときと同じなら、
+ * 作り直しても同じ中身になるので飛ばす。何か1つでも変われば丸ごと作り直すので、
+ * 「Driveから作り直せる」はCSVを取り込んだ同期のたびに確かめられる。
  *
  * ## 作り直せないときは今のキャッシュを残す
  * 一覧が取れない、ダウンロードが途中で失敗した、correctionsやsettingsが
@@ -126,6 +137,17 @@ object CacheSync {
 
         /** 作り直さなかった。今のキャッシュはそのまま。 */
         data class Kept(val reason: String) : Outcome
+
+        /**
+         * 入力が前に作り直したときと同じなので、作り直さなかった(E02-09)。今のキャッシュがそのままDriveと同じ。
+         * [fingerprint]は前に作り直したときの指紋。
+         */
+        data class Unchanged(
+            val fingerprint: String,
+            val backupFiles: Int,
+            val unreadable: List<String>,
+            val missingBackups: List<String>?,
+        ) : Outcome
     }
 
     fun Outcome.summary(): String = when (this) {
@@ -143,9 +165,27 @@ object CacheSync {
             append(" 指紋 ${snapshot.fingerprint}")
         }
         is Outcome.Kept -> "キャッシュは更新せず: $reason"
+        is Outcome.Unchanged -> buildString {
+            append("キャッシュ: Driveに変わりが無いので作り直さず (backup ${backupFiles}件")
+            if (unreadable.isNotEmpty()) append(", 読めず ${unreadable.size}件")
+            append(")")
+            when {
+                missingBackups == null -> append(" / processedの一覧を取れずbackupの抜けは未確認")
+                missingBackups.isNotEmpty() -> append(" / backupの無い取り込み済み ${missingBackups.size}件: ${missingBackups.joinToString(", ")}")
+            }
+            append(" 指紋 $fingerprint")
+        }
     }
 
-    suspend fun rebuild(api: DriveApi, folders: AppFolders, db: AppDatabase): Outcome {
+    /** 一度に落とすbackupの数(E02-08)。多すぎるとDriveに断られるので数本ずつ。 */
+    private const val PARALLEL_DOWNLOADS = 4
+
+    private class DownloadFailed(val fileName: String, cause: Exception) : Exception(cause)
+
+    /**
+     * @param copies 落としたbackupの写し(E02-08)。中身がDriveと同じものは落とし直さない。nullなら毎回全部落とす
+     */
+    suspend fun rebuild(api: DriveApi, folders: AppFolders, db: AppDatabase, copies: BackupCopies? = null): Outcome {
         val files = try {
             api.listFiles(folders.backup)
         } catch (e: Exception) {
@@ -155,19 +195,18 @@ object CacheSync {
             // 後から取り込んだものを後ろに。Metricの後勝ちがこの順序に依存する。
             .sortedBy { it.modifiedTime }
 
+        val contents = try {
+            fetchAll(api, files, copies)
+        } catch (e: DownloadFailed) {
+            // 読み直してもだめなら、通信の問題。次回は読める。欠けたまま入れ替えない。
+            Log.w(TAG, "backupを落とせない: ${e.fileName}", e.cause)
+            return Outcome.Kept("backupを落とせない: ${e.fileName}")
+        }
+        copies?.keepOnly(files.map { it.id }.toSet())
+
         val backups = mutableListOf<BackupReader.Backup>()
         val unreadable = mutableListOf<String>()
-        for (file in files) {
-            val bytes = try {
-                // 書いた直後で読めないことがあるので、少し待って読み直す(E02-06)
-                withRetry { api.download(file.id) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // 読み直してもだめなら、通信の問題。次回は読める。欠けたまま入れ替えない。
-                Log.w(TAG, "backupを落とせない: ${file.name}", e)
-                return Outcome.Kept("backupを落とせない: ${file.name}")
-            }
+        for ((file, bytes) in files.zip(contents)) {
             val backup = runCatching { BackupReader.parse(String(bytes, Charsets.UTF_8)) }.getOrNull()
             if (backup == null) {
                 Log.w(TAG, "backupの形を読めないので飛ばす: ${file.name}")
@@ -180,23 +219,40 @@ object CacheSync {
         // 同じ元ファイルのbackupが2つあれば(古い名前が片付かずに残った)、新しいほうだけ使う(E01-16)
         val latest = latestPerSource(backups)
 
+        // processed(backupの抜けを探す)・corrections・settingsの一覧は互いに関係しないので並べて取る(E02-09)
+        val (processed, correctionFiles, settingFiles) = coroutineScope {
+            listOf(folders.processed, folders.corrections, folders.settings)
+                .map { id -> async { runCatching { api.listFiles(id) }.getOrNull() } }
+                .awaitAll()
+        }
         // backupの抜けを探す。取れなくても作り直しは止めない(見えるように書くだけ)
-        val missing = try {
-            missingBackups(api.listFiles(folders.processed), latest)
-        } catch (e: Exception) {
-            Log.w(TAG, "processedの一覧を取れない", e)
+        if (processed == null) Log.w(TAG, "processedの一覧を取れない")
+        val missing = processed?.let { missingBackups(it, latest) }
+
+        // 入力(backup・corrections・settingsの中身とアプリの版)が前に作り直したときと同じなら、作り直しても同じなので飛ばす(E02-09)
+        // 入れ物の印が取れなければ、入れ直したかが分からないので毎回作り直す
+        val key = if (copies != null && copies.appStamp.isNotEmpty() && correctionFiles != null && settingFiles != null) {
+            inputKey(copies.appStamp, files, correctionFiles, settingFiles)
+        } else {
             null
         }
+        val last = copies?.lastRebuild()
+        if (key != null && last != null && last.first == key) {
+            return Outcome.Unchanged(last.second, files.size, unreadable, missing).also { Log.i(TAG, it.summary()) }
+        }
 
-        val corrections = Corrections.load(api, folders)
-            ?: return Outcome.Kept("correctionsを読めない")
-        val settings = Settings.load(api, folders)
-            ?: return Outcome.Kept("settingsを読めない")
-        val categories = CategoryStore.load(api, folders)
-            ?: return Outcome.Kept("明細のカテゴリを読めない")
-
-        // 基準価額の取り先(E05-09)。読めなくても作り直しは止めない(取り先が無いだけ。端末の控えは前のまま残す)
-        val fundSources = FundSourceStore.load(api, folders)
+        // 読むファイルも互いに関係しないので並べて読む(E02-09)
+        val (corrections, settings, categories, fundSources) = coroutineScope {
+            val c = async { Corrections.load(api, folders) }
+            val s = async { Settings.load(api, folders) }
+            val k = async { CategoryStore.load(api, folders) }
+            // 基準価額の取り先(E05-09)。読めなくても作り直しは止めない(取り先が無いだけ。端末の控えは前のまま残す)
+            val f = async { FundSourceStore.load(api, folders) }
+            Loaded(c.await(), s.await(), k.await(), f.await())
+        }
+        corrections ?: return Outcome.Kept("correctionsを読めない")
+        settings ?: return Outcome.Kept("settingsを読めない")
+        categories ?: return Outcome.Kept("明細のカテゴリを読めない")
 
         val snapshot = build(latest, corrections, settings, categories).copy(fundSources = fundSources)
 
@@ -209,9 +265,70 @@ object CacheSync {
             db.bankTransactionDao().insertAll(snapshot.transactions)
         }
 
+        // 入れ替えられたときだけ、入力の組み合わせを覚える。一覧を取ったあとに変わっていても、次は一覧が違うので作り直す
+        if (key != null) copies?.saveRebuild(key, snapshot.fingerprint)
+
         return Outcome.Rebuilt(snapshot, files.size, unreadable, missing).also {
             Log.i(TAG, it.summary())
         }
+    }
+
+    private data class Loaded(
+        val corrections: List<Corrections.Entry>?,
+        val settings: List<ItemEntity>?,
+        val categories: CategorySettings?,
+        val fundSources: List<com.yswy.assetdashboard.data.FundSource>?,
+    )
+
+    /**
+     * 作り直しの入力の組み合わせ(E02-09)。backupは並び順も効く(Metricの後勝ち)ので一覧の順のまま、
+     * corrections・settingsは名前順にして、IDと名前・md5・更新日時をつなげてハッシュを取る。
+     * アプリの入れ物の印([BackupCopies.appStamp]。版と入れた日時)も入れる(読み方・組み立て方を直したアプリでは、同じ入力でも中身が変わる)。
+     * md5の無いファイルがあれば、変わったかを確かめられないのでnull(毎回作り直す)。
+     */
+    fun inputKey(
+        appVersion: String,
+        backups: List<DriveApi.DriveFile>,
+        corrections: List<DriveApi.DriveFile>,
+        settings: List<DriveApi.DriveFile>,
+    ): String? {
+        val all = backups + corrections + settings
+        if (all.any { it.md5Checksum == null }) return null
+        fun line(tag: String, f: DriveApi.DriveFile) = "$tag|${f.id}|${f.name}|${f.md5Checksum}|${f.modifiedTime}"
+        val lines = listOf("v|$appVersion") +
+            backups.map { line("b", it) } +
+            corrections.sortedBy { it.name }.map { line("c", it) } +
+            settings.sortedBy { it.name }.map { line("s", it) }
+        return MessageDigest.getInstance("SHA-256").digest(lines.joinToString("\n").toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * backupの中身を、一覧と同じ順に返す(E02-08)。写しがDriveと同じならそれを使い、違う・無いものだけ数本ずつ並べて落とす。
+     * 1つでも落とせなければ[DownloadFailed](欠けたまま作り直さない)。
+     */
+    private suspend fun fetchAll(api: DriveApi, files: List<DriveApi.DriveFile>, copies: BackupCopies?): List<ByteArray> {
+        val gate = Semaphore(PARALLEL_DOWNLOADS)
+        val downloaded = AtomicInteger()
+        val contents = coroutineScope {
+            files.map { file ->
+                async {
+                    copies?.read(file) ?: gate.withPermit {
+                        downloaded.incrementAndGet()
+                        try {
+                            // 書いた直後で読めないことがあるので、少し待って読み直す(E02-06)
+                            withRetry { api.download(file.id) }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            throw DownloadFailed(file.name, e)
+                        }
+                    }.also { copies?.write(file.id, it) }
+                }
+            }.awaitAll()
+        }
+        Log.i(TAG, "backup ${files.size}件のうち${downloaded.get()}件を落とし、残りは写しから")
+        return contents
     }
 
     /**

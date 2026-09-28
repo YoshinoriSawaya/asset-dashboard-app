@@ -28,13 +28,14 @@ object FullSync {
         }
     }
 
-    suspend fun run(api: DriveApi, db: AppDatabase): Result {
+    suspend fun run(api: DriveApi, db: AppDatabase, copies: BackupCopies? = null): Result {
         val setup = DriveFolderSetup.ensure(api)
         val inbox = InboxSync.run(api, setup.folders, db.ingestedFileDao())
 
         // 取り込みで増えたbackupも含めて作り直す。取り込みが全部失敗していても、
         // 既存のbackupからキャッシュは作れるので必ず走らせる。
-        val cache = CacheSync.rebuild(api, setup.folders, db)
+        // 変わっていないbackupは写しから読む(E02-08)
+        val cache = CacheSync.rebuild(api, setup.folders, db, copies)
 
         return Result(setup.created, inbox, cache)
     }

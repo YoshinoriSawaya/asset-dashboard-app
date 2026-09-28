@@ -52,6 +52,10 @@ Drive/inbox のCSV
 `InboxSync` がinboxの一周を、`CacheSync` がキャッシュの作り直しを受け持つ。
 キャッシュを差分でなく毎回作り直す理由は
 [E02-03](../issues/tasks/E02-03-drive-to-cache-sync.md)。
+作り直しは丸ごとだが、backupは中身がDriveと同じ(md5が一致する)端末の写しがあれば落とし直さない
+([E02-08](../issues/tasks/E02-08-backup-local-copy.md))。何を使うかは毎回Driveの一覧で決める。
+backup・corrections・settingsの一覧(md5)とアプリの入れ物(版・入れた日時)が前に作り直したときと同じなら、作り直さない
+([E02-09](../issues/tasks/E02-09-skip-unchanged-rebuild.md))。
 `DriveSession` が認可・トークン切れ・オフラインを引き受けるので、
 UIはこの流れを気にしなくていい。
 
@@ -95,7 +99,7 @@ Roomにだけ書いてよいものは無い。項目の定義もアプリで入�
 画面から保存するときは、Driveの今のファイルを読み直してから、そのものだけを変えて書く
 (画面が古い内容を持ったまま、ほかの決まりを上書きしないように)。
 ただし `funds.json` はDBの中身に関係しないので、画面から保存したときはキャッシュを作り直さず、
-Driveに書けた内容をそのまま控えに書く(作り直しはbackupを全部落とし直すので、保存のたびに待たされる)。
+Driveに書けた内容をそのまま控えに書く(作り直しはbackupを全部読み直すので、保存のたびに待たされる)。
 詳細は [E07-29](../issues/tasks/E07-29-category-budgets.md)・[E05-09](../issues/tasks/E05-09-nav-alert.md)・[E05-17](../issues/tasks/E05-17-faster-fund-save.md)。
 
 ### 項目にしない系列は `#` で始める

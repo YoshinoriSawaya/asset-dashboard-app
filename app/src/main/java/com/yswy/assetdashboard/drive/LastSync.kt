@@ -60,7 +60,12 @@ data class LastSync(
             val skippedRows = inbox.skipped.values.sumOf { it.size }
             val cacheKept = result.cache is CacheSync.Outcome.Kept
             // backupの抜け(E01-16)。取り込み直さないと、DBを失ったときに戻せない
-            val missingBackups = (result.cache as? CacheSync.Outcome.Rebuilt)?.missingBackups?.size ?: 0
+            val missingBackups = when (val cache = result.cache) {
+                is CacheSync.Outcome.Rebuilt -> cache.missingBackups?.size ?: 0
+                // 作り直さなかったとき(E02-09)も、抜けは毎回探している
+                is CacheSync.Outcome.Unchanged -> cache.missingBackups?.size ?: 0
+                is CacheSync.Outcome.Kept -> 0
+            }
 
             val summary = buildList {
                 add("取り込み${ok}件")
