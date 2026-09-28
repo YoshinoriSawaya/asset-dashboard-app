@@ -233,6 +233,25 @@ USBでつなげないときは、APKをDriveに上げてスマホで開いても
 ```
 
 「最後に出した日」の記録は `shared_prefs/notify.xml`。消すと同じ通知がもう一度出る。
+中身は `last_notified` という1つのJSON(通知の鍵 → 日付)。基準価額の通知の鍵は `navup:<区分>|<ファンド名>:up`(平均取得単価)・
+`navpeak:…:up`(決めた最高値)。**どのファンドで出たかは、通知欄ではなくこの記録で見る**: 通知欄には前に出た通知が残り、
+`cmd notification` に全部消すコマンドは無い。名前を出さずに比べるときは、JSONを読んで取り先の区分と名前で突き合わせる。
+
+## 同期の速さを見る(E02-08・E02-09)
+
+落としたbackupの写しは `files/backup-copies/<DriveのファイルID>.json`、前に作り直したときの入力の組み合わせと指紋は
+同じ場所の `rebuild.txt`。
+
+```powershell
+& $adb -s emulator-5554 logcat -c
+# 「Driveと同期」を押したあと
+& $adb -s emulator-5554 logcat -d -v time -s CacheSync InboxSync
+# 「backup 38件のうち0件を落とし…」「キャッシュ: Driveに変わりが無いので作り直さず … 指紋 …」
+```
+
+- **必ず作り直させたいとき**は `rebuild.txt` を消す(か壊す)。アプリを入れ直しても作り直す(入れた日時が組み合わせに入る)
+- 写しを消す・壊すと、そのファイルだけ落とし直す
+- 指紋は金額から作るので、値は出さずに前回と同じかだけ比べる
 
 ## 確認用の一時データを入れる
 
@@ -281,7 +300,8 @@ Get-Content -Raw -Encoding UTF8 tmp.sql | & $adb -s emulator-5554 shell sqlite3 
 | アラームの予約が消えた | `am force-stop` はアプリのアラームも消す。更新・再起動・アプリを開くと予約し直される |
 | 再起動したのにアラームが予約されない | `BOOT_COMPLETED` は起動から1分ほど遅れて届く。待ってから見る |
 | adbでロックを試したい | `adb shell locksettings set-pin 1234` で端末にPINを付ける。消すのは `locksettings clear --old 1234` |
-| PowerShellで自作の関数 `Where` が動かない | `where` は `Where-Object` の別名。別の名前にする |
+| PowerShellで自作の関数 `Where` が動かない | `where` は `Where-Object` の別名。別の名前にする。`R` も `Invoke-History` の別名で同じことが起きる(E05-15) |
+| 一致を確かめるだけのつもりが、値が画面に出た | PowerShellの `-eq` は、左が配列だと一致した要素を返す。`"一致: " + ($a -eq $b)` は値を出してしまう。比べる前に1つに絞り、`[bool]` か `if` で真偽だけにする(E05-15の検証で最高値の日付と%を出した) |
 | リリース版を入れると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | デバッグ版と署名が違う。デバッグ版を消してから入れる |
 | リリースのビルドで `Configuration cache problems` | `doFirst` の中でスクリプトの変数を直接つかんでいた。ローカルに写してから使う |
 | adbのスワイプで、入力欄に「to to to…」と文字が入る | 入力欄にフォーカスが残ってソフトキーボードが開いたまま、スワイプがジェスチャー入力になった。文字を打ったあとは `input keyevent 4` でキーボードを閉じ、`dumpsys input_method` の `mInputShown=false` を見てからスクロールする([E07-23](../issues/tasks/E07-23-uncategorized-review.md)) |
