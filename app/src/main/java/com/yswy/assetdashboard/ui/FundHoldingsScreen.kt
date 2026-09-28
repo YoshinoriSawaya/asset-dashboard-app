@@ -60,6 +60,8 @@ fun FundHoldingsScreen(
     onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
     /** 今すぐ基準価額を取る。取れた本数 */
     onRefreshNavs: suspend () -> Int = { 0 },
+    /** そのファンドだけ今すぐ基準価額を取る(E05-16)。取れたらtrue */
+    onRefreshNav: suspend (FundSource) -> Boolean = { false },
     /** 取り先の無いファンドをまとめて名前で探して保存する(E05-10)。結果の一言 */
     onFindMissing: suspend () -> String = { "" },
     /** ファンド名で取り先の候補を探す(E05-10)。探せなければnull */
@@ -76,6 +78,15 @@ fun FundHoldingsScreen(
     var peaks by remember { mutableStateOf(loadPeaks()) }
     var navMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    // 1本だけ取ったら(E05-16)、行と合計が見直されるように控えを読み直す
+    val refreshOne: suspend (FundSource) -> Boolean = { source ->
+        onRefreshNav(source).also { ok ->
+            if (ok) {
+                navs = loadNavs()
+                peaks = loadPeaks()
+            }
+        }
+    }
 
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
@@ -146,6 +157,7 @@ fun FundHoldingsScreen(
                 saving = saving,
                 onSearch = onSearch,
                 onLoadHistory = onLoadHistory,
+                onRefreshNav = refreshOne,
                 onSaveSource = { section, name, isin, code, done ->
                     onSaveSource(section, name, isin, code) { error ->
                         if (error == null) sources = loadSources()
@@ -172,6 +184,7 @@ fun FundHoldingsScreen(
                     saving = saving,
                     onSearch = onSearch,
                     onLoadHistory = onLoadHistory,
+                    onRefreshNav = refreshOne,
                     onSaveSource = { section, name, isin, code, done ->
                         onSaveSource(section, name, isin, code) { error ->
                             if (error == null) sources = loadSources()
@@ -198,6 +211,7 @@ private fun FundRow(
     onLoadHistory: suspend (FundSource) -> List<Nav>?,
     onSaveSource: (String, String, String, String, (String?) -> Unit) -> Unit,
     onSaveBase: (String, String, NavBase, (String?) -> Unit) -> Unit = { _, _, _, _ -> },
+    onRefreshNav: suspend (FundSource) -> Boolean = { false },
 ) {
     val money = LocalMoney.current
     val key = fund.section + "|" + fund.name
@@ -255,7 +269,7 @@ private fun FundRow(
                         NavBase.PEAK -> {
                             val d = FundNow.fromPeak(nav, peak)
                             if (peak == null || d == null) {
-                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は「今すぐ基準価額を取る」か、次の朝の確認で取ります")
+                                Label("基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値は、行を開いて「このファンドの基準価額を取る」か「今すぐ基準価額を取る」を押すか、次の朝の確認で取ります")
                             } else {
                                 Text(
                                     "基準価額 ${money.unit(nav.yen)}(${nav.date}) ・ 最高値 ${money.unit(peak.yen)}(${peak.date})より ${signedRatio(money, d)}",
@@ -273,6 +287,7 @@ private fun FundRow(
                 }
                 if (open) {
                     sources.firstOrNull { it.fundKey == key }?.let { source ->
+                        NavRefreshButton(source, onRefreshNav)
                         NavHistorySection(source, if (sold) null else s.unitCost, fund.sales, onLoadHistory)
                         if (!sold) BaseEditor(source.base, saving) { b, done -> onSaveBase(fund.section, fund.name, b, done) }
                     }
@@ -325,6 +340,32 @@ private fun SalesText(fund: FundHoldings.Fund, nav: Nav?, hasSource: Boolean) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
+    }
+}
+
+/**
+ * そのファンドだけ今すぐ基準価額を取る(E05-16)。最新の点と設定来の最高値を端末に控える(まとめて取るのと同じ)。
+ * 取れなければ前に取った値のまま。
+ */
+@Composable
+private fun NavRefreshButton(source: FundSource, onRefresh: suspend (FundSource) -> Boolean) {
+    var message by remember(source) { mutableStateOf<String?>(null) }
+    var busy by remember(source) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Row(modifier = Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(enabled = !busy, onClick = {
+            busy = true
+            message = "取得中..."
+            scope.launch {
+                message = if (onRefresh(source)) {
+                    "取れました"
+                } else {
+                    "取れませんでした(通信できないか、取り先が違います)。前に取った値のままです"
+                }
+                busy = false
+            }
+        }) { Text("このファンドの基準価額を取る") }
+        message?.let { Label(it) }
     }
 }
 

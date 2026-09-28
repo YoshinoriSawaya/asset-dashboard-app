@@ -387,6 +387,16 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * そのファンドだけ今すぐ基準価額を取る(E05-16)。取れたらtrue。通知はしない。
+     * 控えには取れた1本だけを重ねるので、他のファンドの控えはそのまま。
+     */
+    suspend fun refreshNav(source: FundSource): Boolean {
+        val history = NavFetcher.fetchHistory(source)?.takeIf { it.isNotEmpty() } ?: return false
+        fundStore.saveFromHistories(mapOf(source.fundKey to history))
+        return true
+    }
+
+    /**
      * ファンドの基準価額の取り先を保存する(E05-09)。Driveの funds.json を読み直して、そのファンドだけ変える。
      * ISINと協会コードが空ならやめる。形が合わなければ保存しない。
      */

@@ -300,6 +300,7 @@ private fun Screens(
             onSaveSource = viewModel::saveFundSource,
             onSaveBase = viewModel::saveFundBase,
             onRefreshNavs = viewModel::refreshNavs,
+            onRefreshNav = viewModel::refreshNav,
             onFindMissing = viewModel::findMissingSources,
             onSearch = viewModel::searchFunds,
             onLoadHistory = viewModel::navHistory,
